@@ -1,0 +1,508 @@
+#:kivy 1.1.0
+
+ScreenManager:
+    id: screen_manager
+    #transition: FadeTransition()
+    MainScreen:
+        id: main_screen
+        name: 'MainScreen'
+        manager: 'screen_manager'
+    AboutScreen:
+        id: about_screen
+        name: 'AboutScreen'
+        manager: 'screen_manager'
+    InitializeDirectScreen:
+        id: initializedirect_screen
+        name: 'InitializeDirectScreen'
+        manager: 'screen_manager'
+    InitializeSetAngleScreen:
+        id: initializesetangle_screen
+        name: 'InitializeSetAngleScreen'
+        manager: 'screen_manager'
+    InitializeOnePointScreen:
+        id: initializeonepoint_screen
+        name: 'InitializeOnePointScreen'
+        manager: 'screen_manager'
+    InitializeTwoPointScreen:
+        id: initializetwopoint_screen
+        name: 'InitializeTwoPointScreen'
+        manager: 'screen_manager'
+    InitializeThreePointScreen:
+        id: initializethreepoint_screen
+        name: 'InitializeThreePointScreen'
+        manager: 'screen_manager'
+    EditPointsScreen:
+        id: editpoints_screen
+        name: 'EditPointsScreen'
+        manager: 'screen_manager'
+    EditDatumScreen:
+        id: editdatums_screen
+        name: 'EditDatumsScreen'
+        manager: 'screen_manager'
+    EditUnitsScreen:
+        id: editunits_screen
+        name: 'EditUnitsScreen'
+        manager: 'screen_manager'
+    EditPrismsScreen:
+        id: editprisms_screen
+        name: 'EditPrismsScreen'
+        manager: 'screen_manager'
+
+
+<MainScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        BoxLayout:
+            pos_hint: {'top':1}
+            size_hint_y: .25
+            ActionView:
+                use_separator: True
+                ActionPrevious:
+                    title: 'pyEDM'
+                    with_previous: False
+                ActionOverflow:
+                ActionButton:
+                    icon: 'atlas://data/images/defaulttheme/audio-volume-high'
+                ActionButton:
+                    important: True
+                    text: 'Important'
+                ActionGroup:
+                    text: 'Help'
+                    ActionButton:
+                        text: 'About'
+                        on_press: app.root.current = 'AboutScreen'
+                ActionGroup:
+                    text: 'Edit'
+                    ActionButton:
+                        text: 'The last point'
+                    ActionButton:
+                        text: 'Points'
+                        on_press: app.root.current = 'EditPointsScreen'
+                    ActionButton:
+                        text: 'Datums'
+                        on_press: app.root.current = 'EditDatumsScreen'
+                    ActionButton:
+                        text: 'Units'
+                        on_press: app.root.current = 'EditUnitsScreen'
+                    ActionButton:
+                        text: 'Prims'
+                        on_press: app.root.current = 'EditPrismsScreen'
+                ActionGroup:
+                    text: 'Setup'
+                    ActionButton:
+                        text: 'Configure Station'
+                    ActionButton:
+                        text: 'Direct'
+                        on_press: app.root.current = 'InitializeDirectScreen'
+                    ActionButton:
+                        text: 'Set Angle Only'
+                        on_press: app.root.current = 'InitializeSetAngleScreen'
+                    ActionButton:
+                        text: 'Shoot One Point'
+                        on_press: app.root.current = 'InitializeOnePointScreen'
+                    ActionButton:
+                        text: 'Over One Point + Shoot One Point'
+                        on_press: app.root.current = 'InitializeTwoPointScreen'
+                    ActionButton:
+                        text: 'Shoot Two Points'
+                        on_press: app.root.current = 'InitializeThreePointScreen'
+                ActionGroup:
+                    text: 'File'
+                    ActionButton:
+                        text: 'Open CFG'
+                        on_release: root.show_load_cfg()
+                    ActionButton:
+                        text: 'Save CFG as'
+                        on_release: root.show_save()
+                    ActionButton:
+                        text: 'Exit'
+        BoxLayout:
+            padding: (5,5,5,2.55)
+            spacing: 5
+            orientation: 'horizontal'
+            Button:
+                text: 'Button1'
+                on_release: root.button_action('Button1')
+            Button:
+                text: 'Button2'
+                on_release: root.button_action('Button2')
+            Button:
+                text: 'Button3'
+                on_release: root.button_action('Button3')
+        BoxLayout:
+            padding: (5,2.5,5,2.5)
+            spacing: 5
+            orientation: 'horizontal'
+            Button:
+                text: 'Button4'
+                on_release: root.button_action('Button4')
+            Button:
+                text: 'Button5'
+                on_release: root.button_action('Button5')
+            Button:
+                text: 'Button6'
+                on_release: root.button_action('Button6')
+        BoxLayout:
+            padding: (5,2.5,5,5)
+            spacing: 5
+            orientation: 'horizontal'
+            Button:
+                text: 'Record'
+                on_release: root.button_action('Record')
+            Button:
+                text: 'Continue'
+                on_release: root.button_action('Continue')
+            Button:
+                text: 'Measure'
+                on_release: root.button_action('Measure')
+
+
+<AboutScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        Label:
+            text: 'EDMpy by Shannon McPherron and Harold Dibble'
+            height: .25
+        BoxLayout:
+            orientation: 'vertical'
+            height: 1
+            Button:
+                text: 'OK'
+                on_press: app.root.current = 'MainScreen'
+                default_size: None, dp(56)
+                default_size_hint: 1, None
+
+
+<InitializeDirectScreen>:
+    name: 'datums'
+
+
+<datumlist>:
+    RecycleBoxLayout:
+        default_size: None, dp(56)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+
+
+
+<MessageBox>:
+    title: 'Popup Message Box'
+    size_hint: None, None
+    size: 400, 400
+
+    BoxLayout:
+        orientation: 'vertical'
+        Label:
+            text: app.root.rv_layout.selected_value
+        Button:
+            size_hint: 1, 0.2
+            text: 'OK'
+            on_press:
+                root.dismiss()
+
+
+<SelectableButton>:
+    # Draw a background to indicate selection
+    canvas.before:
+        Color:
+            rgba: (0.0, 0.9, 0.1, 0.3)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+
+<RV>:
+    rv_layout: layout
+    viewclass: 'SelectableButton'
+    SelectableRecycleBoxLayout:
+        id: layout
+        default_size: None, dp(56)
+        default_size_hint: 0.1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: "vertical"
+
+
+<DatumLister>:
+    BoxLayout:
+        orientation: "vertical"
+        size_hint_y: None
+        height: 30
+        Label:
+            text: 'Select a datum or define a new one.'
+        Button:
+            text: "New"
+        Button:
+            text: "Cancel"
+
+
+<InitializeSetAngleScreen>:
+    BoxLayout:
+        size_hint_y: None
+        orientation: "vertical"
+        Label:
+            text: 'Set an angle. Either enter the angle to the point or from the point.'
+        BoxLayout:
+            orientation: "horizontal"
+            Label:
+                text: 'Anlge to the point :'
+            TextInput:
+                id: foreshot
+        BoxLayout:
+            orientation: "horizontal"
+            Label:
+                text: 'or angle from the point :'
+            TextInput:
+                id: backshot
+        BoxLayout:
+            orientation: "horizontal"
+            Button:
+                text: "Set Angle"
+                on_press: root.set_angle(foreshot.text, backshot.text)
+            Button:
+                text: "Cancel"
+                on_press: app.root.current = 'MainScreen'
+
+
+<InitializeOnePointScreen>:
+    BoxLayout:
+        size_hint_y: None
+        orientation: "vertical"
+
+
+<InitializeOnePointHeader>:
+    Label:
+        text: 'Initialize the station by recording one known point.  This method assumes that the horizontal angle is already correct. Select the datum to record.'
+
+
+<InitializeOnePointFooter>:
+    BoxLayout:
+        orientation: "horizontal"
+        Button:
+            text: "Record datum"
+            on_press: root.one_point()
+        Button:
+            text: "Cancel"
+            on_press: app.root.current = 'MainScreen'
+
+<EditPointsScreen>:
+    BoxLayout:
+        orientation: "horizontal"
+        Button:
+            text: "Cancel"
+            on_press: app.root.current = 'MainScreen'
+
+
+<EditUnitsScreen>:
+    BoxLayout:
+        orientation: "horizontal"
+        Button:
+            text: "Cancel"
+            on_press: app.root.current = 'MainScreen'
+
+
+<EditPrismsScreen>:
+    BoxLayout:
+        orientation: "horizontal"
+        Button:
+            text: "Cancel"
+            on_press: app.root.current = 'MainScreen'
+
+
+<EditDatumsScreen>:
+    BoxLayout:
+        size_hint_y: None
+        orientation: "vertical"
+        BoxLayout:
+            Label:
+                text: 'Define/Edit a datum.'
+            Button:
+                text: "Record with Station"
+        BoxLayout:
+            orientation: "horizontal"
+            Label:
+                text: 'Name :'
+            TextInput:
+                id: 'name'
+        BoxLayout:
+            orientation: "horizontal"
+            Label:
+                text: 'X :'
+            TextInput:
+                id: 'X'
+        BoxLayout:
+            orientation: "horizontal"
+            Label:
+                text: 'Y :'
+            TextInput:
+                id: 'Y'
+        BoxLayout:
+            orientation: "horizontal"
+            Label:
+                text: 'Z :'
+            TextInput:
+                id: 'Z'
+        BoxLayout:
+            orientation: "horizontal"
+            Button:
+                text: "Save"
+            Button:
+                text: "Cancel"
+                on_press: app.root.current = 'MainScreen'
+
+
+<LoadDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Open"
+                on_release: root.load_cfg(filechooser.path, filechooser.selection)
+
+<SaveDialog>:
+    text_input: text_input
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            on_selection: text_input.text = self.selection and self.selection[0] or ''
+
+        TextInput:
+            id: text_input
+            size_hint_y: None
+            height: 30
+            multiline: False
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Save"
+                on_release: root.save(filechooser.path, text_input.text)
+
+
+## code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
+
+<HeaderCell>:
+    size_hint: (None, None)
+    text_size: self.size
+    halign: "center"
+    valign: "middle"
+    height: '30dp'
+    background_disabled_normal: '' 
+    disabled_color: (1, 1, 1, 1)
+    canvas.before:
+        Color:
+            rgba: 0.165, 0.165, 0.165, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    on_release: root.parent.parent.parent.parent._generate_table(self.text)
+
+
+<TableHeader>:
+    header: header
+    bar_width: 0
+    do_scroll: False
+    size_hint: (1, None)
+    effect_cls: "ScrollEffect"
+    height: '30dp'
+    GridLayout:
+        id: header
+        rows: 1
+        size_hint: (None, None)
+        width: self.minimum_width
+        height: self.minimum_height
+
+
+<ScrollCell>:
+    canvas.before:
+        Color:
+            rgba: [0.23, 0.23, 0.23, 1] if root.is_even else [0.2, 0.2, 0.2, 1]
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    text: root.text
+    font_size: "12dp"
+    halign: "center"
+    valign: "middle"
+    text_size: self.size
+    size_hint: 1, 1
+    height: 60
+    width: 400
+
+
+<TableData>:
+    rgrid: rgrid
+    scroll_type: ['bars', 'content']
+    bar_color: [0.2, 0.7, 0.9, 1]
+    bar_inactive_color: [0.2, 0.7, 0.9, .5]
+    do_scroll_x: True
+    do_scroll_y: True
+    effect_cls: "ScrollEffect"
+    viewclass: "ScrollCell"
+    RecycleGridLayout:
+        id: rgrid
+        rows: root.nrows
+        cols: root.ncols
+        size_hint: (None, None)
+        width: self.minimum_width
+        height: self.minimum_height
+
+
+<DfguiWidget>:
+    panel1: data_frame_panel
+    panel3: fil_select_panel
+    do_default_tab: False
+    TabbedPanelItem:
+        text: 'Data Frame'
+        on_release: root.open_panel1()
+        DataframePanel:
+            id: data_frame_panel
+    TabbedPanelItem:
+        text: 'Filters'
+        FilterPanel:
+            id: fil_select_panel
+
+
+<DataframePanel>:
+    orientation: 'vertical'
+
+
+<FilterPanel>:
+    filter_list: filter_list
+    orientation: 'vertical'
+    ScrollView:
+        do_scroll_x: False
+        do_scroll_y: True
+        size_hint: 1, 1
+        scroll_timeout: 150
+        GridLayout:
+            id: filter_list
+            padding: "10sp"
+            spacing: "5sp"
+            cols:1
+            row_default_height: '55dp'
+            row_force_default: True
+            size_hint_y: None
+
+## end code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
