@@ -1,0 +1,215 @@
+                            Case "UNITFIELDS"
+                                options(17) = ""
+                                dt = UCase(dt)
+                                dt = Replace(dt, ",SUFFIX", "")
+                                Do Until Len(dt) = 0
+                                    e = InStr(dt, " ")
+                                    If e = 0 Then e = Len(dt) + 1
+                                    If options(17) = "" Then
+                                        options(17) = Left(dt, e - 1)
+                                    Else
+                                        options(17) = options(17) + "," + Left(dt, e - 1)
+                                    End If
+                                    dt = LTrim(Mid(dt, e))
+                                Loop
+
+                                If options(17) <> "" Then
+                                    b = InStr(options(17), ",")
+                                    If b = 0 Then
+                                        unitname = Trim(options(17))
+                                    Else
+                                        unitname = Trim(leftstr(options(17), b - 1))
+                                    End If
+                                Else
+                                    unitname = "unit"
+                                End If
+
+                                '------------------------------------------
+                                'Set limits for units
+                                '------------------------------------------
+                            Case "LIMIT"
+                                dt = UCase(dt)
+                                f = 0
+                                Do Until Len(dt) = 0
+                                    e = InStr(dt, " ")
+                                    If e = 0 Then e = Len(dt) + 1
+                                    f = f + 1
+                                    temp(f) = Left(dt, e - 1)
+                                    dt = LTrim(Mid(dt, e))
+                                Loop
+                                tempunitname = temp(1)
+                                For a = 1 To unitlimits
+                                    If Trim(limitname(a)) = tempunitname Then
+                                        errorcode = 95
+                                        errormessage = tempunitname + " defined twice."
+                                        Exit Do
+                                    End If
+                                Next a
+                                Select Case temp(2)
+                                    Case "RECT"
+                                        If f <> 6 Then
+                                            errorcode = 94
+                                            errormessage = "Format RECT as Name RECT X1 Y1 X2 Y2"
+                                            Exit Do
+                                        End If
+                                        unitlimits = unitlimits + 1
+                                        limitname(unitlimits) = tempunitname
+                                        limits(unitlimits, 1) = CDbl(temp(3))
+                                        limits(unitlimits, 2) = CDbl(temp(4))
+                                        limits(unitlimits, 3) = CDbl(temp(5))
+                                        limits(unitlimits, 4) = CDbl(temp(6))
+
+                                    Case Else
+                                        errormessage = "Missing unit type."
+                                        errorcode = 81
+                                        Exit Do
+
+                                End Select
+
+                            if key_field == "SITE":
+                                EDM.sitename = data_value      
+
+                            if key_field == "PRINTER":
+                                EDM.printer = data_value
+
+                            if key_field == "TAMISRATE":
+                                pass
+
+                            if key_field == "VHDORXYZ":
+                                pass
+
+                                '--------------------------------------------------------
+                                ' If we reach this point, the line must begin with either
+                                ' a variable or unit name.  Otherwise it is an error.
+                                '--------------------------------------------------------
+                            Case Else
+
+                                errorflag = 1
+                                '-------------------------------------
+                                ' First check to see if its an already
+                                ' defined variable.
+                                '-------------------------------------
+                                For c = 1 To vars
+
+                                    'check if defined variable
+
+                                    If varlist(c) = key Then
+                                        b = InStr(dt, " ") ' look for space
+                                        If b = 0 Then b = Len(dt) + 1 'no value list
+
+                                        '-------------------------------------
+                                        'variable name and data
+                                        '-------------------------------------
+                                        varn = UCase(LTrim(RTrim(Left(dt, b - 1))))
+                                        dat = LTrim(RTrim(Mid(dt, b + 1)))
+
+                                        '-------------------------------------
+                                        ' check for possible commands
+                                        '-------------------------------------
+                                        Select Case varn
+                                            Case "INPUT"
+                                                Select Case UCase(dat)
+                                                    Case "TEXT"
+                                                        vtype(c) = 1
+                                                    Case "NUMERIC"
+                                                        vtype(c) = 2
+                                                    Case "INSTRUMENT"
+                                                        vtype(c) = 3
+                                                    Case "MENU"
+                                                        vtype(c) = 4
+                                                    Case "UNIT"
+                                                        vtype(c) = 5
+
+                                                        '---------------------
+                                                        'For CC system only.
+                                                        '---------------------
+                                                    Case "SQID"
+                                                        vtype(c) = 6
+                                                        vlen(c) = 11
+                                                        If options(10) = "" Then
+                                                            errorcode = 7
+                                                            errormessage = "SQIDFILE option must be specified first."
+                                                            Exit Do
+                                                        End If
+
+                                                    Case Else
+                                                        errorcode = 7
+                                                        errormessage = Left(dat, 20) + " is an unrecognized INPUT type. "
+                                                        Exit Do
+                                                End Select
+
+                                            Case "DEFAULT"
+                                                vardefault(c) = dat
+
+                                            Case "PRINT"
+                                                dat = UCase(Left(dat, 1))
+                                                If dat = "Y" Then varprint(c) = True
+
+                                            Case "PROMPT"
+                                                varprompt(c) = dat
+                                                If Len(varprompt(c)) > 60 Then varprompt(c) = Left(varprompt(c), 60)
+
+                                            Case "MENULIST"
+                                                vmenu(c) = ""
+                                                Do Until Len(dat) = 0
+                                                    e = InStr(dat, " ")
+                                                    If e = 0 Then e = Len(dat) + 1
+                                                    If vmenu(c) = "" Then
+                                                        vmenu(c) = UCase(Left(dat, e - 1))
+                                                    Else
+                                                        vmenu(c) = vmenu(c) + "," + UCase(Left(dat, e - 1))
+                                                    End If
+                                                    dat = LTrim(Mid(dat, e))
+                                                Loop
+
+                                            Case "VARLEN"
+                                                vlen(c) = CInt(dat)
+
+                                            Case "CARRY"
+                                                vcarry(c) = True
+
+                                            Case "INCREMENT"
+                                                vincr(c) = True
+
+                                            Case "REQUIRED"
+                                                varrequired(c) = True
+
+                                            Case "VARLOC"
+
+                                            Case Else
+                                                errorcode = 3
+                                                errormessage = "Unrecognized command " + varn + " "
+                                                Exit Do
+                                        End Select
+
+                                        errorflag = 0
+                                        Exit For
+                                    End If
+                                Next c
+                                If errorflag = 1 Then
+                                    errorcode = 2
+                                    errormessage = "No FIELD statement or unrecognized command " + key + ". "
+                                    Exit Do
+                                End If
+                        End Select
+                    Else
+                        errorcode = 5
+                        errormessage = "Unrecognized statement or field."
+                        Exit Do
+                    End If
+                End If
+            Loop
+            file2.Close()
+            file2.Dispose()
+
+            If errorcode = 0 Then
+                Cursor.Current = Cursors.Default
+                answer = MsgBox("This file will be converted to EDM-Mobile format.", MsgBoxStyle.OkCancel, "EDM-Mobile")
+                If answer = 1 Then
+                    needtoconvert = 1
+                    Cursor.Current = Cursors.WaitCursor
+                Else
+                    errorcode = 100
+                    errormessage = "The configuration file must be converted to EDM-Mobile format for this program to work."
+                End If
+            End If

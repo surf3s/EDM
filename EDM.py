@@ -23,8 +23,16 @@ from kivy.uix.tabbedpanel import TabbedPanel
 import os
 import string
 import random
+import numpy as np
+import datetime
+import pandas as pd 
+
 
 from collections import OrderedDict
+
+
+
+
 # get anglr.py library
 # or get angles.py library (looks maybe better)
 
@@ -165,8 +173,8 @@ class datums:
     MAX_DATUMS = 100
     
     class datum:
-        def __init__(self):
-            self.name = name
+        def __init__(self, datum_name):
+            self.name = datum_name
             self.x = 0
             self.y = 0
             self.z = 0
@@ -174,17 +182,21 @@ class datums:
     
     def __init__(self, filename):
         self.filename = filename
-        # check to see if this files exists already and if so read in the datums
-        self.datums = []
+        if os.path.exists(self.filename):
+            self.datums = pd.read_csv(self.filename)
+        else:
+            self.datums = pd.DataFrame(columns = ['Name','X','Y','Z','Date_Created'])
+            self.datums.set_index('Name')
+            self.save()
+
+    def save(self):
+        self.datums.to_csv(self.filename)
 
     def count(self):
-        return(len(self.datums))
+        return(self.datums.shape[0])
 
     def names(self):
-        name_list = []
-        for datum in self.datums:
-            name_list.append(datum.name)
-        return(name_list)
+        return(self.datums.loc[:,'Name'])
 
     def select(self):
         # need code that build a list of datum names with an add new and cancel button
@@ -196,7 +208,6 @@ class datums:
         # need code that makes input boxes for a datum item
         # needs a name box, XYZ boxes, a record with station and cancel button
         pass
-
 
 class prisms:
     MAX_PRISMS = 20
@@ -501,7 +512,6 @@ class cfg:
     def save(self):
         pass
 
-
 class totalstation:
     def __init__(self, make, model):
         if make=='':
@@ -632,17 +642,14 @@ class totalstation:
     def calculate_angle(self):
         pass
 
-
 class LoadDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
-
 
 class SaveDialog(FloatLayout):
     save = ObjectProperty(None)
     text_input = ObjectProperty(None)
     cancel = ObjectProperty(None)
-
 
 class Root(FloatLayout):
     loadfile = ObjectProperty(None)
@@ -678,25 +685,19 @@ class Root(FloatLayout):
     def button_action(self, button_name):
         pass
 
-
 class EditDatums(Screen):
     pass
-
-
 
 class MainScreen(Screen):
     pass
 
-
 class InitializeOnePointHeader(Label):
     pass
-
 
 class InitializeDirectScreen(Screen):
     def __init__(self,**kwargs):
         super(InitializeDirectScreen, self).__init__(**kwargs)
         self.add_widget(DatumLister())
-
 
 class InitializeSetAngleScreen(Screen):
     def set_angle(self, foreshot, backshot):
@@ -740,9 +741,6 @@ class EditPrismsScreen(Screen):
 class EditUnitsScreen(Screen):
     pass
 
-
-class EditDatumsScreen(Screen):
-    pass
 
 
 class datumlist(RecycleView, Screen):
@@ -807,9 +805,15 @@ class AboutScreen(Screen):
 #sm.add_widget(InitializeDirectScreen(name='InitializeDirect'))
 #sm.add_widget(MainScreen(name='main'))
 
+class EditDatumsScreen(Screen):
+    def __init__(self,**kwargs):
+        super(EditDatumsScreen, self).__init__(**kwargs)
+        df = EDMpy.edm_datums.datums 
+        self.add_widget(DfguiWidget(df))
+
 class EDMpy(App):
     title = 'EDMpy'
-
+    edm_datums = datums('EDM_datums.csv')
     def build(self):
         self.computer = 'WINDOWS'
         self.printer = False
@@ -820,20 +824,17 @@ class EDMpy(App):
             self.cfg_file = edm_ini.get_value("EDM", "CFG")
             cfg = cfg(self.cfg_file)
             cfg.load()
-        edm_points = points(self.database + '_points')
-        edm_units = units(self.database + '_units')
-        edm_prisms = prisms(self.database + '_prisms')
-        edm_datums = datums(self.database + '_datums')
+        self.edm_points = points(self.database + '_points')
+        self.edm_units = units(self.database + '_units')
+        self.edm_prisms = prisms(self.database + '_prisms')
+        self.edm_datums = datums(self.database + '_datums.csv')
         #sm.current = 'main'
-        df = create_dummy_data(1000)
-        return(DfguiWidget(df))
+        #df = create_dummy_data(0)
+        #df = edm_datums.datums 
+        #return(DfguiWidget(df))
 
 
 # Code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
-
-import numpy as np
-import datetime
-import pandas as pd 
 
 def create_dummy_data(size):
 
@@ -869,10 +870,8 @@ class TableHeader(ScrollView):
     """Fixed table header that scrolls x with the data table"""
     header = ObjectProperty(None)
 
-    def __init__(self, list_dicts=None, *args, **kwargs):
+    def __init__(self, titles = None, *args, **kwargs):
         super(TableHeader, self).__init__(*args, **kwargs)
-
-        titles = list_dicts[0].keys()
 
         for title in titles:
             self.header.add_widget(HeaderCell(text=title))
@@ -888,9 +887,9 @@ class TableData(RecycleView):
     ncols = NumericProperty(None)
     rgrid = ObjectProperty(None)
 
-    def __init__(self, list_dicts=[], *args, **kwargs):
+    def __init__(self, list_dicts=[], column_names = None, *args, **kwargs):
         self.nrows = len(list_dicts)
-        self.ncols = len(list_dicts[0])
+        self.ncols = len(column_names)
 
         super(TableData, self).__init__(*args, **kwargs)
 
@@ -908,13 +907,13 @@ class TableData(RecycleView):
         
 class Table(BoxLayout):
 
-    def __init__(self, list_dicts=[], *args, **kwargs):
+    def __init__(self, list_dicts=[], column_names = None, *args, **kwargs):
 
         super(Table, self).__init__(*args, **kwargs)
         self.orientation = "vertical"
 
-        self.header = TableHeader(list_dicts=list_dicts)
-        self.table_data = TableData(list_dicts=list_dicts)
+        self.header = TableHeader(column_names)
+        self.table_data = TableData(list_dicts = list_dicts, column_names = column_names)
 
         self.table_data.fbind('scroll_x', self.scroll_with_header)
 
@@ -955,7 +954,7 @@ class DataframePanel(BoxLayout):
                 row[keys[i2]] = str(df.iloc[i1, i2])
             data.append(row)
         data = sorted(data, key=lambda k: k[self.sort_key]) 
-        self.add_widget(Table(list_dicts=data))
+        self.add_widget(Table(list_dicts=data, column_names = df.columns))
         
     def apply_filter(self, conditions):
         """
@@ -1026,7 +1025,7 @@ class DfguiWidget(TabbedPanel):
     def open_panel1(self):
         #arr = self.panel3.get_filters()
         #print(str(arr))
-        self.panel1.apply_filter(self.panel3.get_filters())
+        #self.panel1.apply_filter(self.panel3.get_filters())
         self.panel1._generate_table(disabled=
                                     self.panel2.get_disabled_columns())
 

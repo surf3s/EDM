@@ -35,7 +35,7 @@ ScreenManager:
         id: editpoints_screen
         name: 'EditPointsScreen'
         manager: 'screen_manager'
-    EditDatumScreen:
+    EditDatumsScreen:
         id: editdatums_screen
         name: 'EditDatumsScreen'
         manager: 'screen_manager'
@@ -309,48 +309,6 @@ ScreenManager:
         Button:
             text: "Cancel"
             on_press: app.root.current = 'MainScreen'
-
-
-<EditDatumsScreen>:
-    BoxLayout:
-        size_hint_y: None
-        orientation: "vertical"
-        BoxLayout:
-            Label:
-                text: 'Define/Edit a datum.'
-            Button:
-                text: "Record with Station"
-        BoxLayout:
-            orientation: "horizontal"
-            Label:
-                text: 'Name :'
-            TextInput:
-                id: 'name'
-        BoxLayout:
-            orientation: "horizontal"
-            Label:
-                text: 'X :'
-            TextInput:
-                id: 'X'
-        BoxLayout:
-            orientation: "horizontal"
-            Label:
-                text: 'Y :'
-            TextInput:
-                id: 'Y'
-        BoxLayout:
-            orientation: "horizontal"
-            Label:
-                text: 'Z :'
-            TextInput:
-                id: 'Z'
-        BoxLayout:
-            orientation: "horizontal"
-            Button:
-                text: "Save"
-            Button:
-                text: "Cancel"
-                on_press: app.root.current = 'MainScreen'
 
 
 <LoadDialog>:
