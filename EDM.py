@@ -9,6 +9,8 @@ from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.spinner import Spinner
+from kivy.uix.textinput import TextInput
 from kivy.lang import Builder
 from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.recycleview.layout import LayoutSelectionBehavior
@@ -186,7 +188,6 @@ class datums:
             self.datums = pd.read_csv(self.filename)
         else:
             self.datums = pd.DataFrame(columns = ['Name','X','Y','Z','Date_Created'])
-            self.datums.set_index('Name')
             self.save()
 
     def save(self):
@@ -220,17 +221,22 @@ class prisms:
 
     def __init__(self, filename):
         self.filename = filename
-        # check to see if this file exists already and if so read in the prisms
-        self.prisms = []
+        if os.path.exists(self.filename):
+            self.prisms = pd.read_csv(self.filename)
+        else:
+            self.prisms = pd.DataFrame(columns = ['Name','Height','Offset'])
+            self.prisms.set_index('Name')
+            self.save()
+
+    def save(self):
+        self.prisms.to_csv(self.filename)
 
     def count(self):
-        return(len(self.prims))
+        return(self.prisms.shape[0])
 
     def names(self):
-        name_list = []
-        for prism in self.prisms:
-            name_list.append(prism.name)
-        return(name_list)
+        return(self.prisms.loc[:,'Name'])
+
 
     def select(self):
         # need code that build a list of prism names with an add new and cancel button
@@ -257,17 +263,21 @@ class units:
 
     def __init__(self, filename):
         self.filename = filename
-        # check to see if this file exists already and if so read in the unit names
-        self.units = []
+        if os.path.exists(self.filename):
+            self.units = pd.read_csv(self.filename)
+        else:
+            self.units = pd.DataFrame(columns = ['Name','X1','Y1','X2','Y2','Radius'])
+            self.units.set_index('Name')
+            self.save()
+
+    def save(self):
+        self.units.to_csv(self.filename)
 
     def count(self):
-        return(len(self.units))
+        return(self.units.shape[0])
 
     def names(self):
-        name_list = []
-        for unit in self.units:
-            name_list.append(unit.name)
-        return(name_list)
+        return(self.units.loc[:,'Name'])
 
     def select(self):
         # need code that build a list of unit names with an add new and cancel button
@@ -708,13 +718,11 @@ class InitializeSetAngleScreen(Screen):
             totalstation.set_horizontal_angle(foreshot)
         self.parent.current = 'MainScreen'
 
-
 class InitializeOnePointScreen(Screen):
     def __init__(self,**kwargs):
         super(InitializeOnePointScreen, self).__init__(**kwargs)
         self.add_widget(InitializeOnePointHeader())
         self.add_widget(DatumLister())
-
 
 class InitializeTwoPointScreen(Screen):
     def __init__(self,**kwargs):
@@ -722,25 +730,29 @@ class InitializeTwoPointScreen(Screen):
         self.add_widget(InitializeOnePointHeader())
         self.add_widget(DatumLister())
 
-
 class InitializeThreePointScreen(Screen):
     def __init__(self,**kwargs):
         super(InitializeThreePointScreen, self).__init__(**kwargs)
         self.add_widget(InitializeOnePointHeader())
         self.add_widget(DatumLister())
 
-
 class EditPointsScreen(Screen):
     pass
 
-
 class EditPrismsScreen(Screen):
-    pass
-
+    def __init__(self,**kwargs):
+        super(EditPrismsScreen, self).__init__(**kwargs)
+        self.add_widget(DfguiWidget(EDMpy.edm_prisms.prisms, "prisms"))
 
 class EditUnitsScreen(Screen):
-    pass
+    def __init__(self,**kwargs):
+        super(EditUnitsScreen, self).__init__(**kwargs)
+        self.add_widget(DfguiWidget(EDMpy.edm_units.units, "units"))
 
+class EditDatumsScreen(Screen):
+    def __init__(self,**kwargs):
+        super(EditDatumsScreen, self).__init__(**kwargs)
+        self.add_widget(DfguiWidget(EDMpy.edm_datums.datums, "datums"))
 
 
 class datumlist(RecycleView, Screen):
@@ -805,15 +817,13 @@ class AboutScreen(Screen):
 #sm.add_widget(InitializeDirectScreen(name='InitializeDirect'))
 #sm.add_widget(MainScreen(name='main'))
 
-class EditDatumsScreen(Screen):
-    def __init__(self,**kwargs):
-        super(EditDatumsScreen, self).__init__(**kwargs)
-        df = EDMpy.edm_datums.datums 
-        self.add_widget(DfguiWidget(df))
 
 class EDMpy(App):
     title = 'EDMpy'
     edm_datums = datums('EDM_datums.csv')
+    edm_units = units('EDM_units.csv')
+    edm_prisms = prisms('EDM_prisms.csv')
+
     def build(self):
         self.computer = 'WINDOWS'
         self.printer = False
@@ -1008,26 +1018,109 @@ class FilterPanel(BoxLayout):
         return [x.get_filter() for x in self.filter_list.children
                 if x.is_option_set]
 
-  
+class FilterOption(BoxLayout):
+        
+    def __init__(self, columns, **kwargs):
+        super(FilterOption, self).__init__(**kwargs)
+        self.height="30sp"
+        self.size_hint=(0.9, None)
+        self.spacing=10
+        options = ["Select Column"]
+        options.extend(columns)
+        self.spinner = Spinner(text='Select Column',
+                               values= options,
+                               size_hint=(0.25, None),
+                               height="30sp",
+                               pos_hint={'center_x': .5, 'center_y': .5})
+        self.txt = TextInput(multiline=False, size_hint=(0.75, None),\
+                             font_size="15sp")
+        self.txt.bind(minimum_height=self.txt.setter('height'))
+        self.add_widget(self.spinner)
+        self.add_widget(self.txt)
+
+    def is_option_set(self):
+        return self.spinner.text != 'Select Column'
+
+    def get_filter(self):
+        return (self.spinner.text, self.txt.text)
+
+class AddNewPanel(BoxLayout):
+    
+    def populate(self, columns, df_name):            
+        self.addnew_list.bind(minimum_height=self.addnew_list.setter('height'))
+        for col in columns:
+            self.addnew_list.add_widget(AddNew(col, df_name))
+        self.addnew_list.add_widget(AddNew('Save', df_name))
+
+    def get_addnews(self):
+        result=[]
+        for opt_widget in self.addnew_list.children:
+            if opt_widget.is_option_set():
+                result.append(opt_widget.get_addnew())
+        return [x.get_addnew() for x in self.addnew_list.children
+                if x.is_option_set]
+
+class AddNew(BoxLayout):
+
+    def __init__(self, col, df_name, **kwargs):
+        super(AddNew, self).__init__(**kwargs)
+        self.df_name = df_name
+        self.height="30sp"
+        self.size_hint=(0.9, None)
+        self.spacing=10
+        if col=='Save':
+            self.label = Label(text = "")
+            self.button = Button(text = "Save", size_hint=(0.75, 1), font_size="15sp")
+            self.button.bind(on_press = self.append_data)
+            self.add_widget(self.label)
+            self.add_widget(self.button)
+        else:
+            self.label = Label(text = col)
+            self.txt = TextInput(multiline=False, size_hint=(0.75, None), font_size="15sp")
+            self.txt.bind(minimum_height=self.txt.setter('height'))
+            self.add_widget(self.label)
+            self.add_widget(self.txt)
+
+    def append_data(self, instance):
+        if self.df_name == 'datums':
+            new_data = pd.DataFrame({'Name':'test','X':1000,'Y':2000,'Z':3000,'Date_Created':'test'},index=['test'])
+            EDMpy.edm_datums.datums = EDMpy.edm_datums.datums.append(new_data)
+            EDMpy.edm_datums.save()
+        elif self.df_name == 'prisms':
+            pass
+        elif self.df_name == 'units':
+            pass
+
+    def is_option_set(self):
+        return self.spinner.text != 'Select Column'
+
+    def get_addnew(self):
+        return (self.label.text, self.txt.text)
+             
 class DfguiWidget(TabbedPanel):
 
-    def __init__(self, df, **kwargs):
+    def __init__(self, df, df_name, **kwargs):
         super(DfguiWidget, self).__init__(**kwargs)
         self.df = df
+        self.df_name = df_name
         self.panel1.populate_data(df)
         #self.panel2.populate_columns(df.columns[:])
-        #self.panel3.populate(df.columns[:])
+        self.panel3.populate(df.columns[:])
+        self.panel4.populate(df.columns[:], df_name)
         #self.panel4.populate_options(df.columns[:])
         #self.panel5.populate_options(df.columns[:])
 
     # This should be changed so that the table isn't rebuilt
     # each time settings change.
     def open_panel1(self):
-        #arr = self.panel3.get_filters()
+        arr = self.panel3.get_filters()
         #print(str(arr))
-        #self.panel1.apply_filter(self.panel3.get_filters())
-        self.panel1._generate_table(disabled=
-                                    self.panel2.get_disabled_columns())
+        self.panel1.apply_filter(self.panel3.get_filters())
+        #self.panel1._generate_table(disabled=self.panel2.get_disabled_columns())
+        self.panel1._generate_table()
+    
+    def cancel(self):
+        pass
 
 
 

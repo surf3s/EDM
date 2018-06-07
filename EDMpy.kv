@@ -295,22 +295,6 @@ ScreenManager:
             on_press: app.root.current = 'MainScreen'
 
 
-<EditUnitsScreen>:
-    BoxLayout:
-        orientation: "horizontal"
-        Button:
-            text: "Cancel"
-            on_press: app.root.current = 'MainScreen'
-
-
-<EditPrismsScreen>:
-    BoxLayout:
-        orientation: "horizontal"
-        Button:
-            text: "Cancel"
-            on_press: app.root.current = 'MainScreen'
-
-
 <LoadDialog>:
     BoxLayout:
         size: root.size
@@ -377,6 +361,7 @@ ScreenManager:
     on_release: root.parent.parent.parent.parent._generate_table(self.text)
 
 
+
 <TableHeader>:
     header: header
     bar_width: 0
@@ -430,6 +415,7 @@ ScreenManager:
 <DfguiWidget>:
     panel1: data_frame_panel
     panel3: fil_select_panel
+    panel4: add_new_panel
     do_default_tab: False
     TabbedPanelItem:
         text: 'Data Frame'
@@ -440,11 +426,17 @@ ScreenManager:
         text: 'Filters'
         FilterPanel:
             id: fil_select_panel
+    TabbedPanelItem:
+        text: 'Add New'
+        AddNewPanel:
+            id: add_new_panel
+    TabbedPanelItem:
+        text: 'Close'
+        on_release: app.root.current = 'MainScreen'
 
 
 <DataframePanel>:
     orientation: 'vertical'
-
 
 <FilterPanel>:
     filter_list: filter_list
@@ -456,6 +448,23 @@ ScreenManager:
         scroll_timeout: 150
         GridLayout:
             id: filter_list
+            padding: "10sp"
+            spacing: "5sp"
+            cols:1
+            row_default_height: '55dp'
+            row_force_default: True
+            size_hint_y: None
+
+<AddNewPanel>:
+    addnew_list: addnew_list
+    orientation: 'vertical'
+    ScrollView:
+        do_scroll_x: False
+        do_scroll_y: True
+        size_hint: 1, 1
+        scroll_timeout: 150
+        GridLayout:
+            id: addnew_list
             padding: "10sp"
             spacing: "5sp"
             cols:1
