@@ -1,5 +1,19 @@
 # need to move read_ini and write_ini over before much else can be done on the read cfg routines
 
+# Need a basic yes/no/cancel pop-up (can find templates on-line)
+# Need a datum select pop-up 
+# Need the program flow for station initial direct
+# Need a setup screen to set the total station type to simulation
+# Need a select prism pop-up
+# Need the program flow from record point, to select prism, to edit point, to save
+# Need a read and write ini to be able to easily resume the program
+# Need status screen
+# Then start working on the flow for more complex setups
+# See if individual items in the data grid can be selected
+# Add communications parameters to setup
+# Add serial port communications
+# Add bluetooth communications
+
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.factory import Factory
@@ -32,13 +46,8 @@ import pandas as pd
 
 from collections import OrderedDict
 
-
-
-
 # get anglr.py library
 # or get angles.py library (looks maybe better)
-
-# use shelve for nosql database (at least at start)
 
 # use pySerial for serial communications
 
@@ -66,7 +75,6 @@ class points:
 
     def create_defaults(self):
         self.fields = []
-        delete_all()
 
         unit = field('UNIT')
         unit.prompt = 'Unit'
@@ -102,47 +110,49 @@ class points:
         excavator.maxlen = 20
         self.fields.append(excavator)
 
-        prism = fields('PRISM')
+        prism = field('PRISM')
         prism.type = 'Numeric'
         prism.required = True
         self.fields.append(prism)
 
-        x = fields('X')
+        x = field('X')
         x.type = 'Numeric'
         x.required = True
         self.fields.append(x)
 
-        y = fields('Y')
+        y = field('Y')
         y.type = 'Numeric'
         y.required = True
         self.fields.append(y)
 
-        z = fields('Z')
+        z = field('Z')
         z.type = 'Numeric'
         z.required = True
         self.fields.append(z)
 
-        hangle = fields('HANGLE')
+        hangle = field('HANGLE')
         hangle.required = True
         hangle.prompt = 'H-Angle'
         self.fields.append(hangle)
 
-        vangle = fields('VANGLE')
+        vangle = field('VANGLE')
         vangle.required = True
         vangle.prompt = 'V-Angle'
         self.fields.append(vangle)
 
-        sloped = fields('SLOPED')
+        sloped = field('SLOPED')
         sloped.type = 'Numeric'
         sloped.required = True
         sloped.prompt = 'Slope D.'
         self.fields.append(sloped)
 
-        datetime = fields('DATETIME')
+        datetime = field('DATETIME')
         datetime.type = 'Text'
         datetime.required = True
         datetime.prompt = 'Date-Time'
         self.fields.append(datetime)
+
+        # Need something here about convert this now to dataframe
 
     def names(self):
         name_list = []
@@ -191,24 +201,13 @@ class datums:
             self.save()
 
     def save(self):
-        self.datums.to_csv(self.filename)
+        self.datums.to_csv(self.filename, index=False)
 
     def count(self):
         return(self.datums.shape[0])
 
     def names(self):
         return(self.datums.loc[:,'Name'])
-
-    def select(self):
-        # need code that build a list of datum names with an add new and cancel button
-        # and returns the selected datum
-        # if add new is selected the put up edit datum and then save
-        pass
-
-    def edit(self):
-        # need code that makes input boxes for a datum item
-        # needs a name box, XYZ boxes, a record with station and cancel button
-        pass
 
 class prisms:
     MAX_PRISMS = 20
@@ -225,29 +224,16 @@ class prisms:
             self.prisms = pd.read_csv(self.filename)
         else:
             self.prisms = pd.DataFrame(columns = ['Name','Height','Offset'])
-            self.prisms.set_index('Name')
             self.save()
 
     def save(self):
-        self.prisms.to_csv(self.filename)
+        self.prisms.to_csv(self.filename, index=False)
 
     def count(self):
         return(self.prisms.shape[0])
 
     def names(self):
         return(self.prisms.loc[:,'Name'])
-
-
-    def select(self):
-        # need code that build a list of prism names with an add new and cancel button
-        # and returns the selected prism
-        # if add new is selected the put up edit prism and then save
-        pass
-
-    def edit(self):
-        # need code that makes input boxes for a prism item
-        # needs a name box, height and offset boxes and cancel button
-        pass
 
 class units:
     MAX_UNITS = 100
@@ -267,11 +253,10 @@ class units:
             self.units = pd.read_csv(self.filename)
         else:
             self.units = pd.DataFrame(columns = ['Name','X1','Y1','X2','Y2','Radius'])
-            self.units.set_index('Name')
             self.save()
 
     def save(self):
-        self.units.to_csv(self.filename)
+        self.units.to_csv(self.filename, index=False)
 
     def count(self):
         return(self.units.shape[0])
@@ -279,46 +264,46 @@ class units:
     def names(self):
         return(self.units.loc[:,'Name'])
 
-    def select(self):
-        # need code that build a list of unit names with an add new and cancel button
-        # and returns the selected unit
-        # if add new is selected the put up edit unit and then save
-        pass
-
-    def edit(self):
-        # need code that makes input boxes for a unit item
-        # needs a name box, minx, miny, maxx, maxy, and cancel button
-        pass
-
 class ini:
+    
     def ini_class(self):
         def __init__(self, name):
             self.name = name
             self.items = []
 
-    def add_value(self, ini_classname, varname, vardata):
-        # implement dictionary - add new values and append to existing values using chr(1) as separator
-        pass
+    def update_value(self, ini_classname, varname, vardata, append = True):
+        class_exists = False
+        for ini_class in self.classes:
+            if ini_class.name==ini_classname:
+                class_exists = True
+                if ini_class.items[varname]:
+                    ini_class.items[varname] += vardata
+                else:
+                    ini_class.items[varname] = vardata 
+        if not class_exists:
+            temp = ini_class(ini_classname)
+            temp.items[varname] = vardata
+            self.classes.append(temp)
 
     def read_ini(self):
         try:
             with open(self.filename) as f:
                 for line in f:
                     if line.strip()[0]=="[":
-                        ini_classname = ini_class(line.strip()[1:-1].upper())
+                        ini_classname = line.strip()[1:-1].upper()
                     else:
                         if line.find("="):
                             varname = line.split("=")[0].strip().upper()
                             vardata = line.split("=")[1].strip()
-                            self.add_value(ini_classname, varname, vardata)
+                            self.update_value(ini_classname, varname, vardata)
         except:
             pass
+
 
     def __init__(self, filename):
         self.filename = filename
         self.classes = []
         self.read_ini()
-
 
     def names(self):
         name_list = []
@@ -331,11 +316,6 @@ class ini:
             if ini_class.name==ini_classname:
                 return(ini_class[varname])
         return('')                
-
-    def set_value(self, ini_classname, varname, vardata):
-        # same as above but without append
-        pass
-
 
     def write_ini(self):
         try:
@@ -355,14 +335,15 @@ class cfg:
 
     def load(self):
         new_format = False
+        errormessage = []
         with open(self.filename) as f:
             for line in f:
                 if line.upper() == '[EDM]':
                     new_format = True
 
         if not new_format:
-            pass
             lineno = 0
+            complete_line = ''
             with open(self.filename) as f:
                 for line in f:
                     lineno += 1
@@ -376,13 +357,13 @@ class cfg:
                             data_value = complete_line[a:]
                             if key_field=='FIELD':
                                 if data_value == "":
-                                    errormessage = "No field name given in line %s." & (lineno)
+                                    errormessage.append = "No field name given in line %s." & (lineno)
                                     break 
                                 if data_value in points.names(): 
-                                    errormessage = "Duplicate FIELD definition for %s in line %s." & (data_value, lineno)
+                                    errormessage.append = "Duplicate FIELD definition for %s in line %s." & (data_value, lineno)
                                     break
                                 if points.field_count() == points.MAX_FIELDS:
-                                    errormessage = "Too many FIELD definitions with %s.  Limit is %s" & (data_value, points.MAX_FIELDS)
+                                    errormessage.append = "Too many FIELD definitions with %s.  Limit is %s" & (data_value, points.MAX_FIELDS)
                                     break
                                 new_field = points.field
                                 new_field.name = data_value
@@ -692,22 +673,37 @@ class Root(FloatLayout):
 
         self.dismiss_popup()
 
-    def button_action(self, button_name):
-        pass
 
 class EditDatums(Screen):
     pass
 
 class MainScreen(Screen):
-    pass
+    def button_action(self, button_name):
+        print(YesNoCancel(caption = 'Test', cancel = False))
+
 
 class InitializeOnePointHeader(Label):
     pass
 
 class InitializeDirectScreen(Screen):
-    def __init__(self,**kwargs):
-        super(InitializeDirectScreen, self).__init__(**kwargs)
-        self.add_widget(DatumLister())
+    def datum_list(self):
+        content = BoxLayout(orientation = 'vertical')
+        # loop through the datums adding them as buttons
+        # bind a button press event to a function that will actually set the station coordinates
+
+        label = Label(text = "made it", size_hint=(.8, .8))
+        content.add_widget(label)
+        button1 = Button(text = 'Cancel', size_hint_y = .2)
+        content.add_widget(button1)
+        popup = Popup(title = 'Initial Direct',
+                    content = content,
+                    size_hint = (None, None), size=(400, 400),
+                    auto_dismiss = False)
+        button1.bind(on_press = popup.dismiss)
+        popup.open()
+
+    def initialize_direct:
+        # get which button was pressed, load the XYZ, and set this in the appropriate object
 
 class InitializeSetAngleScreen(Screen):
     def set_angle(self, foreshot, backshot):
@@ -834,15 +830,16 @@ class EDMpy(App):
             self.cfg_file = edm_ini.get_value("EDM", "CFG")
             cfg = cfg(self.cfg_file)
             cfg.load()
-        self.edm_points = points(self.database + '_points')
-        self.edm_units = units(self.database + '_units')
-        self.edm_prisms = prisms(self.database + '_prisms')
+        self.edm_points = points(self.database + '_points.csv')
+        self.edm_units = units(self.database + '_units.csv')
+        self.edm_prisms = prisms(self.database + '_prisms.csv')
         self.edm_datums = datums(self.database + '_datums.csv')
         #sm.current = 'main'
         #df = create_dummy_data(0)
         #df = edm_datums.datums 
-        #return(DfguiWidget(df))
-
+        #test = YesNoCancel("This is a test of a yes no popup box", cancel=False)
+        #print(test)
+        #return(DfguiWidget(EDMpy.edm_datums.datums, "datums"))
 
 # Code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 
@@ -1046,7 +1043,8 @@ class FilterOption(BoxLayout):
 
 class AddNewPanel(BoxLayout):
     
-    def populate(self, columns, df_name):            
+    def populate(self, columns, df_name):
+        self.df_name = df_name            
         self.addnew_list.bind(minimum_height=self.addnew_list.setter('height'))
         for col in columns:
             self.addnew_list.add_widget(AddNew(col, df_name))
@@ -1055,16 +1053,15 @@ class AddNewPanel(BoxLayout):
     def get_addnews(self):
         result=[]
         for opt_widget in self.addnew_list.children:
-            if opt_widget.is_option_set():
-                result.append(opt_widget.get_addnew())
-        return [x.get_addnew() for x in self.addnew_list.children
-                if x.is_option_set]
+            result.append(opt_widget.get_addnew())
+        return(result)
 
 class AddNew(BoxLayout):
 
     def __init__(self, col, df_name, **kwargs):
         super(AddNew, self).__init__(**kwargs)
         self.df_name = df_name
+        self.widget_type = 'data'
         self.height="30sp"
         self.size_hint=(0.9, None)
         self.spacing=10
@@ -1074,6 +1071,7 @@ class AddNew(BoxLayout):
             self.button.bind(on_press = self.append_data)
             self.add_widget(self.label)
             self.add_widget(self.button)
+            self.widget_type = 'button'
         else:
             self.label = Label(text = col)
             self.txt = TextInput(multiline=False, size_hint=(0.75, None), font_size="15sp")
@@ -1081,22 +1079,27 @@ class AddNew(BoxLayout):
             self.add_widget(self.label)
             self.add_widget(self.txt)
 
+    def get_addnew(self):
+        return (self.label.text, self.txt.text)
+
     def append_data(self, instance):
+        result = {}
+        for obj in instance.parent.parent.children:
+            if obj.widget_type=='data':
+                result[obj.label.text] = obj.txt.text 
+                obj.txt.text = ''
+        new_data = pd.DataFrame(result, index=[result['Name']])
         if self.df_name == 'datums':
-            new_data = pd.DataFrame({'Name':'test','X':1000,'Y':2000,'Z':3000,'Date_Created':'test'},index=['test'])
             EDMpy.edm_datums.datums = EDMpy.edm_datums.datums.append(new_data)
             EDMpy.edm_datums.save()
         elif self.df_name == 'prisms':
-            pass
+            EDMpy.edm_prisms.prisms = EDMpy.edm_prisms.prisms.append(new_data)
+            EDMpy.edm_prisms.save()
         elif self.df_name == 'units':
-            pass
+            EDMpy.edm_units.units = EDMpy.edm_units.units.append(new_data)
+            EDMpy.edm_units.save()
 
-    def is_option_set(self):
-        return self.spinner.text != 'Select Column'
 
-    def get_addnew(self):
-        return (self.label.text, self.txt.text)
-             
 class DfguiWidget(TabbedPanel):
 
     def __init__(self, df, df_name, **kwargs):
@@ -1126,7 +1129,32 @@ class DfguiWidget(TabbedPanel):
 
 # End code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 
+class YesNoCancel(Popup):
+    def __init__(self, caption, cancel = False, **kwargs):
+        super(YesNoCancel, self).__init__(**kwargs)
+        box = BoxLayout()
+        self.label = Label(text = caption)
+        self.button1 = Button(text = "Yes", size_hint=(0.75, 1), font_size="15sp")
+        self.button1.bind(on_press = self.yes)
+        self.button2 = Button(text = "No", size_hint=(0.75, 1), font_size="15sp")
+        self.button2.bind(on_press = self.no)
+        box.add_widget(self.label)
+        box.add_widget(self.button1)
+        box.add_widget(self.button2)
+        if cancel == True:
+            box.button3 = Button(text = "Cancel", size_hint=(0.75, 1), font_size="15sp")
+            box.button3.bind(on_press = self.cancel)
+            box.add_widget(self.button3)
+        self.add_widget(box)
+        self.open()
+    def yes(self, instance):
+        return('Yes')
+    def no(self, instance):
+        return('No')
+    def cancel(self, instance):
+        return('Cancel')
 
+    
 Factory.register('Root', cls=Root)
 Factory.register('LoadDialog', cls=LoadDialog)
 Factory.register('SaveDialog', cls=SaveDialog)

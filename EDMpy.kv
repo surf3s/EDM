@@ -116,6 +116,8 @@ ScreenManager:
                         on_release: root.show_save()
                     ActionButton:
                         text: 'Exit'
+                        on_release: app.stop()
+
         BoxLayout:
             padding: (5,5,5,2.55)
             spacing: 5
@@ -175,7 +177,24 @@ ScreenManager:
 
 <InitializeDirectScreen>:
     name: 'datums'
-
+    BoxLayout:
+        orientation: 'vertical'
+        Label:
+            text: 'Use this option to set the station coordinates only.  This option assumes that the horizontal angle is already correct'
+            height: .25
+        BoxLayout:
+            orientation: 'horizontal'
+            height: 1
+            Button:
+                text: 'Proceed'
+                on_press: root.datum_list()
+                default_size: None, dp(56)
+                default_size_hint: 1, None
+            Button:
+                text: 'Cancel'
+                on_press: app.root.current = 'MainScreen'
+                default_size: None, dp(56)
+                default_size_hint: 1, None
 
 <datumlist>:
     RecycleBoxLayout:
@@ -473,3 +492,6 @@ ScreenManager:
             size_hint_y: None
 
 ## end code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
+
+<YesNoCancel>:
+    cols:1
