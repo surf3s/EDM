@@ -29,12 +29,14 @@ from kivy.lang import Builder
 from kivy.uix.behaviors import FocusBehavior
 from kivy.uix.recycleview.layout import LayoutSelectionBehavior
 from kivy.uix.popup import Popup
+from kivy.uix.gridlayout import GridLayout
 from kivy.properties import ListProperty, StringProperty, ObjectProperty, BooleanProperty, NumericProperty
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.tabbedpanel import TabbedPanel
+from kivy.core.window import Window
 
 import os
 import string
@@ -45,6 +47,10 @@ import pandas as pd
 
 
 from collections import OrderedDict
+
+CANCEL_BUTTON_BACKGROUND = [26, 26, 26] #0x424242
+BUTTON_BACKGROUND = [0, .69 * 255, 255]
+WINDOW_BACKGROUND = [255, 255, 255]
 
 # get anglr.py library
 # or get angles.py library (looks maybe better)
@@ -72,6 +78,12 @@ class points:
         # if no file exists are after opening the file there are no fields, insert default fields
         self.fields = []
         self.records = []
+
+    def status(self):
+        txt = 'The points file is %s\n' % self.filename
+        txt += '%s points in the data file\n' % self.record_count()
+        txt += 'with %s fields per point' % self.field_count()
+        return(txt)
 
     def create_defaults(self):
         self.fields = []
@@ -200,6 +212,10 @@ class datums:
             self.datums = pd.DataFrame(columns = ['Name','X','Y','Z','Date_Created'])
             self.save()
 
+    def status(self):
+        txt = '%s datums are defined\n' % self.count()
+        return(txt)
+
     def save(self):
         self.datums.to_csv(self.filename, index=False)
 
@@ -225,6 +241,10 @@ class prisms:
         else:
             self.prisms = pd.DataFrame(columns = ['Name','Height','Offset'])
             self.save()
+
+    def status(self):
+        txt = '%s prisms are defined\n' % self.count()
+        return(txt)
 
     def save(self):
         self.prisms.to_csv(self.filename, index=False)
@@ -254,6 +274,10 @@ class units:
         else:
             self.units = pd.DataFrame(columns = ['Name','X1','Y1','X2','Y2','Radius'])
             self.save()
+
+    def status(self):
+        txt = '%s units are defined\n' % self.count()
+        return(txt)
 
     def save(self):
         self.units.to_csv(self.filename, index=False)
@@ -504,14 +528,16 @@ class cfg:
         pass
 
 class totalstation:
-    def __init__(self, make, model):
-        if make=='':
-            make = "Emulation"
-        else:
-    	    self.make = make
+    def __init__(self, make = "Emulation", model = ''):
+        self.make = make
         self.model = model
-        self.com_port_no = 0
-        self.com_port_settings = ''
+        self.communication = 'Serial'
+        self.comport = 'COM1'
+        self.baudrate = '1200'
+        self.parity = 'EVEN'
+        self.databits = 7
+        self.stopbits = 1
+        self.comport_settings = ''
         self.input_string = ''
         self.output_string = ''
         self.port_open = False
@@ -525,6 +551,22 @@ class totalstation:
         self.hangle = ''
         self.vangle = ''
         self.sloped = 0
+
+    def status(self):
+        txt = 'Total Station:\n'
+        txt += 'Make is %s\n' % self.make
+        txt += 'Communication type is %s\n' % self.communication
+        txt += 'COM Port is %s\n' % self.comport
+        txt += 'Com settings are %s, %s, %s, %s\n' % (self.baudrate,self.parity,self.databits,self.stopbits)
+        if self.port_open:
+            txt += 'COM Port is open\n'
+        else:
+            txt += 'COM port is closed\n'
+        txt += 'Station X : %s\n' % self.current_x
+        txt += 'Station Y : %s\n' % self.current_y
+        txt += 'Station Z : %s\n' % self.current_z
+
+        return(txt)
 
     def initialize(self):
         pass
@@ -685,25 +727,41 @@ class MainScreen(Screen):
 class InitializeOnePointHeader(Label):
     pass
 
+
 class InitializeDirectScreen(Screen):
+
+    popup = ObjectProperty(None)
+
     def datum_list(self):
-        content = BoxLayout(orientation = 'vertical')
-        # loop through the datums adding them as buttons
-        # bind a button press event to a function that will actually set the station coordinates
-
-        label = Label(text = "made it", size_hint=(.8, .8))
-        content.add_widget(label)
-        button1 = Button(text = 'Cancel', size_hint_y = .2)
-        content.add_widget(button1)
-        popup = Popup(title = 'Initial Direct',
-                    content = content,
-                    size_hint = (None, None), size=(400, 400),
+        layout_popup = GridLayout(cols = 1, spacing = 10, size_hint_y = None)
+        layout_popup.bind(minimum_height=layout_popup.setter('height'))
+        for datum in datums.names(EDMpy.edm_datums):
+            button1 = Button(text = datum, size_hint_y = None, id = datum)
+            layout_popup.add_widget(button1)
+            button1.bind(on_press = self.initialize_direct)
+        button2 = Button(text = 'Cancel', size_hint_y = None,
+                        background_color = (CANCEL_BUTTON_BACKGROUND[0]/255,
+                                            CANCEL_BUTTON_BACKGROUND[1]/255,
+                                            CANCEL_BUTTON_BACKGROUND[2]/255,1),
+                        background_normal = '')
+        layout_popup.add_widget(button2)
+        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
+        root.add_widget(layout_popup)
+        self.popup = Popup(title = 'Initial Direct',
+                    content = root,
+                    size_hint = (None, None),
+                    size=(400, 400),
+                    #pos_hint = {None, None},
                     auto_dismiss = False)
-        button1.bind(on_press = popup.dismiss)
-        popup.open()
+        button2.bind(on_press = self.popup.dismiss)
+        self.popup.open()
 
-    def initialize_direct:
-        # get which button was pressed, load the XYZ, and set this in the appropriate object
+    def initialize_direct(self, value):
+        EDMpy.edm_station.X = EDMpy.edm_datums.datums[EDMpy.edm_datums.datums.Name==value.id].iloc[0]['X']
+        EDMpy.edm_station.Y = EDMpy.edm_datums.datums[EDMpy.edm_datums.datums.Name==value.id].iloc[0]['X']
+        EDMpy.edm_station.Z = EDMpy.edm_datums.datums[EDMpy.edm_datums.datums.Name==value.id].iloc[0]['X']
+        self.popup.dismiss()
+        self.parent.current = 'MainScreen'
 
 class InitializeSetAngleScreen(Screen):
     def set_angle(self, foreshot, backshot):
@@ -805,22 +863,146 @@ class EditDatumScreen(Screen):
     pass
 
 
+class StationConfigurationScreen(Screen):
+    def __init__(self,**kwargs):
+        super(StationConfigurationScreen, self).__init__(**kwargs)
+    
+        layout = GridLayout(cols = 2)
+
+        # Station type menu
+        self.StationLabel = Label(text="Station type :")
+        layout.add_widget(self.StationLabel)
+        self.StationMenu = Spinner(text="Simulate", values=("Leica", "Wild", "Topcon", "Simulate"), id = 'station') 
+        self.StationMenu.size_hint  = (0.3, 0.2)
+        layout.add_widget(self.StationMenu)
+
+        # Communications type menu
+        self.CommTypeLabel = Label(text="Communications :")
+        layout.add_widget(self.CommTypeLabel)
+        self.CommTypeMenu = Spinner(text="None", values=("Serial", "Bluetooth"), id = 'communications') 
+        self.CommTypeMenu.size_hint  = (0.3, 0.2)
+        layout.add_widget(self.CommTypeMenu)
+
+        # Port number
+        self.PortNoLabel = Label(text="Port Number :")
+        layout.add_widget(self.PortNoLabel)
+        self.PortNoMenu = Spinner(text="COM1", values=("COM1", "COM2","COM3","COM4","COM5","COM6"), id = 'comport')  
+        self.PortNoMenu.size_hint  = (0.3, 0.2)
+        layout.add_widget(self.PortNoMenu)
+
+        # Speed
+        self.SpeedLabel = Label(text="Speed :")
+        layout.add_widget(self.SpeedLabel)
+        self.SpeedMenu = Spinner(text="1200", values=("1200", "2400","4800","9600"), id = 'baudrate')  
+        self.SpeedMenu.size_hint  = (0.3, 0.2)
+        layout.add_widget(self.SpeedMenu)
+
+        # Parity
+        self.ParityLabel = Label(text="Parity :")
+        layout.add_widget(self.ParityLabel)
+        self.ParityMenu = Spinner(text="Even", values=("Even", "Odd","None"), id = 'parity')  
+        self.ParityMenu.size_hint  = (0.3, 0.2)
+        layout.add_widget(self.ParityMenu)
+
+        # Databits
+        self.DataBitsLabel = Label(text="Data bits :")
+        layout.add_widget(self.DataBitsLabel)
+        self.DataBitsMenu = Spinner(text="7", values=("7", "8"), id = 'databits')  
+        self.DataBitsMenu.size_hint  = (0.3, 0.2)
+        layout.add_widget(self.DataBitsMenu)
+
+        # Stopbits
+        self.StopBitsLabel = Label(text="Stop bits :")
+        layout.add_widget(self.StopBitsLabel)
+        self.StopBitsMenu = Spinner(text="1", values=("0", "1", "2"), id = 'stopbits')  
+        self.StopBitsMenu.size_hint  = (0.3, 0.2)
+        layout.add_widget(self.StopBitsMenu)
+
+        button1 = Button(text = 'Save', size_hint_y = None, id = 'save')
+        layout.add_widget(button1)
+        button1.bind(on_press = self.close_screen)
+        button2 = Button(text = 'Cancel', size_hint_y = None, id = 'cancel')
+        layout.add_widget(button2)
+        button2.bind(on_press = self.close_screen)
+
+        self.add_widget(layout)
+
+    def close_screen(self, instance):
+        if instance.id=='save':
+            for child in self.children[0].children:
+                if child.id=='stopbits':
+                    totalstation.stopbits = child.text
+                if child.id=='baudrate':
+                    totalstation.baudrate = child.text
+                if child.id=='databits':
+                    totalstation.databits = child.text
+                if child.id=='comport':
+                    totalstation.comport = child.text
+                if child.id=='parity':
+                    totalstation.parity = child.text
+                if child.id=='communications':
+                    totalstation.communications = child.text
+                if child.id=='station':
+                    totalstation.station = child.text
+                ## need code to open com port here
+        self.parent.current = 'MainScreen'
+
+
 class AboutScreen(Screen):
     pass
 
-#sm = ScreenManager()
-#sm.add_widget(AboutScreen(name='about'))
-#sm.add_widget(InitializeDirectScreen(name='InitializeDirect'))
-#sm.add_widget(MainScreen(name='main'))
 
+class DebugScreen(Screen):
+    pass
+
+
+class LogScreen(Screen):
+    pass
+
+
+class StatusScreen(Screen):
+    def __init__(self,**kwargs):
+        super(StatusScreen, self).__init__(**kwargs)
+        layout = GridLayout(cols = 1, size_hint_y = None)
+        layout.bind(minimum_height=layout.setter('height'))
+        txt = EDMpy.edm_station.status() + EDMpy.edm_datums.status() + EDMpy.edm_prisms.status()
+        txt += EDMpy.edm_units.status()
+        label = Label(text = txt, size_hint_y = None, color = (0,0,0,1), id = 'content')
+        layout.add_widget(label)
+        label.bind(texture_size = label.setter('size'))
+        label.bind(size_hint_min_x = label.setter('width'))
+        button = Button(text = 'Back', size_hint_y = None,
+                        background_color = (BUTTON_BACKGROUND[0]/255,
+                                            BUTTON_BACKGROUND[1]/255,
+                                            BUTTON_BACKGROUND[2]/255,1),
+                        background_normal = '')
+        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height))
+        root.add_widget(layout)
+        self.add_widget(root)
+        self.add_widget(button)
+        button.bind(on_press = self.go_back)
+
+    def on_pre_enter(self):
+        for widget in self.walk():
+            if widget.id=='content':
+                txt = EDMpy.edm_station.status() + EDMpy.edm_datums.status() + EDMpy.edm_prisms.status()
+                txt += EDMpy.edm_units.status()
+                widget.text = txt
+
+    def go_back(self, value):
+        self.parent.current = 'MainScreen'
 
 class EDMpy(App):
     title = 'EDMpy'
     edm_datums = datums('EDM_datums.csv')
     edm_units = units('EDM_units.csv')
     edm_prisms = prisms('EDM_prisms.csv')
+    edm_station = totalstation()
 
     def build(self):
+        Window.clearcolor = (WINDOW_BACKGROUND[0]/255,
+                            WINDOW_BACKGROUND[1]/255,
+                            WINDOW_BACKGROUND[2]/255, 1)
         self.computer = 'WINDOWS'
         self.printer = False
         self.sitename = ''
@@ -834,6 +1016,7 @@ class EDMpy(App):
         self.edm_units = units(self.database + '_units.csv')
         self.edm_prisms = prisms(self.database + '_prisms.csv')
         self.edm_datums = datums(self.database + '_datums.csv')
+
         #sm.current = 'main'
         #df = create_dummy_data(0)
         #df = edm_datums.datums 

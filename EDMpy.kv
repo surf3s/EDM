@@ -1,4 +1,8 @@
 #:kivy 1.1.0
+#:set CANCEL_BUTTON_BACKGROUND [26, 26,  26]
+#:set BUTTON_COLOR [0, .69 * 255, 255]
+#:set MENU_COLOR [0, 0, 0]
+#:set SUBMENU_COLOR [255, 255, 255]
 
 ScreenManager:
     id: screen_manager
@@ -7,9 +11,25 @@ ScreenManager:
         id: main_screen
         name: 'MainScreen'
         manager: 'screen_manager'
+    StatusScreen:
+        id: status_screen
+        name: 'StatusScreen'
+        manager: 'screen_manager'
+    LogScreen:
+        id: log_screen
+        name: 'LogScreen'
+        manager: 'screen_manager'
+    DebugScreen:
+        id: debug_screen
+        name: 'DebugScreen'
+        manager: 'screen_manager'
     AboutScreen:
         id: about_screen
         name: 'AboutScreen'
+        manager: 'screen_manager'
+    StationConfigurationScreen:
+        id: stationconfiguration_screen
+        name: 'StationConfigurationScreen'
         manager: 'screen_manager'
     InitializeDirectScreen:
         id: initializedirect_screen
@@ -61,62 +81,90 @@ ScreenManager:
                     title: 'pyEDM'
                     with_previous: False
                 ActionOverflow:
-                ActionButton:
-                    icon: 'atlas://data/images/defaulttheme/audio-volume-high'
-                ActionButton:
-                    important: True
-                    text: 'Important'
                 ActionGroup:
                     text: 'Help'
+                    color: (MENU_COLOR[0]/255, MENU_COLOR[1]/255, MENU_COLOR[2]/255,1)
+                    ActionButton:
+                        text: 'Status'
+                        on_press: app.root.current = 'StatusScreen'
+                        color: SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255, 1
+                    ActionButton:
+                        text: 'Log'
+                        on_press: app.root.current = 'LogScreen'
+                        color: SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255, 1
+                    ActionButton:
+                        text: 'Debug'
+                        on_press: app.root.current = 'DebugScreen'
+                        color: SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255, 1
                     ActionButton:
                         text: 'About'
                         on_press: app.root.current = 'AboutScreen'
+                        color: SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255, 1
                 ActionGroup:
                     text: 'Edit'
+                    color: (MENU_COLOR[0]/255, MENU_COLOR[1]/255, MENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'The last point'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Points'
                         on_press: app.root.current = 'EditPointsScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Datums'
                         on_press: app.root.current = 'EditDatumsScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Units'
                         on_press: app.root.current = 'EditUnitsScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Prims'
                         on_press: app.root.current = 'EditPrismsScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                 ActionGroup:
                     text: 'Setup'
+                    color: (MENU_COLOR[0]/255, MENU_COLOR[1]/255, MENU_COLOR[2]/255,1)
+                    size_hint_x: 0.35
                     ActionButton:
                         text: 'Configure Station'
+                        on_press: app.root.current = 'StationConfigurationScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Direct'
                         on_press: app.root.current = 'InitializeDirectScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Set Angle Only'
                         on_press: app.root.current = 'InitializeSetAngleScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Shoot One Point'
                         on_press: app.root.current = 'InitializeOnePointScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
-                        text: 'Over One Point + Shoot One Point'
+                        text: 'Over One Point +\nShoot One Point'
                         on_press: app.root.current = 'InitializeTwoPointScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Shoot Two Points'
                         on_press: app.root.current = 'InitializeThreePointScreen'
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                 ActionGroup:
                     text: 'File'
+                    color: (MENU_COLOR[0]/255, MENU_COLOR[1]/255, MENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Open CFG'
                         on_release: root.show_load_cfg()
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Save CFG as'
                         on_release: root.show_save()
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
                     ActionButton:
                         text: 'Exit'
                         on_release: app.stop()
+                        color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
 
         BoxLayout:
             padding: (5,5,5,2.55)
@@ -158,25 +206,35 @@ ScreenManager:
                 text: 'Measure'
                 on_release: root.button_action('Measure')
 
+<StatusScreen>:
+
+<LogScreen>:
 
 <AboutScreen>:
     BoxLayout:
         orientation: 'vertical'
         Label:
-            text: 'EDMpy by Shannon McPherron and Harold Dibble'
-            height: .25
-        BoxLayout:
-            orientation: 'vertical'
-            height: 1
-            Button:
-                text: 'OK'
-                on_press: app.root.current = 'MainScreen'
-                default_size: None, dp(56)
-                default_size_hint: 1, None
+            text: 'EDMpy by Shannon P. McPherron\n\nVersion 1.0 Alpha\nApple Pie\n\nAn OldStoneAge.Com Production\n\nSeptember, 2018'
+            size_hint_y: .8
+            valign: 'middle'
+            halign: 'center'
+            font_size: 20
+            color: MENU_COLOR[0]/255, MENU_COLOR[1]/255, MENU_COLOR[2]/255, 1
+        Button:
+            text: 'Back'
+            on_press: app.root.current = 'MainScreen'
+            size_hint_y: .2
+            background_color: (BUTTON_COLOR[0]/255, BUTTON_COLOR[1]/255, BUTTON_COLOR[2]/255, 1)
+            background_normal: ''
+
+
+<StationConfigureScreen>:
+    name: 'stationconfigure'
 
 
 <InitializeDirectScreen>:
     name: 'datums'
+    popup: None
     BoxLayout:
         orientation: 'vertical'
         Label:
@@ -195,6 +253,8 @@ ScreenManager:
                 on_press: app.root.current = 'MainScreen'
                 default_size: None, dp(56)
                 default_size_hint: 1, None
+                background_color: (CANCEL_BUTTON_BACKGROUND[0]/255,CANCEL_BUTTON_BACKGROUND[1]/255,CANCEL_BUTTON_BACKGROUND[2]/255, 1)
+                background_normal: ''
 
 <datumlist>:
     RecycleBoxLayout:
@@ -495,3 +555,7 @@ ScreenManager:
 
 <YesNoCancel>:
     cols:1
+
+<Test>:
+    Button:
+        text: "Save"
