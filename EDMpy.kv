@@ -1,8 +1,9 @@
 #:kivy 1.1.0
-#:set CANCEL_BUTTON_BACKGROUND [26, 26,  26]
-#:set BUTTON_COLOR [0, .69 * 255, 255]
+#:set BUTTON_BACKGROUND (0, .69, 255/255, 1)
+#:set BUTTON_COLOR (0, 0, 0, 1)
 #:set MENU_COLOR [0, 0, 0]
 #:set SUBMENU_COLOR [255, 255, 255]
+#:set WINDOW_COLOR (0, 0, 0, 1)
 
 ScreenManager:
     id: screen_manager
@@ -71,12 +72,13 @@ ScreenManager:
 
 <MainScreen>:
     BoxLayout:
+        id: mainbox
         orientation: 'vertical'
         BoxLayout:
-            pos_hint: {'top':1}
-            size_hint_y: .25
             ActionView:
+                size_hint_y : .1
                 use_separator: True
+                pos_hint: {'top':1}
                 ActionPrevious:
                     title: 'pyEDM'
                     with_previous: False
@@ -166,45 +168,6 @@ ScreenManager:
                         on_release: app.stop()
                         color: (SUBMENU_COLOR[0]/255, SUBMENU_COLOR[1]/255, SUBMENU_COLOR[2]/255,1)
 
-        BoxLayout:
-            padding: (5,5,5,2.55)
-            spacing: 5
-            orientation: 'horizontal'
-            Button:
-                text: 'Button1'
-                on_release: root.button_action('Button1')
-            Button:
-                text: 'Button2'
-                on_release: root.button_action('Button2')
-            Button:
-                text: 'Button3'
-                on_release: root.button_action('Button3')
-        BoxLayout:
-            padding: (5,2.5,5,2.5)
-            spacing: 5
-            orientation: 'horizontal'
-            Button:
-                text: 'Button4'
-                on_release: root.button_action('Button4')
-            Button:
-                text: 'Button5'
-                on_release: root.button_action('Button5')
-            Button:
-                text: 'Button6'
-                on_release: root.button_action('Button6')
-        BoxLayout:
-            padding: (5,2.5,5,5)
-            spacing: 5
-            orientation: 'horizontal'
-            Button:
-                text: 'Record'
-                on_release: root.button_action('Record')
-            Button:
-                text: 'Continue'
-                on_release: root.button_action('Continue')
-            Button:
-                text: 'Measure'
-                on_release: root.button_action('Measure')
 
 <StatusScreen>:
 
@@ -219,12 +182,13 @@ ScreenManager:
             valign: 'middle'
             halign: 'center'
             font_size: 20
-            color: MENU_COLOR[0]/255, MENU_COLOR[1]/255, MENU_COLOR[2]/255, 1
+            color: WINDOW_COLOR
         Button:
             text: 'Back'
             on_press: app.root.current = 'MainScreen'
             size_hint_y: .2
-            background_color: (BUTTON_COLOR[0]/255, BUTTON_COLOR[1]/255, BUTTON_COLOR[2]/255, 1)
+            color: BUTTON_COLOR
+            background_color: BUTTON_BACKGROUND
             background_normal: ''
 
 
@@ -237,23 +201,33 @@ ScreenManager:
     popup: None
     BoxLayout:
         orientation: 'vertical'
+        spacing: 5
         Label:
-            text: 'Use this option to set the station coordinates only.  This option assumes that the horizontal angle is already correct'
-            height: .25
+            text: 'Use this option to set the station coordinates only.\n  This option assumes that the horizontal angle is already correct.'
+            size_hint_y: .8
+            valign: 'middle'
+            halign: 'center'
+            font_size: 20
+            color: WINDOW_COLOR
         BoxLayout:
             orientation: 'horizontal'
-            height: 1
+            spacing: 5
+            size_hint_y: .2
             Button:
-                text: 'Proceed'
+                text: 'Next'
                 on_press: root.datum_list()
                 default_size: None, dp(56)
                 default_size_hint: 1, None
+                color: BUTTON_COLOR
+                background_color: BUTTON_BACKGROUND
+                background_normal: ''
             Button:
-                text: 'Cancel'
+                text: 'Back'
                 on_press: app.root.current = 'MainScreen'
                 default_size: None, dp(56)
                 default_size_hint: 1, None
-                background_color: (CANCEL_BUTTON_BACKGROUND[0]/255,CANCEL_BUTTON_BACKGROUND[1]/255,CANCEL_BUTTON_BACKGROUND[2]/255, 1)
+                color: BUTTON_COLOR
+                background_color: BUTTON_BACKGROUND
                 background_normal: ''
 
 <datumlist>:

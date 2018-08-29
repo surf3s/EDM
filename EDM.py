@@ -14,6 +14,8 @@
 # Add serial port communications
 # Add bluetooth communications
 
+__version__ = '1.0.0'
+
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.factory import Factory
@@ -48,10 +50,14 @@ import pandas as pd
 
 from collections import OrderedDict
 
-CANCEL_BUTTON_BACKGROUND = [26, 26, 26] #0x424242
-BUTTON_BACKGROUND = [0, .69 * 255, 255]
-WINDOW_BACKGROUND = [255, 255, 255]
+OPTIONBUTTON_BACKGROUND = (128/255, 216/255, 255/255, 1) #80D8FF (lighter blue)
+OPTIONBUTTON_COLOR = (0, 0, 0, 1) # black
+BUTTON_BACKGROUND = (0, .69, 255/255, 1) #00B0FF (deep blue)
+BUTTON_COLOR =  (0, 0, 0, 1) # black
+WINDOW_BACKGROUND = (255/255, 255/255, 255/255, 1) #FFFFFF
+WINDOW_COLOR = (0, 0, 0, 1)
 
+test = (128 / 255, 216/255, 255/255, 1)
 # get anglr.py library
 # or get angles.py library (looks maybe better)
 
@@ -715,18 +721,44 @@ class Root(FloatLayout):
 
         self.dismiss_popup()
 
-
 class EditDatums(Screen):
     pass
 
 class MainScreen(Screen):
-    def button_action(self, button_name):
-        print(YesNoCancel(caption = 'Test', cancel = False))
+    def __init__(self,**kwargs):
+        super(MainScreen, self).__init__(**kwargs)
+        layout = GridLayout(cols = 3, spacing = 10, size_hint_y = None)
 
+        ## go through the cfg and add buttons
+
+        button_rec = Button(text = 'Record', size_hint_y = None, id = 'record',
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
+        layout.add_widget(button_rec)
+        button_rec.bind(on_press = self.take_shot)
+
+        button_continue = Button(text = 'Continue', size_hint_y = None, id = 'continue',
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
+        layout.add_widget(button_continue)
+        button_continue.bind(on_press = self.take_shot)
+
+        button_measure = Button(text = 'Measure', size_hint_y = None, id = 'measure',
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
+        layout.add_widget(button_measure)
+        button_measure.bind(on_press = self.take_shot)
+
+        self.add_widget(layout)
+
+    def take_shot(self, value):
+        pass
 
 class InitializeOnePointHeader(Label):
     pass
-
 
 class InitializeDirectScreen(Screen):
 
@@ -736,13 +768,15 @@ class InitializeDirectScreen(Screen):
         layout_popup = GridLayout(cols = 1, spacing = 10, size_hint_y = None)
         layout_popup.bind(minimum_height=layout_popup.setter('height'))
         for datum in datums.names(EDMpy.edm_datums):
-            button1 = Button(text = datum, size_hint_y = None, id = datum)
+            button1 = Button(text = datum, size_hint_y = None, id = datum,
+                        color = OPTIONBUTTON_COLOR,
+                        background_color = OPTIONBUTTON_BACKGROUND,
+                        background_normal = '')
             layout_popup.add_widget(button1)
             button1.bind(on_press = self.initialize_direct)
         button2 = Button(text = 'Cancel', size_hint_y = None,
-                        background_color = (CANCEL_BUTTON_BACKGROUND[0]/255,
-                                            CANCEL_BUTTON_BACKGROUND[1]/255,
-                                            CANCEL_BUTTON_BACKGROUND[2]/255,1),
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
                         background_normal = '')
         layout_popup.add_widget(button2)
         root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
@@ -867,61 +901,88 @@ class StationConfigurationScreen(Screen):
     def __init__(self,**kwargs):
         super(StationConfigurationScreen, self).__init__(**kwargs)
     
-        layout = GridLayout(cols = 2)
+        layout = GridLayout(cols = 2, spacing = 5)
 
         # Station type menu
-        self.StationLabel = Label(text="Station type :")
+        self.StationLabel = Label(text="Station type", color = WINDOW_COLOR)
         layout.add_widget(self.StationLabel)
-        self.StationMenu = Spinner(text="Simulate", values=("Leica", "Wild", "Topcon", "Simulate"), id = 'station') 
+        self.StationMenu = Spinner(text="Simulate", values=("Leica", "Wild", "Topcon", "Simulate"), id = 'station',
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '')
         self.StationMenu.size_hint  = (0.3, 0.2)
         layout.add_widget(self.StationMenu)
 
         # Communications type menu
-        self.CommTypeLabel = Label(text="Communications :")
+        self.CommTypeLabel = Label(text="Communications", color = WINDOW_COLOR)
         layout.add_widget(self.CommTypeLabel)
-        self.CommTypeMenu = Spinner(text="None", values=("Serial", "Bluetooth"), id = 'communications') 
+        self.CommTypeMenu = Spinner(text="None", values=("Serial", "Bluetooth"), id = 'communications',
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '')
         self.CommTypeMenu.size_hint  = (0.3, 0.2)
         layout.add_widget(self.CommTypeMenu)
 
         # Port number
-        self.PortNoLabel = Label(text="Port Number :")
+        self.PortNoLabel = Label(text="Port Number", color = WINDOW_COLOR)
         layout.add_widget(self.PortNoLabel)
-        self.PortNoMenu = Spinner(text="COM1", values=("COM1", "COM2","COM3","COM4","COM5","COM6"), id = 'comport')  
+        self.PortNoMenu = Spinner(text="COM1", values=("COM1", "COM2","COM3","COM4","COM5","COM6"), id = 'comport',
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '')
         self.PortNoMenu.size_hint  = (0.3, 0.2)
         layout.add_widget(self.PortNoMenu)
 
         # Speed
-        self.SpeedLabel = Label(text="Speed :")
+        self.SpeedLabel = Label(text="Speed", color = WINDOW_COLOR)
         layout.add_widget(self.SpeedLabel)
-        self.SpeedMenu = Spinner(text="1200", values=("1200", "2400","4800","9600"), id = 'baudrate')  
+        self.SpeedMenu = Spinner(text="1200", values=("1200", "2400","4800","9600"), id = 'baudrate',
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '')
         self.SpeedMenu.size_hint  = (0.3, 0.2)
         layout.add_widget(self.SpeedMenu)
 
         # Parity
-        self.ParityLabel = Label(text="Parity :")
+        self.ParityLabel = Label(text="Parity", color = WINDOW_COLOR)
         layout.add_widget(self.ParityLabel)
-        self.ParityMenu = Spinner(text="Even", values=("Even", "Odd","None"), id = 'parity')  
+        self.ParityMenu = Spinner(text="Even", values=("Even", "Odd","None"), id = 'parity',
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '')
         self.ParityMenu.size_hint  = (0.3, 0.2)
         layout.add_widget(self.ParityMenu)
 
         # Databits
-        self.DataBitsLabel = Label(text="Data bits :")
+        self.DataBitsLabel = Label(text="Data bits", color = WINDOW_COLOR)
         layout.add_widget(self.DataBitsLabel)
-        self.DataBitsMenu = Spinner(text="7", values=("7", "8"), id = 'databits')  
+        self.DataBitsMenu = Spinner(text="7", values=("7", "8"), id = 'databits',
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '')
         self.DataBitsMenu.size_hint  = (0.3, 0.2)
         layout.add_widget(self.DataBitsMenu)
 
         # Stopbits
-        self.StopBitsLabel = Label(text="Stop bits :")
+        self.StopBitsLabel = Label(text="Stop bits", color = WINDOW_COLOR)
         layout.add_widget(self.StopBitsLabel)
-        self.StopBitsMenu = Spinner(text="1", values=("0", "1", "2"), id = 'stopbits')  
+        self.StopBitsMenu = Spinner(text="1", values=("0", "1", "2"), id = 'stopbits',
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '')
         self.StopBitsMenu.size_hint  = (0.3, 0.2)
         layout.add_widget(self.StopBitsMenu)
 
-        button1 = Button(text = 'Save', size_hint_y = None, id = 'save')
+        button1 = Button(text = 'Save', size_hint_y = None, id = 'save',
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
         layout.add_widget(button1)
         button1.bind(on_press = self.close_screen)
-        button2 = Button(text = 'Cancel', size_hint_y = None, id = 'cancel')
+        button2 = Button(text = 'Back', size_hint_y = None, id = 'cancel',
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
         layout.add_widget(button2)
         button2.bind(on_press = self.close_screen)
 
@@ -931,19 +992,19 @@ class StationConfigurationScreen(Screen):
         if instance.id=='save':
             for child in self.children[0].children:
                 if child.id=='stopbits':
-                    totalstation.stopbits = child.text
+                    EDMpy.edm_station.stopbits = child.text
                 if child.id=='baudrate':
-                    totalstation.baudrate = child.text
+                    EDMpy.edm_station.baudrate = child.text
                 if child.id=='databits':
-                    totalstation.databits = child.text
+                    EDMpy.edm_station.databits = child.text
                 if child.id=='comport':
-                    totalstation.comport = child.text
+                    EDMpy.edm_station.comport = child.text
                 if child.id=='parity':
-                    totalstation.parity = child.text
+                    EDMpy.edm_station.parity = child.text
                 if child.id=='communications':
-                    totalstation.communications = child.text
+                    EDMpy.edm_station.communications = child.text
                 if child.id=='station':
-                    totalstation.station = child.text
+                    EDMpy.edm_station.make = child.text
                 ## need code to open com port here
         self.parent.current = 'MainScreen'
 
@@ -972,9 +1033,7 @@ class StatusScreen(Screen):
         label.bind(texture_size = label.setter('size'))
         label.bind(size_hint_min_x = label.setter('width'))
         button = Button(text = 'Back', size_hint_y = None,
-                        background_color = (BUTTON_BACKGROUND[0]/255,
-                                            BUTTON_BACKGROUND[1]/255,
-                                            BUTTON_BACKGROUND[2]/255,1),
+                        background_color = BUTTON_BACKGROUND,
                         background_normal = '')
         root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height))
         root.add_widget(layout)
@@ -987,6 +1046,7 @@ class StatusScreen(Screen):
             if widget.id=='content':
                 txt = EDMpy.edm_station.status() + EDMpy.edm_datums.status() + EDMpy.edm_prisms.status()
                 txt += EDMpy.edm_units.status()
+                txt += 'test %s ' % EDMpy.title
                 widget.text = txt
 
     def go_back(self, value):
@@ -1000,9 +1060,7 @@ class EDMpy(App):
     edm_station = totalstation()
 
     def build(self):
-        Window.clearcolor = (WINDOW_BACKGROUND[0]/255,
-                            WINDOW_BACKGROUND[1]/255,
-                            WINDOW_BACKGROUND[2]/255, 1)
+        Window.clearcolor = WINDOW_BACKGROUND
         self.computer = 'WINDOWS'
         self.printer = False
         self.sitename = ''
