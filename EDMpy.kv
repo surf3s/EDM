@@ -355,17 +355,24 @@ ScreenManager:
         orientation: "vertical"
         FileChooserListView:
             id: filechooser
-
+            filters: ['*.cfg']
+            path: root.start_path
         BoxLayout:
             size_hint_y: None
             height: 30
+            spacing: 5
             Button:
-                text: "Cancel"
+                text: "Next"
+                on_release: root.load(filechooser.path, filechooser.selection)
+                color: BUTTON_COLOR
+                background_color: BUTTON_BACKGROUND
+                background_normal: ''
+            Button:
+                text: "Back"
                 on_release: root.cancel()
-
-            Button:
-                text: "Open"
-                on_release: root.load_cfg(filechooser.path, filechooser.selection)
+                color: BUTTON_COLOR
+                background_color: BUTTON_BACKGROUND
+                background_normal: ''
 
 <SaveDialog>:
     text_input: text_input

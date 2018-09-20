@@ -46,7 +46,7 @@ import random
 import numpy as np
 import datetime
 import pandas as pd 
-
+import logging
 
 from collections import OrderedDict
 
@@ -92,85 +92,7 @@ class points:
         return(txt)
 
     def create_defaults(self):
-        self.fields = []
-
-        unit = field('UNIT')
-        unit.prompt = 'Unit'
-        unit.maxlen = 6
-        unit.required = True
-        self.fields.append(unit)
-
-        ID = field('ID')
-        ID.prompt = 'ID'
-        ID.maxlen = 5
-        ID.required = True
-        self.fields.append(ID)
-
-        suffix = field('SUFFIX')
-        suffix.type = 'Numeric'
-        suffix.prompt = 'Suffix'
-        suffix.maxlen = 3
-        suffix.required = True
-        self.fields.append(suffix)
-
-        layer = field('LAYER')
-        layer.prompt = 'Layer'
-        layer.maxlen = 20
-        self.fields.append(layer)
-
-        code = field('CODE')
-        code.prompt = 'Code'
-        code.maxlen = 20
-        self.fields.append(code)
-
-        excavator = field('excavator')
-        excavator.prompt = 'Excavator'
-        excavator.maxlen = 20
-        self.fields.append(excavator)
-
-        prism = field('PRISM')
-        prism.type = 'Numeric'
-        prism.required = True
-        self.fields.append(prism)
-
-        x = field('X')
-        x.type = 'Numeric'
-        x.required = True
-        self.fields.append(x)
-
-        y = field('Y')
-        y.type = 'Numeric'
-        y.required = True
-        self.fields.append(y)
-
-        z = field('Z')
-        z.type = 'Numeric'
-        z.required = True
-        self.fields.append(z)
-
-        hangle = field('HANGLE')
-        hangle.required = True
-        hangle.prompt = 'H-Angle'
-        self.fields.append(hangle)
-
-        vangle = field('VANGLE')
-        vangle.required = True
-        vangle.prompt = 'V-Angle'
-        self.fields.append(vangle)
-
-        sloped = field('SLOPED')
-        sloped.type = 'Numeric'
-        sloped.required = True
-        sloped.prompt = 'Slope D.'
-        self.fields.append(sloped)
-
-        datetime = field('DATETIME')
-        datetime.type = 'Text'
-        datetime.required = True
-        datetime.prompt = 'Date-Time'
-        self.fields.append(datetime)
-
-        # Need something here about convert this now to dataframe
+        pass
 
     def names(self):
         name_list = []
@@ -294,244 +216,167 @@ class units:
     def names(self):
         return(self.units.loc[:,'Name'])
 
+class manage_inicfg:
+    def update_value(blocks, blockname, varname, vardata, append = False):
+        block_exists = False
+        for block in blocks:
+            if block['BLOCKNAME']==blockname:
+                block_exists = True
+                if (varname in block.keys()) and append:
+                    block[varname] = [block[varname] , vardata]
+                else:
+                    block[varname] = vardata 
+                return(True)
+        if not block_exists:
+            temp = {}
+            temp['BLOCKNAME'] = blockname
+            temp[varname] = vardata
+            blocks.append(temp)
+            return(True)
+        return(False)
+
+    def read_blocks(filename):
+        blocks = []
+        try:
+            with open(filename) as f:
+                for line in f:
+                    if len(line) > 2:
+                        if line.strip()[0]=="[":
+                            blockname = line.strip()[1:-1].upper()
+                        else:
+                            if '=' in line:
+                                varname = line.split("=")[0].strip().upper()
+                                vardata = line.split("=")[1].strip()
+                                manage_inicfg.update_value(blocks, blockname, varname, vardata)
+        except Exception as ex:
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+            logging.exception(message)
+            return([])
+        return(blocks)
+
+    def names(self, blocks):
+        name_list = []
+        for block in self.blocks:
+            name_list.append(block['BLOCKNAME'])
+        return(name_list)
+        
+    def get_value(blocks, blockname, varname):
+        for block in blocks:
+            if block['BLOCKNAME'] == blockname:
+                if varname in block.keys():
+                    return(block[varname])
+                else:
+                    return('')
+        return('')                
+
+    def write_blocks(filename, blocks):
+        try:
+            with open(filename, mode = 'w') as f:
+                for block in blocks:
+                    f.write("[%s]\n" % block['BLOCKNAME'])
+                    for item in block.keys():
+                        f.write(item + "=%s\n" % block[item])
+                    f.write("\n")
+            return(True)
+        except:
+            return(False)
+
 class ini:
     
-    def ini_class(self):
-        def __init__(self, name):
-            self.name = name
-            self.items = []
-
-    def update_value(self, ini_classname, varname, vardata, append = True):
-        class_exists = False
-        for ini_class in self.classes:
-            if ini_class.name==ini_classname:
-                class_exists = True
-                if ini_class.items[varname]:
-                    ini_class.items[varname] += vardata
-                else:
-                    ini_class.items[varname] = vardata 
-        if not class_exists:
-            temp = ini_class(ini_classname)
-            temp.items[varname] = vardata
-            self.classes.append(temp)
-
-    def read_ini(self):
-        try:
-            with open(self.filename) as f:
-                for line in f:
-                    if line.strip()[0]=="[":
-                        ini_classname = line.strip()[1:-1].upper()
-                    else:
-                        if line.find("="):
-                            varname = line.split("=")[0].strip().upper()
-                            vardata = line.split("=")[1].strip()
-                            self.update_value(ini_classname, varname, vardata)
-        except:
-            pass
-
+    blocks = []
 
     def __init__(self, filename):
         self.filename = filename
-        self.classes = []
-        self.read_ini()
+        self.blocks = manage_inicfg.read_blocks('EDMpy.ini')
 
-    def names(self):
-        name_list = []
-        for ini_class in self.classes:
-            name_list.append(ini_class.name)
-        return(name_list)
-        
-    def get_value(self, ini_classname, varname):
-        for ini_class in self.classes:
-            if ini_class.name==ini_classname:
-                return(ini_class[varname])
-        return('')                
+    def update(self):
+        global edm_station
+        global edm_cfg
+        manage_inicfg.update_value(self.blocks,'STATION','TotalStation', edm_station.make)
+        manage_inicfg.update_value(self.blocks,'STATION','Communication', edm_station.communication)
+        manage_inicfg.update_value(self.blocks,'STATION','COMPort', edm_station.comport)
+        manage_inicfg.update_value(self.blocks,'STATION','BAUD', edm_station.baudrate)
+        manage_inicfg.update_value(self.blocks,'STATION','Parity', edm_station.parity)
+        manage_inicfg.update_value(self.blocks,'STATION','DataBits', edm_station.databits)
+        manage_inicfg.update_value(self.blocks,'STATION','StopBits', edm_station.stopbits)
+        manage_inicfg.update_value(self.blocks,'EDM','CFG', edm_cfg.filename)
+        self.save()
 
-    def write_ini(self):
-        try:
-            with open('$temp$.ini', mode = 'w') as f:
-                pass
-                # loop through items in items
-                # loop through dictionary for each item
-
-            # when successful - delete current ini
-            # rename temp.ini as current ini
-        except:
-            pass
-
-class cfg:
-    def __init__(self, filename):
-        self.filename = filename 
-
-    def load(self):
-        new_format = False
-        errormessage = []
-        with open(self.filename) as f:
-            for line in f:
-                if line.upper() == '[EDM]':
-                    new_format = True
-
-        if not new_format:
-            lineno = 0
-            complete_line = ''
-            with open(self.filename) as f:
-                for line in f:
-                    lineno += 1
-                    complete_line += line.strip()
-                    if complete_line[-1] == '\\':
-                        complete_line[-1] = ' '
-                    elif len(complete_line)>0 and complete_line[1]!="'":
-                        a = complete_line.find(":")
-                        if a:
-                            key_field = complete_line[:a].upper()
-                            data_value = complete_line[a:]
-                            if key_field=='FIELD':
-                                if data_value == "":
-                                    errormessage.append = "No field name given in line %s." & (lineno)
-                                    break 
-                                if data_value in points.names(): 
-                                    errormessage.append = "Duplicate FIELD definition for %s in line %s." & (data_value, lineno)
-                                    break
-                                if points.field_count() == points.MAX_FIELDS:
-                                    errormessage.append = "Too many FIELD definitions with %s.  Limit is %s" & (data_value, points.MAX_FIELDS)
-                                    break
-                                new_field = points.field
-                                new_field.name = data_value
-                                points.fields.append(new_field)
-
-                            if key_field == 'POINTSFILE':
-                                points.filename = data_value.upper()
-
-                            if key_field == 'COM1':
-                                totalstation.com_port_no = 1
-                                totalstation.com_port_settings = data_value.upper()
-
-                            if key_field == 'COM2':
-                                totalstation.com_port_no = 2
-                                totalstation.com_port_settings = data_value.upper()
-
-                            if key_field == 'EDM':
-                                data_value = data_value.upper().split(' ')
-                                if data_value[0] in ['NONE','MANUAL']:
-                                    totalstation.make = 'NONE'
-                                if data_value[0] in ["GTS-3B", "GTS-301", "GTS-302", "GTS-303", "GTS-3X", "TOPCON"]:
-                                    totalstation.make = 'TOPCON'
-                                if data_value[0] in ["TC-500", "WILD"]:
-                                    totalstation.make = 'WILD'
-                                if data_value[0] in ["SOKKIA"]:
-                                    totalstation.make = 'SOKKIA'
-                                if totalstation.make == '':
-                                    errormessage = "Expected NONE, MANUAL, TOPCON, WILD or SOKKIA instrument in line %s." & (lineno)
-                                    break
-
-                            if key_field == "COMPUTER":
-                                data_value = data_value.upper()
-                                if data_value not in ['WINDOWS','OSX','ANRDOID']:
-                                    errormessage = "Expected WINDOWS, OSX or ANDROID for computer type in line %s." & (lineno)
-                                    break
-
-                            if key_field == "SQID":
-                                pass
-
-                            if key_field == "PRISMDEF":
-                                if prisms.count() == prisms.MAX_PRISMS:
-                                    errormessage = "The number of prisms is limited to %s." & (prisms.MAX_PRISMS)
-                                    break
-                                data_value = data_value.split(' ')
-                                if len(data_value)<2:
-                                    errormessage = 'Prism definitions require a height.  See line %s.' & (lineno)
-                                if data_value[0] in prisms.names():
-                                    errormessage = 'Duplicate prism name in line %s.' & (lineno)
-                                new_prism = prisms.prism
-                                new_prism.name = data_value[0].upper()
-                                new_prism.height = data_value[1]
-                                if len(new_prism)>2:
-                                    new_prism.offset = data_value[2]
-                                prisms.prisms.append(new_prism)
-
-                            if key_field == "DATUMDEF":
-                                if datums.count() == datums.MAX_DATUMS:
-                                    errormessage = "The number of datums is limited to %s." & (datums.MAX_DATUMS)
-                                    break
-                                data_value = data_value.upper().split(' ')
-                                if len(data_value) < 4:
-                                    errormessage = "Format DATUMDEF as Name X Y Z.  See line %s." & (lineno)
-                                    break
-                                if data_value[0] in datums.names():
-                                    errormessage = "Duplicate datum name in line %s." & (lineno)
-                                    break
-                                new_datum = datums.datum
-                                new_datum.name = data_value[0]
-                                new_datum.X = data_value[1]
-                                new_datum.Y = data_value[2]
-                                new_datum.Z = data_value[3]
-                                datums.datums.append(new_datum)
-
-                            if key_field == "UNITFILE":
-                                pass
-
-        else:
-            ini_data = ini(cfg_file)
-
-            if ini.get_value("EDM", "Sitename"):
-                EDM.sitename = ini.get_value("EDM", "Sitename")
-            else:
-                EDM.sitename = "EDM"
-       
-            if ini.get_value("EDM", "Database"):
-                EDM.database = ini.get_value("EDM", "Database")
-            else:
-                EDM.database = "EDM"
-
-            if ini.get_value("EDM", "SQID").upper() in ['TRUE', 'YES']:
-                EDM.sqid = True
-            else:
-                EDM.sqid = False
-
-            if ini.get_value("EDM", "Limitchecking").upper() in ['TRUE', 'YES']:
-                EDM.limitchecking = True
-            else:
-                EDM.limitchecking = False
-
-            if ini.get_value("EDM", "WriteLogFile").upper() in ['TRUE', 'YES']:
-                EDM.writelogfile = True
-            else:
-                EDM.writelogfile = False
-
-            if ini.get_value("EDM", "Unitfields"):
-                EDM.unitfields = ini.get_value("EDM", "Unitfields").upper()
-                # if suffix is a unit field, remove it
-                # remove these fields as well "x", "y", "z", "date", "time", "hangle", "vangle"
-                unitname = "unit"
-            else:
-                EDM.unitfields = ""
-
-            for fieldname in ini.names():
-                if fieldname not in ["EDM", "BUTTON1", "BUTTON2", "BUTTON3", "BUTTON4", "BUTTON5", "BUTTON6"]:
-                    new_field = points.field(fieldname)
-                    new_field.type = ini.get_value(fieldname, "Type")
-                    new_field.prompt = ini.get_value(fieldname, "Prompt")
-                    new_field.menulist = ini.get_value(fieldname, "Menu")
-                    new_field.maxlen = ini.get_value(fieldname, "Length")
-                    if ini.get_value(fieldname, "Carry").upper() in ['TRUE', 'YES']:
-                        new_field.carry = True
-                    else:
-                        new_field.carry = False
-                    if ini.get_value(fieldname, "Unique").upper() in ['TRUE', 'YES']:
-                        new_field.unique = True
-                    else:
-                        new_field.unique = False
-                    if ini.get_value(fieldname, "Required").upper() in ['TRUE', 'YES']:
-                        new_field.required = True
-                    else:
-                        new_field.required = False
-                    if ini.get_value(fieldname, "Increment").upper() in ['TRUE', 'YES']:
-                        new_field.increment = True
-                    else:
-                        new_field.increment = False
+    def get_value(self, blockname, varname):
+        return(manage_inicfg.get_value(self.blocks, blockname, varname))
 
     def save(self):
+        manage_inicfg.write_blocks('EDMpy.ini', self.blocks)
+
+class cfg:
+
+    blocks = []
+    filename = ""
+
+    def __init__(self, filename):
+        self.load(filename)
+
+    def get_value(self, blockname, varname):
+        return(manage_inicfg.get_value(self.blocks, blockname, varname))
+
+    def build_default(self):
+        manage_inicfg.update_value(self.blocks, 'UNIT', 'Prompt', 'Unit :')
+        manage_inicfg.update_value(self.blocks, 'UNIT', 'Type', 'Text')
+        manage_inicfg.update_value(self.blocks, 'UNIT', 'Length', 6)
+
+        manage_inicfg.update_value(self.blocks, 'ID', 'Prompt', 'ID :')
+        manage_inicfg.update_value(self.blocks, 'ID', 'Type', 'Text')
+        manage_inicfg.update_value(self.blocks, 'ID', 'Length', 6)
+
+        manage_inicfg.update_value(self.blocks, 'SUFFIX', 'Prompt', 'Suffix :')
+        manage_inicfg.update_value(self.blocks, 'SUFFIX', 'Type', 'Numeric')
+
+        manage_inicfg.update_value(self.blocks, 'LEVEL', 'Prompt', 'Level :')
+        manage_inicfg.update_value(self.blocks, 'LEVEL', 'Type', 'Menu')
+        manage_inicfg.update_value(self.blocks, 'LEVEL', 'Length', 20)
+
+        manage_inicfg.update_value(self.blocks, 'CODE', 'Prompt', 'Code :')
+        manage_inicfg.update_value(self.blocks, 'CODE', 'Type', 'Menu')
+        manage_inicfg.update_value(self.blocks, 'CODE', 'Length', 20)
+
+        manage_inicfg.update_value(self.blocks, 'EXCAVATOR', 'Prompt', 'Excavator :')
+        manage_inicfg.update_value(self.blocks, 'EXCAVATOR', 'Type', 'Menu')
+        manage_inicfg.update_value(self.blocks, 'EXCAVATOR', 'Length', 20)
+
+        manage_inicfg.update_value(self.blocks, 'PRISM', 'Prompt', 'Prism :')
+        manage_inicfg.update_value(self.blocks, 'PRISM', 'Type', 'Numeric')
+
+        manage_inicfg.update_value(self.blocks, 'X', 'Prompt', 'X :')
+        manage_inicfg.update_value(self.blocks, 'X', 'Type', 'Numeric')
+
+        manage_inicfg.update_value(self.blocks, 'Y', 'Prompt', 'Y :')
+        manage_inicfg.update_value(self.blocks, 'Y', 'Type', 'Numeric')
+
+        manage_inicfg.update_value(self.blocks, 'Z', 'Prompt', 'Z :')
+        manage_inicfg.update_value(self.blocks, 'Z', 'Type', 'Numeric')
+
+        manage_inicfg.update_value(self.blocks, 'DATE', 'Prompt', 'Date :')
+        manage_inicfg.update_value(self.blocks, 'DATE', 'Type', 'Text')
+        manage_inicfg.update_value(self.blocks, 'DATE', 'Length', 24)
+
+        # should add hangle, vangle, sloped 
+
+    def validate(self):
         pass
+
+    def save(self):
+        manage_inicfg.write_blocks(self.filename, self.blocks)
+
+    def load(self, filename):
+        self.filename = filename 
+        self.blocks = manage_inicfg.read_blocks(filename)
+        if self.blocks==[]:
+            self.build_default()
+    
+    def status(self):
+        txt = 'CFG file is %s\n' % self.filename
+        return(txt)
 
 class totalstation:
     def __init__(self, make = "Emulation", model = ''):
@@ -682,6 +527,7 @@ class totalstation:
         pass
 
 class LoadDialog(FloatLayout):
+    start_path =  ObjectProperty(None)
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
 
@@ -724,12 +570,55 @@ class Root(FloatLayout):
 class EditDatums(Screen):
     pass
 
+class record_button(Button):
+    def __init__(self,id,text,**kwargs):
+        super(Button, self).__init__(**kwargs)
+        self.text = text
+        self.id = id
+        self.size_hint_y = None
+        self.id = id
+        self.color = BUTTON_COLOR
+        self.background_color = BUTTON_BACKGROUND
+        self.background_normal = ''
+
 class MainScreen(Screen):
+
     def __init__(self,**kwargs):
         super(MainScreen, self).__init__(**kwargs)
-        layout = GridLayout(cols = 3, spacing = 10, size_hint_y = None)
 
-        ## go through the cfg and add buttons
+        global edm_cfg
+
+        layout = GridLayout(cols = 3, spacing = 10, size_hint_y = .8)
+
+        if edm_cfg.get_value('BUTTON1','TITLE'):
+            button1 = record_button(text = edm_cfg.get_value('BUTTON1','TITLE'), id = 'button1')
+            layout.add_widget(button1)
+            button1.bind(on_press = self.take_shot)
+
+        if edm_cfg.get_value('BUTTON2','TITLE'):
+            button2  = record_button(text = edm_cfg.get_value('BUTTON2','TITLE'), id = 'button2')
+            layout.add_widget(button2)
+            button2.bind(on_press = self.take_shot)
+
+        if edm_cfg.get_value('BUTTON3','TITLE'):
+            button3  = record_button(text = edm_cfg.get_value('BUTTON3','TITLE'), id = 'button3')
+            layout.add_widget(button3)
+            button3.bind(on_press = self.take_shot)
+
+        if edm_cfg.get_value('BUTTON4','TITLE'):
+            button4  = record_button(text = edm_cfg.get_value('BUTTON4','TITLE'), id = 'button4')
+            layout.add_widget(button4)
+            button4.bind(on_press = self.take_shot)
+
+        if edm_cfg.get_value('BUTTON5','TITLE'):
+            button5  = record_button(text = edm_cfg.get_value('BUTTON5','TITLE'), id = 'button5')
+            layout.add_widget(button5)
+            button5.bind(on_press = self.take_shot)
+
+        if edm_cfg.get_value('BUTTON6','TITLE'):
+            button6  = record_button(text = edm_cfg.get_value('BUTTON6','TITLE'), id = 'button6')
+            layout.add_widget(button6)
+            button6.bind(on_press = self.take_shot)
 
         button_rec = Button(text = 'Record', size_hint_y = None, id = 'record',
                         color = BUTTON_COLOR,
@@ -756,6 +645,23 @@ class MainScreen(Screen):
 
     def take_shot(self, value):
         pass
+
+    def show_load_cfg(self):
+        content = LoadDialog(load = self.load, 
+                            cancel = self.dismiss_popup,
+                            start_path = os.path.dirname(os.path.abspath( __file__ )))
+        self._popup = Popup(title = "Load CFG file", content = content,
+                            size_hint = (0.9, 0.9))
+        self._popup.open()
+
+    def load(self, path, filename):
+        global edm_cfg, edm_ini
+        edm_cfg.load(os.path.join(path, filename[0]))
+        edm_ini.update()
+        self.dismiss_popup()
+
+    def dismiss_popup(self):
+        self._popup.dismiss()
 
 class InitializeOnePointHeader(Label):
     pass
@@ -830,17 +736,20 @@ class EditPointsScreen(Screen):
 class EditPrismsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditPrismsScreen, self).__init__(**kwargs)
-        self.add_widget(DfguiWidget(EDMpy.edm_prisms.prisms, "prisms"))
+        global edm_prisms
+        self.add_widget(DfguiWidget(edm_prisms.prisms, "prisms"))
 
 class EditUnitsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditUnitsScreen, self).__init__(**kwargs)
-        self.add_widget(DfguiWidget(EDMpy.edm_units.units, "units"))
+        global edm_units
+        self.add_widget(DfguiWidget(edm_units.units, "units"))
 
 class EditDatumsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditDatumsScreen, self).__init__(**kwargs)
-        self.add_widget(DfguiWidget(EDMpy.edm_datums.datums, "datums"))
+        global edm_datums
+        self.add_widget(DfguiWidget(edm_datums.datums, "datums"))
 
 
 class datumlist(RecycleView, Screen):
@@ -1024,15 +933,23 @@ class LogScreen(Screen):
 class StatusScreen(Screen):
     def __init__(self,**kwargs):
         super(StatusScreen, self).__init__(**kwargs)
+
+        global edm_station, edm_datums, edm_units, edm_prisms
+        global edm_cfg
+
         layout = GridLayout(cols = 1, size_hint_y = None)
         layout.bind(minimum_height=layout.setter('height'))
-        txt = EDMpy.edm_station.status() + EDMpy.edm_datums.status() + EDMpy.edm_prisms.status()
-        txt += EDMpy.edm_units.status()
-        label = Label(text = txt, size_hint_y = None, color = (0,0,0,1), id = 'content')
+        txt = edm_station.status() + edm_datums.status() + edm_prisms.status()
+        txt += edm_units.status()
+        label = Label(text = txt, size_hint_y = None,
+                     color = (0,0,0,1), id = 'content',
+                     halign = 'left',
+                     font_size = 20)
         layout.add_widget(label)
         label.bind(texture_size = label.setter('size'))
         label.bind(size_hint_min_x = label.setter('width'))
         button = Button(text = 'Back', size_hint_y = None,
+                        color = BUTTON_COLOR,
                         background_color = BUTTON_BACKGROUND,
                         background_normal = '')
         root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height))
@@ -1042,45 +959,17 @@ class StatusScreen(Screen):
         button.bind(on_press = self.go_back)
 
     def on_pre_enter(self):
+        global edm_station, edm_datums, edm_units, edm_prisms
+        global edm_cfg
         for widget in self.walk():
             if widget.id=='content':
-                txt = EDMpy.edm_station.status() + EDMpy.edm_datums.status() + EDMpy.edm_prisms.status()
-                txt += EDMpy.edm_units.status()
-                txt += 'test %s ' % EDMpy.title
+                txt = edm_station.status() + edm_datums.status() + edm_prisms.status()
+                txt += edm_units.status() + edm_cfg.status()
                 widget.text = txt
 
     def go_back(self, value):
         self.parent.current = 'MainScreen'
 
-class EDMpy(App):
-    title = 'EDMpy'
-    edm_datums = datums('EDM_datums.csv')
-    edm_units = units('EDM_units.csv')
-    edm_prisms = prisms('EDM_prisms.csv')
-    edm_station = totalstation()
-
-    def build(self):
-        Window.clearcolor = WINDOW_BACKGROUND
-        self.computer = 'WINDOWS'
-        self.printer = False
-        self.sitename = ''
-        self.database = 'EDM'
-        edm_ini = ini('EDM.ini')
-        if edm_ini.get_value("EDM", "CFG"):
-            self.cfg_file = edm_ini.get_value("EDM", "CFG")
-            cfg = cfg(self.cfg_file)
-            cfg.load()
-        self.edm_points = points(self.database + '_points.csv')
-        self.edm_units = units(self.database + '_units.csv')
-        self.edm_prisms = prisms(self.database + '_prisms.csv')
-        self.edm_datums = datums(self.database + '_datums.csv')
-
-        #sm.current = 'main'
-        #df = create_dummy_data(0)
-        #df = edm_datums.datums 
-        #test = YesNoCancel("This is a test of a yes no popup box", cancel=False)
-        #print(test)
-        #return(DfguiWidget(EDMpy.edm_datums.datums, "datums"))
 
 # Code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 
@@ -1395,6 +1284,18 @@ class YesNoCancel(Popup):
     def cancel(self, instance):
         return('Cancel')
 
+class EDMpy(App):
+
+    def build(self):
+        Window.clearcolor = WINDOW_BACKGROUND
+        self.title = "EDMpy 1.0"
+
+        #sm.current = 'main'
+        #df = create_dummy_data(0)
+        #df = edm_datums.datums 
+        #test = YesNoCancel("This is a test of a yes no popup box", cancel=False)
+        #print(test)
+        #return(DfguiWidget(EDMpy.edm_datums.datums, "datums"))
     
 Factory.register('Root', cls=Root)
 Factory.register('LoadDialog', cls=LoadDialog)
@@ -1402,4 +1303,19 @@ Factory.register('SaveDialog', cls=SaveDialog)
 Factory.register('EDMpy', cls=EDMpy)
 
 if __name__ == '__main__':
+    logging.basicConfig(filename='EDMpy.log', filemode='w', level=logging.DEBUG)
+    database = 'EDM'
+    edm_ini = ini('EDMpy.ini')
+    edm_station = totalstation()
+    edm_cfg = cfg(edm_ini.get_value("EDM", "CFG"))
+    edm_points = points(database + '_points.csv')
+    edm_units = units(database + '_units.csv')
+    edm_prisms = prisms(database + '_prisms.csv')
+    edm_datums = datums(database + '_datums.csv')
+    if not edm_cfg.filename:
+        edm_cfg.filename = 'EDMpy.cfg'
+    edm_cfg.save()
+    edm_ini.update()
+    edm_ini.save()
+    
     EDMpy().run()
