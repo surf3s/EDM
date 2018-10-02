@@ -44,6 +44,7 @@ import numpy as np
 import datetime
 import pandas as pd 
 import logging
+from blockdata import blockdata
 
 from collections import OrderedDict
 
@@ -213,152 +214,91 @@ class units:
     def names(self):
         return(self.units.loc[:,'Name'])
 
-class manage_inicfg:
-    def update_value(blocks, blockname, varname, vardata, append = False):
-        block_exists = False
-        for block in blocks:
-            if block['BLOCKNAME']==blockname:
-                block_exists = True
-                if (varname in block.keys()) and append:
-                    block[varname] = [block[varname] , vardata]
-                else:
-                    block[varname] = vardata 
-                return(True)
-        if not block_exists:
-            temp = {}
-            temp['BLOCKNAME'] = blockname
-            temp[varname] = vardata
-            blocks.append(temp)
-            return(True)
-        return(False)
-
-    def read_blocks(filename):
-        blocks = []
-        try:
-            with open(filename) as f:
-                for line in f:
-                    if len(line) > 2:
-                        if line.strip()[0]=="[":
-                            blockname = line.strip()[1:-1].upper()
-                        else:
-                            if '=' in line:
-                                varname = line.split("=")[0].strip().upper()
-                                vardata = line.split("=")[1].strip()
-                                manage_inicfg.update_value(blocks, blockname, varname, vardata)
-        except Exception as ex:
-            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-            message = template.format(type(ex).__name__, ex.args)
-            logging.exception(message)
-            return([])
-        return(blocks)
-
-    def names(blocks):
-        name_list = []
-        for block in blocks:
-            name_list.append(block['BLOCKNAME'])
-        return(name_list)
-        
-    def get_value(blocks, blockname, varname):
-        for block in blocks:
-            if block['BLOCKNAME'] == blockname:
-                if varname in block.keys():
-                    return(block[varname])
-                else:
-                    return('')
-        return('')                
-
-    def write_blocks(filename, blocks):
-        try:
-            with open(filename, mode = 'w') as f:
-                for block in blocks:
-                    f.write("[%s]\n" % block['BLOCKNAME'])
-                    for item in block.keys():
-                        f.write(item + "=%s\n" % block[item])
-                    f.write("\n")
-            return(True)
-        except:
-            return(False)
-
-class ini:
+class ini(blockdata):
     
     blocks = []
+    filename = ''
 
     def __init__(self, filename):
+        if filename=='':
+            filename = 'EDMpy.ini'
         self.filename = filename
-        self.blocks = manage_inicfg.read_blocks('EDMpy.ini')
+        self.blocks = self.read_blocks()
 
     def update(self):
         global edm_station
         global edm_cfg
-        manage_inicfg.update_value(self.blocks,'STATION','TotalStation', edm_station.make)
-        manage_inicfg.update_value(self.blocks,'STATION','Communication', edm_station.communication)
-        manage_inicfg.update_value(self.blocks,'STATION','COMPort', edm_station.comport)
-        manage_inicfg.update_value(self.blocks,'STATION','BAUD', edm_station.baudrate)
-        manage_inicfg.update_value(self.blocks,'STATION','Parity', edm_station.parity)
-        manage_inicfg.update_value(self.blocks,'STATION','DataBits', edm_station.databits)
-        manage_inicfg.update_value(self.blocks,'STATION','StopBits', edm_station.stopbits)
-        manage_inicfg.update_value(self.blocks,'EDM','CFG', edm_cfg.filename)
+        self.update_value('STATION','TotalStation', edm_station.make)
+        self.update_value('STATION','Communication', edm_station.communication)
+        self.update_value('STATION','COMPort', edm_station.comport)
+        self.update_value('STATION','BAUD', edm_station.baudrate)
+        self.update_value('STATION','Parity', edm_station.parity)
+        self.update_value('STATION','DataBits', edm_station.databits)
+        self.update_value('STATION','StopBits', edm_station.stopbits)
+        self.update_value('EDM','CFG', edm_cfg.filename)
         self.save()
 
-    def get_value(self, blockname, varname):
-        return(manage_inicfg.get_value(self.blocks, blockname, varname))
+#    def get_value(self, blockname, varname):
+#        return(self.get_value(self.blocks, blockname, varname))
 
     def save(self):
-        manage_inicfg.write_blocks('EDMpy.ini', self.blocks)
+        self.write_blocks()
 
-class cfg:
+class cfg(blockdata):
 
     blocks = []
     filename = ""
 
     def __init__(self, filename):
+        if filename=='':
+            filename = 'EDMpy.cfg'
         self.load(filename)
 
     def fields(self):
-        return(manage_inicfg.names(self.blocks))
+        return(self.names(self.blocks))
 
-    def get_value(self, blockname, varname):
-        return(manage_inicfg.get_value(self.blocks, blockname, varname))
+#    def get_value(self, blockname, varname):
+#        return(self.get_value(self.blocks, blockname, varname))
 
     def build_default(self):
-        manage_inicfg.update_value(self.blocks, 'UNIT', 'Prompt', 'Unit :')
-        manage_inicfg.update_value(self.blocks, 'UNIT', 'Type', 'Text')
-        manage_inicfg.update_value(self.blocks, 'UNIT', 'Length', 6)
+        self.update_value(self.blocks, 'UNIT', 'Prompt', 'Unit :')
+        self.update_value(self.blocks, 'UNIT', 'Type', 'Text')
+        self.update_value(self.blocks, 'UNIT', 'Length', 6)
 
-        manage_inicfg.update_value(self.blocks, 'ID', 'Prompt', 'ID :')
-        manage_inicfg.update_value(self.blocks, 'ID', 'Type', 'Text')
-        manage_inicfg.update_value(self.blocks, 'ID', 'Length', 6)
+        self.update_value(self.blocks, 'ID', 'Prompt', 'ID :')
+        self.update_value(self.blocks, 'ID', 'Type', 'Text')
+        self.update_value(self.blocks, 'ID', 'Length', 6)
 
-        manage_inicfg.update_value(self.blocks, 'SUFFIX', 'Prompt', 'Suffix :')
-        manage_inicfg.update_value(self.blocks, 'SUFFIX', 'Type', 'Numeric')
+        self.update_value(self.blocks, 'SUFFIX', 'Prompt', 'Suffix :')
+        self.update_value(self.blocks, 'SUFFIX', 'Type', 'Numeric')
 
-        manage_inicfg.update_value(self.blocks, 'LEVEL', 'Prompt', 'Level :')
-        manage_inicfg.update_value(self.blocks, 'LEVEL', 'Type', 'Menu')
-        manage_inicfg.update_value(self.blocks, 'LEVEL', 'Length', 20)
+        self.update_value(self.blocks, 'LEVEL', 'Prompt', 'Level :')
+        self.update_value(self.blocks, 'LEVEL', 'Type', 'Menu')
+        self.update_value(self.blocks, 'LEVEL', 'Length', 20)
 
-        manage_inicfg.update_value(self.blocks, 'CODE', 'Prompt', 'Code :')
-        manage_inicfg.update_value(self.blocks, 'CODE', 'Type', 'Menu')
-        manage_inicfg.update_value(self.blocks, 'CODE', 'Length', 20)
+        self.update_value(self.blocks, 'CODE', 'Prompt', 'Code :')
+        self.update_value(self.blocks, 'CODE', 'Type', 'Menu')
+        self.update_value(self.blocks, 'CODE', 'Length', 20)
 
-        manage_inicfg.update_value(self.blocks, 'EXCAVATOR', 'Prompt', 'Excavator :')
-        manage_inicfg.update_value(self.blocks, 'EXCAVATOR', 'Type', 'Menu')
-        manage_inicfg.update_value(self.blocks, 'EXCAVATOR', 'Length', 20)
+        self.update_value(self.blocks, 'EXCAVATOR', 'Prompt', 'Excavator :')
+        self.update_value(self.blocks, 'EXCAVATOR', 'Type', 'Menu')
+        self.update_value(self.blocks, 'EXCAVATOR', 'Length', 20)
 
-        manage_inicfg.update_value(self.blocks, 'PRISM', 'Prompt', 'Prism :')
-        manage_inicfg.update_value(self.blocks, 'PRISM', 'Type', 'Numeric')
+        self.update_value(self.blocks, 'PRISM', 'Prompt', 'Prism :')
+        self.update_value(self.blocks, 'PRISM', 'Type', 'Numeric')
 
-        manage_inicfg.update_value(self.blocks, 'X', 'Prompt', 'X :')
-        manage_inicfg.update_value(self.blocks, 'X', 'Type', 'Numeric')
+        self.update_value(self.blocks, 'X', 'Prompt', 'X :')
+        self.update_value(self.blocks, 'X', 'Type', 'Numeric')
 
-        manage_inicfg.update_value(self.blocks, 'Y', 'Prompt', 'Y :')
-        manage_inicfg.update_value(self.blocks, 'Y', 'Type', 'Numeric')
+        self.update_value(self.blocks, 'Y', 'Prompt', 'Y :')
+        self.update_value(self.blocks, 'Y', 'Type', 'Numeric')
 
-        manage_inicfg.update_value(self.blocks, 'Z', 'Prompt', 'Z :')
-        manage_inicfg.update_value(self.blocks, 'Z', 'Type', 'Numeric')
+        self.update_value(self.blocks, 'Z', 'Prompt', 'Z :')
+        self.update_value(self.blocks, 'Z', 'Type', 'Numeric')
 
-        manage_inicfg.update_value(self.blocks, 'DATE', 'Prompt', 'Date :')
-        manage_inicfg.update_value(self.blocks, 'DATE', 'Type', 'Text')
-        manage_inicfg.update_value(self.blocks, 'DATE', 'Length', 24)
+        self.update_value(self.blocks, 'DATE', 'Prompt', 'Date :')
+        self.update_value(self.blocks, 'DATE', 'Type', 'Text')
+        self.update_value(self.blocks, 'DATE', 'Length', 24)
 
         # should add hangle, vangle, sloped 
 
@@ -366,11 +306,11 @@ class cfg:
         pass
 
     def save(self):
-        manage_inicfg.write_blocks(self.filename, self.blocks)
+        self.write_blocks()
 
     def load(self, filename):
         self.filename = filename 
-        self.blocks = manage_inicfg.read_blocks(filename)
+        self.blocks = self.read_blocks()
         if self.blocks==[]:
             self.build_default()
     
