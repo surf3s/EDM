@@ -1,8 +1,5 @@
-# need to move read_ini and write_ini over before much else can be done on the read cfg routines
 
-# Need a basic yes/no/cancel pop-up (can find templates on-line)
 # Need a datum select pop-up 
-# Need the program flow for station initial direct
 # Need a setup screen to set the total station type to simulation
 # Need a select prism pop-up
 # Need the program flow from record point, to select prism, to edit point, to save
@@ -255,9 +252,9 @@ class manage_inicfg:
             return([])
         return(blocks)
 
-    def names(self, blocks):
+    def names(blocks):
         name_list = []
-        for block in self.blocks:
+        for block in blocks:
             name_list.append(block['BLOCKNAME'])
         return(name_list)
         
@@ -316,6 +313,9 @@ class cfg:
 
     def __init__(self, filename):
         self.load(filename)
+
+    def fields(self):
+        return(manage_inicfg.names(self.blocks))
 
     def get_value(self, blockname, varname):
         return(manage_inicfg.get_value(self.blocks, blockname, varname))
@@ -583,6 +583,8 @@ class record_button(Button):
 
 class MainScreen(Screen):
 
+    popup = ObjectProperty(None)
+
     def __init__(self,**kwargs):
         super(MainScreen, self).__init__(**kwargs)
 
@@ -644,7 +646,36 @@ class MainScreen(Screen):
         self.add_widget(layout)
 
     def take_shot(self, value):
-        pass
+        global edm_prisms
+        layout_popup = GridLayout(cols = 1, spacing = 10, size_hint_y = None)
+        layout_popup.bind(minimum_height=layout_popup.setter('height'))
+        for prism in edm_prisms.names():
+            button1 = Button(text = prism, size_hint_y = None, id = prism,
+                        color = OPTIONBUTTON_COLOR,
+                        background_color = OPTIONBUTTON_BACKGROUND,
+                        background_normal = '')
+            layout_popup.add_widget(button1)
+            button1.bind(on_press = self.show_edit_screen)
+        button2 = Button(text = 'Back', size_hint_y = None,
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
+        layout_popup.add_widget(button2)
+        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
+        root.add_widget(layout_popup)
+        self.popup = Popup(title = 'Prism Height',
+                    content = root,
+                    size_hint = (None, None),
+                    size=(400, 400),
+                    #pos_hint = {None, None},
+                    auto_dismiss = False)
+        button2.bind(on_press = self.popup.dismiss)
+        self.popup.open()
+
+    def show_edit_screen(self, value):
+        self.popup.dismiss()
+        # note that prism name is value.text 
+        self.parent.current = 'EditPointScreen'
 
     def show_load_cfg(self):
         content = LoadDialog(load = self.load, 
@@ -661,7 +692,8 @@ class MainScreen(Screen):
         self.dismiss_popup()
 
     def dismiss_popup(self):
-        self._popup.dismiss()
+        self.popup.dismiss()
+        self.parent.current = 'MainScreen'
 
 class InitializeOnePointHeader(Label):
     pass
@@ -729,6 +761,29 @@ class InitializeThreePointScreen(Screen):
         super(InitializeThreePointScreen, self).__init__(**kwargs)
         self.add_widget(InitializeOnePointHeader())
         self.add_widget(DatumLister())
+
+class EditPointScreen(Screen):
+
+    def on_pre_enter(self):
+        #super(Screen, self).__init__(**kwargs)
+        global edm_cfg
+        layout = GridLayout(cols = 1, spacing = 10, size_hint_y = None)
+        layout.bind(minimum_height=layout.setter('height'))
+        for field in edm_cfg.fields():
+            layout.add_widget(Label(text = field, size_hint_y = None, color = BUTTON_COLOR))
+        button2 = Button(text = 'Save', size_hint_y = None,
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
+        layout.add_widget(button2)
+        button3 = Button(text = 'Back', size_hint_y = None,
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
+        layout.add_widget(button3)
+        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.5))
+        root.add_widget(layout)
+        self.add_widget(root)
 
 class EditPointsScreen(Screen):
     pass
@@ -1002,7 +1057,6 @@ def create_dummy_data(size):
 class HeaderCell(Button):
     pass
 
-
 class TableHeader(ScrollView):
     """Fixed table header that scrolls x with the data table"""
     header = ObjectProperty(None)
@@ -1013,11 +1067,9 @@ class TableHeader(ScrollView):
         for title in titles:
             self.header.add_widget(HeaderCell(text=title))
 
-
 class ScrollCell(Label):
     text = StringProperty(None)
     is_even = BooleanProperty(None)
-
 
 class TableData(RecycleView):
     nrows = NumericProperty(None)
@@ -1040,7 +1092,6 @@ class TableData(RecycleView):
     def sort_data(self):
         #TODO: Use this to sort table, rather than clearing widget each time.
         pass
-        
         
 class Table(BoxLayout):
 
@@ -1229,7 +1280,6 @@ class AddNew(BoxLayout):
             EDMpy.edm_units.units = EDMpy.edm_units.units.append(new_data)
             EDMpy.edm_units.save()
 
-
 class DfguiWidget(TabbedPanel):
 
     def __init__(self, df, df_name, **kwargs):
@@ -1254,8 +1304,6 @@ class DfguiWidget(TabbedPanel):
     
     def cancel(self):
         pass
-
-
 
 # End code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 

@@ -52,6 +52,10 @@ ScreenManager:
         id: initializethreepoint_screen
         name: 'InitializeThreePointScreen'
         manager: 'screen_manager'
+    EditPointScreen:
+        id: editpoint_screen
+        name: 'EditPointScreen'
+        manager: 'screen_manager'
     EditPointsScreen:
         id: editpoints_screen
         name: 'EditPointsScreen'
@@ -341,11 +345,7 @@ ScreenManager:
             on_press: app.root.current = 'MainScreen'
 
 <EditPointsScreen>:
-    BoxLayout:
-        orientation: "horizontal"
-        Button:
-            text: "Cancel"
-            on_press: app.root.current = 'MainScreen'
+<EditPointScreen>:
 
 
 <LoadDialog>:
