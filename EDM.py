@@ -473,6 +473,11 @@ class totalstation:
         if self.make=="SOKKIA":
             edm_output(Chr(17))
 
+        if self.make == 'Emulation':
+            self.x = random.uniform(1000, 1010)
+            self.y = random.uniform(1000, 1010)
+            self.z = random.uniform(0, 1)
+            
     def set_horizontal_angle(angle):
         pass
 
@@ -539,47 +544,6 @@ class totalstation:
     def calculate_angle(self):
         pass
 
-class LoadDialog(FloatLayout):
-    start_path =  ObjectProperty(None)
-    load = ObjectProperty(None)
-    cancel = ObjectProperty(None)
-
-class SaveDialog(FloatLayout):
-    save = ObjectProperty(None)
-    text_input = ObjectProperty(None)
-    cancel = ObjectProperty(None)
-
-class Root(FloatLayout):
-    loadfile = ObjectProperty(None)
-    savefile = ObjectProperty(None)
-    text_input = ObjectProperty(None)
-
-    def dismiss_popup(self):
-        self._popup.dismiss()
-
-    def show_load_cfg(self):
-        content = LoadDialog(load=self.load, cancel=self.dismiss_popup)
-        self._popup = Popup(title="Open CFG file", content=content,
-                            size_hint=(0.9, 0.9))
-        self._popup.open()
-
-    def show_save(self):
-        content = SaveDialog(save=self.save, cancel=self.dismiss_popup)
-        self._popup = Popup(title="Save file", content=content,
-                            size_hint=(0.9, 0.9))
-        self._popup.open()
-
-    def load_cfg(self, path, filename):
-        cfg = cfg(os.path.join(path, filename[0]))
-        cfg.load()
-        self.dismiss_popup()
-
-    def save(self, path, filename):
-        with open(os.path.join(path, filename), 'w') as stream:
-            stream.write(self.text_input.text)
-
-        self.dismiss_popup()
-
 class EditDatums(Screen):
     pass
 
@@ -595,6 +559,9 @@ class record_button(Button):
         self.background_normal = ''
 
 class MainScreen(Screen):
+
+    global edm_prisms
+    global edm_station
 
     popup = ObjectProperty(None)
 
@@ -659,7 +626,9 @@ class MainScreen(Screen):
         self.add_widget(layout)
 
     def take_shot(self, value):
-        global edm_prisms
+        
+        edm_station.take_shot()
+
         layout_popup = GridLayout(cols = 1, spacing = 10, size_hint_y = None)
         layout_popup.bind(minimum_height=layout_popup.setter('height'))
         for prism in edm_prisms.names():
@@ -687,7 +656,7 @@ class MainScreen(Screen):
 
     def show_edit_screen(self, value):
         self.popup.dismiss()
-        # note that prism name is value.text 
+        edm_station.prism = edm_prisms.get(value.text).height 
         self.parent.current = 'EditPointScreen'
 
     def show_load_cfg(self):
@@ -787,15 +756,16 @@ class MenuList(Popup):
                         background_normal = '')
             __content.add_widget(__button)
             __button.bind(on_press = call_back)
-        __new_item = GridLayout(cols = 2, spacing = 5, size_hint_y = None)
-        __new_item.add_widget(TextInput(size_hint_y = None, id = 'new_item'))
-        __add_button = Button(text = 'Add', size_hint_y = None,
-                                color = BUTTON_COLOR,
-                                background_color = BUTTON_BACKGROUND,
-                                background_normal = '', id = title)
-        __new_item.add_widget(__add_button)
-        __add_button.bind(on_press = call_back)
-        __content.add_widget(__new_item)
+        if title!='PRISM':
+            __new_item = GridLayout(cols = 2, spacing = 5, size_hint_y = None)
+            __new_item.add_widget(TextInput(size_hint_y = None, id = 'new_item'))
+            __add_button = Button(text = 'Add', size_hint_y = None,
+                                    color = BUTTON_COLOR,
+                                    background_color = BUTTON_BACKGROUND,
+                                    background_normal = '', id = title)
+            __new_item.add_widget(__add_button)
+            __add_button.bind(on_press = call_back)
+            __content.add_widget(__new_item)
         __button1 = Button(text = 'Back', size_hint_y = None,
                                 color = BUTTON_COLOR,
                                 background_color = BUTTON_BACKGROUND,
@@ -814,6 +784,8 @@ class EditPointScreen(Screen):
 
     global edm_cfg
     global edm_station
+    global edm_prisms
+
     popup = ObjectProperty(None)
 
     def on_pre_enter(self):
@@ -827,28 +799,28 @@ class EditPointScreen(Screen):
                                 size_hint_y = None, color = BUTTON_COLOR))
             if field_name in ['SUFFIX','X','Y','Z','PRISM','DATE','VANGLE','HANGLE','SLOPED']:
                 if field_name == 'SUFFIX':
-                    layout.add_widget(Label(text = str(edm_station.suffix),
+                    layout.add_widget(Label(text = str(edm_station.suffix), id = 'SUFFIX',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'X':
-                    layout.add_widget(Label(text = str(edm_station.x),
+                    layout.add_widget(Label(text = str(edm_station.x), id = 'X',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'Y':
-                    layout.add_widget(Label(text = str(edm_station.y),
+                    layout.add_widget(Label(text = str(edm_station.y), id = 'Y',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'Z':
-                    layout.add_widget(Label(text = str(edm_station.z),
+                    layout.add_widget(Label(text = str(edm_station.z), id = 'Z',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'SLOPED':
-                    layout.add_widget(Label(text = str(edm_station.sloped),
+                    layout.add_widget(Label(text = str(edm_station.sloped), id = 'SLOPED',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'HANGLE':
-                    layout.add_widget(Label(text = edm_station.hangle,
+                    layout.add_widget(Label(text = edm_station.hangle, id = 'HANGLE',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'VANGLE':
-                    layout.add_widget(Label(text = edm_station.vangle,
+                    layout.add_widget(Label(text = edm_station.vangle, id = 'VANGLE',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'DATE':
-                    layout.add_widget(Label(text = "%s" % datetime.datetime.now(),
+                    layout.add_widget(Label(text = "%s" % datetime.datetime.now(), id = 'DATE',
                                         size_hint_y = None, color = BUTTON_COLOR))
                 if field_name == 'PRISM':
                     prism_button = Button(text = str(edm_station.prism), size_hint_y = None,
@@ -887,8 +859,22 @@ class EditPointScreen(Screen):
         self.add_widget(root)
 
     def show_menu(self, value):
-        self.popup = MenuList(value.id, edm_cfg.get(value.id).menu, self.menu_selection)
+        if value.id!='PRISM':  
+            self.popup = MenuList(value.id, edm_cfg.get(value.id).menu, self.menu_selection)
+        else:
+            self.popup = MenuList(value.id, edm_prisms.names(), self.prism_change)
         self.popup.open()
+
+    def prism_change(self, value):
+        edm_station.z = edm_station.z + edm_station.prism
+        edm_station.prism = edm_prisms.get(value.text).height 
+        edm_station.z = edm_station.z - edm_station.prism
+        for child in self.walk():
+            if child.id == value.id:
+                child.text = str(edm_station.prism)
+            if child.id == 'Z':
+                child.text = str(edm_station.z)
+        self.popup.dismiss()
 
     def menu_selection(self, value):
         for child in self.walk():
@@ -1466,9 +1452,6 @@ class EDMpy(App):
         #print(test)
         #return(DfguiWidget(EDMpy.edm_datums.datums, "datums"))
     
-Factory.register('Root', cls=Root)
-Factory.register('LoadDialog', cls=LoadDialog)
-Factory.register('SaveDialog', cls=SaveDialog)
 Factory.register('EDMpy', cls=EDMpy)
 
 if __name__ == '__main__':
