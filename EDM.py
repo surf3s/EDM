@@ -44,7 +44,13 @@ import numpy as np
 import datetime
 import pandas as pd 
 import logging
+
+# My libraries for this project
 from blockdata import blockdata
+from dbs import dbs
+
+# The database - pure Python
+from tinydb import TinyDB, Query, where
 
 from collections import OrderedDict
 
@@ -55,7 +61,6 @@ BUTTON_COLOR =  (0, 0, 0, 1) # black
 WINDOW_BACKGROUND = (255/255, 255/255, 255/255, 1) #FFFFFF
 WINDOW_COLOR = (0, 0, 0, 1)
 
-test = (128 / 255, 216/255, 255/255, 1)
 # get anglr.py library
 # or get angles.py library (looks maybe better)
 
@@ -119,101 +124,139 @@ class points:
     def initialize(self):
         pass
 
-class datums:
+class datums(dbs):
     MAX_DATUMS = 100
-    
+    db = None
+    filename = None
+    db_name = 'datums'
+
     class datum:
-        def __init__(self, datum_name):
-            self.name = datum_name
-            self.x = 0
-            self.y = 0
-            self.z = 0
-            self.date_created = ''
+        name = ''
+        x = 0
+        y = 0
+        z = 0
+        date_created = ''
+        def __init__(self, name, x, y, z, date_created):
+            self.name = name
+            self.x = x
+            self.y = y
+            self.z = z
+            self.date_created = date_created
     
     def __init__(self, filename):
+        if filename=='':
+            filename = 'EDM_datums.json'
         self.filename = filename
-        if os.path.exists(self.filename):
-            self.datums = pd.read_csv(self.filename)
+        self.db = TinyDB(self.filename)
+
+    def add(self, datum):
+        new_data = {}
+        new_data['name'] = datum.name
+        new_data['x'] = datum.x
+        new_data['y'] = datum.y
+        new_data['z'] = datum.z
+        new_data['date_created'] = datum.date_created
+        self.db.insert(new_data)
+
+    def get(self, name):
+        d = self.db.search(where('name')==name)
+        if d:
+            return(self.datum(d[0]['name'], d[0]['x'], d[0]['y'], d[0]['z'], d[0]['date_created']))
         else:
-            self.datums = pd.DataFrame(columns = ['Name','X','Y','Z','Date_Created'])
-            self.save()
+            return(None)
 
-    def status(self):
-        txt = '%s datums are defined\n' % self.count()
-        return(txt)
+    def delete(self, name):
+        pass
 
-    def save(self):
-        self.datums.to_csv(self.filename, index=False)
-
-    def count(self):
-        return(self.datums.shape[0])
-
-    def names(self):
-        return(self.datums.loc[:,'Name'])
-
-class prisms:
+class prisms(dbs):
     MAX_PRISMS = 20
+    db = None
+    filename = None
+    db_name = 'prisms'
 
     class prism:
-        def __init__(self):
-            self.name = ''
-            self.height = 0
-            self.offset = 0
+        name = None
+        offset = 0
+        height = 0
+        def __init__(self, name, height, offset = 0):
+            self.name = name
+            self.height = height
+            self.offset = offset
 
     def __init__(self, filename):
+        if filename=='':
+            filename = 'EDM_prisms.json'
         self.filename = filename
-        if os.path.exists(self.filename):
-            self.prisms = pd.read_csv(self.filename)
+        self.db = TinyDB(self.filename)
+
+    def add(self, prism):
+        new_data = {}
+        new_data['name'] = prism.name
+        new_data['height'] = prism.height
+        new_data['offset'] = prism.offset
+        self.db.insert(new_data)
+
+    def get(self, name):
+        p = self.db.search(where('name')==name)
+        if p:
+            return(self.prism(p[0]['name'], p[0]['height'], p[0]['offset']))
         else:
-            self.prisms = pd.DataFrame(columns = ['Name','Height','Offset'])
-            self.save()
+            return(None)
 
-    def status(self):
-        txt = '%s prisms are defined\n' % self.count()
-        return(txt)
+    def delete(self, name):
+        pass
 
-    def save(self):
-        self.prisms.to_csv(self.filename, index=False)
-
-    def count(self):
-        return(self.prisms.shape[0])
-
-    def names(self):
-        return(self.prisms.loc[:,'Name'])
-
-class units:
+class units(dbs):
     MAX_UNITS = 100
+    filename = None
+    db = None
+    db_name = 'units'
 
     class unit:
-        def __init__(self):
-            self.name = ''
-            self.x1 = 0
-            self.y1 = 0
-            self.x2 = 0
-            self.y2 = 0
-            self.radius = 0
+        name = ''
+        x1 = 0
+        y1 = 0
+        x2 = 0
+        y2 = 0
+        radius = None
+        def __init__(self, name, x1, y1, x2, y2, radius = 0):
+            self.name = name
+            self.x1 = x1
+            self.y1 = y1
+            self.x2 = x2
+            self.y2 = y2
+            self.radius = radius
 
     def __init__(self, filename):
+        if filename=='':
+            filename == 'EDM_units.json'
         self.filename = filename
-        if os.path.exists(self.filename):
-            self.units = pd.read_csv(self.filename)
+        self.db = TinyDB(self.filename)
+
+    def add(self, unit):
+        new_data = {}
+        new_data['name'] = unit.name
+        new_data['x1'] = unit.x1
+        new_data['y1'] = unit.y1
+        new_data['x2'] = unit.x2
+        new_data['y2'] = unit.y2
+        new_data['x1'] = unit.x1
+        new_data['radius'] = unit.radius
+        self.db.insert(new_data)
+
+    def get(self, unit_name):
+        u = self.db.search(where('name')==unit_name)
+        if u:
+            return(self.unit(u[0]['name'],
+             u[0]['x1'], u[0]['y1'],
+             u[0]['x2'], u[0]['y2'],
+             u[0]['radius']))
         else:
-            self.units = pd.DataFrame(columns = ['Name','X1','Y1','X2','Y2','Radius'])
-            self.save()
+            return(None)
 
-    def status(self):
-        txt = '%s units are defined\n' % self.count()
-        return(txt)
-
-    def save(self):
-        self.units.to_csv(self.filename, index=False)
-
-    def count(self):
-        return(self.units.shape[0])
-
-    def names(self):
-        return(self.units.loc[:,'Name'])
-
+    def delete(self, unit_name):
+        pass
+        
 class ini(blockdata):
     
     blocks = []
@@ -238,9 +281,6 @@ class ini(blockdata):
         self.update_value('EDM','CFG', edm_cfg.filename)
         self.save()
 
-#    def get_value(self, blockname, varname):
-#        return(self.get_value(self.blocks, blockname, varname))
-
     def save(self):
         self.write_blocks()
 
@@ -249,61 +289,92 @@ class cfg(blockdata):
     blocks = []
     filename = ""
 
+    class field:
+        name = ''
+        inputtype = ''
+        prompt = ''
+        length = 0
+        menu = ''
+        def __init__(self, name):
+            self.name = name
+
     def __init__(self, filename):
         if filename=='':
             filename = 'EDMpy.cfg'
         self.load(filename)
+        self.validate()
+    
+    def get(self, field_name):
+        f = self.field(field_name)
+        f.inputtype = self.get_value(field_name, 'TYPE')
+        f.prompt = self.get_value(field_name, 'PROMPT')
+        f.length = self.get_value(field_name, 'LENGTH')
+        f.menu = self.get_value(field_name, 'MENU').split(",")
+        return(f)
+
+    def put(self, field_name, f):
+        self.update_value(field_name, 'PROMPT', f.prompt)
+        self.update_value(field_name, 'LENGTH', f.length)
+        self.update_value(field_name, 'TYPE', f.inputtype)
+        #self.update_value(field_name, 'MENU', f.menu)
 
     def fields(self):
-        return(self.names(self.blocks))
-
-#    def get_value(self, blockname, varname):
-#        return(self.get_value(self.blocks, blockname, varname))
+        field_names = self.names()
+        del_fields = ['BUTTON1','BUTTON2','BUTTON3','BUTTON4','BUTTON5','BUTTON6','EDM','TIME']
+        for del_field in del_fields:
+            if del_field in field_names:
+                field_names.remove(del_field)
+        return(field_names)
 
     def build_default(self):
-        self.update_value(self.blocks, 'UNIT', 'Prompt', 'Unit :')
-        self.update_value(self.blocks, 'UNIT', 'Type', 'Text')
-        self.update_value(self.blocks, 'UNIT', 'Length', 6)
+        self.update_value('UNIT', 'Prompt', 'Unit :')
+        self.update_value('UNIT', 'Type', 'Text')
+        self.update_value('UNIT', 'Length', 6)
 
-        self.update_value(self.blocks, 'ID', 'Prompt', 'ID :')
-        self.update_value(self.blocks, 'ID', 'Type', 'Text')
-        self.update_value(self.blocks, 'ID', 'Length', 6)
+        self.update_value('ID', 'Prompt', 'ID :')
+        self.update_value('ID', 'Type', 'Text')
+        self.update_value('ID', 'Length', 6)
 
-        self.update_value(self.blocks, 'SUFFIX', 'Prompt', 'Suffix :')
-        self.update_value(self.blocks, 'SUFFIX', 'Type', 'Numeric')
+        self.update_value('SUFFIX', 'Prompt', 'Suffix :')
+        self.update_value('SUFFIX', 'Type', 'Numeric')
 
-        self.update_value(self.blocks, 'LEVEL', 'Prompt', 'Level :')
-        self.update_value(self.blocks, 'LEVEL', 'Type', 'Menu')
-        self.update_value(self.blocks, 'LEVEL', 'Length', 20)
+        self.update_value('LEVEL', 'Prompt', 'Level :')
+        self.update_value('LEVEL', 'Type', 'Menu')
+        self.update_value('LEVEL', 'Length', 20)
 
-        self.update_value(self.blocks, 'CODE', 'Prompt', 'Code :')
-        self.update_value(self.blocks, 'CODE', 'Type', 'Menu')
-        self.update_value(self.blocks, 'CODE', 'Length', 20)
+        self.update_value('CODE', 'Prompt', 'Code :')
+        self.update_value('CODE', 'Type', 'Menu')
+        self.update_value('CODE', 'Length', 20)
 
-        self.update_value(self.blocks, 'EXCAVATOR', 'Prompt', 'Excavator :')
-        self.update_value(self.blocks, 'EXCAVATOR', 'Type', 'Menu')
-        self.update_value(self.blocks, 'EXCAVATOR', 'Length', 20)
+        self.update_value('EXCAVATOR', 'Prompt', 'Excavator :')
+        self.update_value('EXCAVATOR', 'Type', 'Menu')
+        self.update_value('EXCAVATOR', 'Length', 20)
 
-        self.update_value(self.blocks, 'PRISM', 'Prompt', 'Prism :')
-        self.update_value(self.blocks, 'PRISM', 'Type', 'Numeric')
+        self.update_value('PRISM', 'Prompt', 'Prism :')
+        self.update_value('PRISM', 'Type', 'Numeric')
 
-        self.update_value(self.blocks, 'X', 'Prompt', 'X :')
-        self.update_value(self.blocks, 'X', 'Type', 'Numeric')
+        self.update_value('X', 'Prompt', 'X :')
+        self.update_value('X', 'Type', 'Numeric')
 
-        self.update_value(self.blocks, 'Y', 'Prompt', 'Y :')
-        self.update_value(self.blocks, 'Y', 'Type', 'Numeric')
+        self.update_value('Y', 'Prompt', 'Y :')
+        self.update_value('Y', 'Type', 'Numeric')
 
-        self.update_value(self.blocks, 'Z', 'Prompt', 'Z :')
-        self.update_value(self.blocks, 'Z', 'Type', 'Numeric')
+        self.update_value('Z', 'Prompt', 'Z :')
+        self.update_value('Z', 'Type', 'Numeric')
 
-        self.update_value(self.blocks, 'DATE', 'Prompt', 'Date :')
-        self.update_value(self.blocks, 'DATE', 'Type', 'Text')
-        self.update_value(self.blocks, 'DATE', 'Length', 24)
+        self.update_value('DATE', 'Prompt', 'Date :')
+        self.update_value('DATE', 'Type', 'Text')
+        self.update_value('DATE', 'Length', 24)
 
         # should add hangle, vangle, sloped 
 
     def validate(self):
-        pass
+        for field_name in self.fields():
+            f = self.get(field_name)
+            if f.prompt == '':
+                f.prompt = field_name
+            f.inputtype = f.inputtype.upper()
+            self.put(field_name, f)
 
     def save(self):
         self.write_blocks()
@@ -342,6 +413,8 @@ class totalstation:
         self.hangle = ''
         self.vangle = ''
         self.sloped = 0
+        self.suffix = 0
+        self.prism = 0
 
     def status(self):
         txt = 'Total Station:\n'
@@ -606,7 +679,7 @@ class MainScreen(Screen):
         self.popup = Popup(title = 'Prism Height',
                     content = root,
                     size_hint = (None, None),
-                    size=(400, 400),
+                    size = (400, 400),
                     #pos_hint = {None, None},
                     auto_dismiss = False)
         button2.bind(on_press = self.popup.dismiss)
@@ -702,28 +775,136 @@ class InitializeThreePointScreen(Screen):
         self.add_widget(InitializeOnePointHeader())
         self.add_widget(DatumLister())
 
+class MenuList(Popup):
+    def __init__(self, title, menu_list, call_back, **kwargs):
+        super(MenuList, self).__init__(**kwargs)
+        __content = GridLayout(cols = 1, spacing = 5, size_hint_y = None)
+        __content.bind(minimum_height=__content.setter('height'))
+        for menu_item in menu_list:
+            __button = Button(text = menu_item, size_hint_y = None, id = title,
+                        color = OPTIONBUTTON_COLOR,
+                        background_color = OPTIONBUTTON_BACKGROUND,
+                        background_normal = '')
+            __content.add_widget(__button)
+            __button.bind(on_press = call_back)
+        __new_item = GridLayout(cols = 2, spacing = 5, size_hint_y = None)
+        __new_item.add_widget(TextInput(size_hint_y = None, id = 'new_item'))
+        __add_button = Button(text = 'Add', size_hint_y = None,
+                                color = BUTTON_COLOR,
+                                background_color = BUTTON_BACKGROUND,
+                                background_normal = '', id = title)
+        __new_item.add_widget(__add_button)
+        __add_button.bind(on_press = call_back)
+        __content.add_widget(__new_item)
+        __button1 = Button(text = 'Back', size_hint_y = None,
+                                color = BUTTON_COLOR,
+                                background_color = BUTTON_BACKGROUND,
+                                background_normal = '')
+        __content.add_widget(__button1)
+        __button1.bind(on_press = self.dismiss)
+        __root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
+        __root.add_widget(__content)
+        self.title = title
+        self.content = __root
+        self.size_hint = (None, None)
+        self.size = (400, 400)
+        self.auto_dismiss = True
+
 class EditPointScreen(Screen):
+
+    global edm_cfg
+    global edm_station
+    popup = ObjectProperty(None)
 
     def on_pre_enter(self):
         #super(Screen, self).__init__(**kwargs)
-        global edm_cfg
-        layout = GridLayout(cols = 1, spacing = 10, size_hint_y = None)
+        self.clear_widgets()
+        layout = GridLayout(cols = 2, spacing = 10, size_hint_y = None, id = 'fields')
         layout.bind(minimum_height=layout.setter('height'))
-        for field in edm_cfg.fields():
-            layout.add_widget(Label(text = field, size_hint_y = None, color = BUTTON_COLOR))
+        for field_name in edm_cfg.fields():
+            f = edm_cfg.get(field_name)
+            layout.add_widget(Label(text = field_name,
+                                size_hint_y = None, color = BUTTON_COLOR))
+            if field_name in ['SUFFIX','X','Y','Z','PRISM','DATE','VANGLE','HANGLE','SLOPED']:
+                if field_name == 'SUFFIX':
+                    layout.add_widget(Label(text = str(edm_station.suffix),
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'X':
+                    layout.add_widget(Label(text = str(edm_station.x),
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'Y':
+                    layout.add_widget(Label(text = str(edm_station.y),
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'Z':
+                    layout.add_widget(Label(text = str(edm_station.z),
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'SLOPED':
+                    layout.add_widget(Label(text = str(edm_station.sloped),
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'HANGLE':
+                    layout.add_widget(Label(text = edm_station.hangle,
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'VANGLE':
+                    layout.add_widget(Label(text = edm_station.vangle,
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'DATE':
+                    layout.add_widget(Label(text = "%s" % datetime.datetime.now(),
+                                        size_hint_y = None, color = BUTTON_COLOR))
+                if field_name == 'PRISM':
+                    prism_button = Button(text = str(edm_station.prism), size_hint_y = None,
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '',
+                                    id = field_name)
+                    layout.add_widget(prism_button)
+                    prism_button.bind(on_press = self.show_menu)
+            else:
+                if f.inputtype == 'TEXT':
+                    layout.add_widget(TextInput())
+                if f.inputtype == 'NUMERIC':
+                    layout.add_widget(TextInput())
+                if f.inputtype == 'MENU':
+                    button1 = Button(text = 'MENU', size_hint_y = None,
+                                    color = OPTIONBUTTON_COLOR,
+                                    background_color = OPTIONBUTTON_BACKGROUND,
+                                    background_normal = '',
+                                    id = field_name)
+                    layout.add_widget(button1)
+                    button1.bind(on_press = self.show_menu)
         button2 = Button(text = 'Save', size_hint_y = None,
                         color = BUTTON_COLOR,
                         background_color = BUTTON_BACKGROUND,
                         background_normal = '')
         layout.add_widget(button2)
+        button2.bind(on_press = self.save)
         button3 = Button(text = 'Back', size_hint_y = None,
                         color = BUTTON_COLOR,
                         background_color = BUTTON_BACKGROUND,
                         background_normal = '')
         layout.add_widget(button3)
-        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.5))
+        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height))
         root.add_widget(layout)
         self.add_widget(root)
+
+    def show_menu(self, value):
+        self.popup = MenuList(value.id, edm_cfg.get(value.id).menu, self.menu_selection)
+        self.popup.open()
+
+    def menu_selection(self, value):
+        for child in self.walk():
+            if child.id == value.id:
+                if value.text == 'Add':
+                    for widget in self.popup.walk():
+                        if widget.id == 'new_item':
+                            child.text = widget.text
+                            edm_cfg.update_value(value.id,'MENU',
+                                                edm_cfg.get_value(value.id,'MENU') + "," + widget.text) 
+                else:
+                    child.text = value.text
+        self.popup.dismiss()
+
+    def save(self, value):
+        self.parent.current = 'MainScreen'
 
 class EditPointsScreen(Screen):
     pass
@@ -732,19 +913,19 @@ class EditPrismsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditPrismsScreen, self).__init__(**kwargs)
         global edm_prisms
-        self.add_widget(DfguiWidget(edm_prisms.prisms, "prisms"))
+        ###self.add_widget(DfguiWidget(edm_prisms.prisms, "prisms"))
 
 class EditUnitsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditUnitsScreen, self).__init__(**kwargs)
         global edm_units
-        self.add_widget(DfguiWidget(edm_units.units, "units"))
+        ###self.add_widget(DfguiWidget(edm_units.units, "units"))
 
 class EditDatumsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditDatumsScreen, self).__init__(**kwargs)
         global edm_datums
-        self.add_widget(DfguiWidget(edm_datums.datums, "datums"))
+        ###self.add_widget(DfguiWidget(edm_datums.datums, "datums"))
 
 
 class datumlist(RecycleView, Screen):
@@ -1296,10 +1477,10 @@ if __name__ == '__main__':
     edm_ini = ini('EDMpy.ini')
     edm_station = totalstation()
     edm_cfg = cfg(edm_ini.get_value("EDM", "CFG"))
-    edm_points = points(database + '_points.csv')
-    edm_units = units(database + '_units.csv')
-    edm_prisms = prisms(database + '_prisms.csv')
-    edm_datums = datums(database + '_datums.csv')
+    edm_points = points(database + '_points.json')
+    edm_units = units(database + '_units.json')
+    edm_prisms = prisms(database + '_prisms.json')
+    edm_datums = datums(database + '_datums.json')
     if not edm_cfg.filename:
         edm_cfg.filename = 'EDMpy.cfg'
     edm_cfg.save()

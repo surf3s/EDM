@@ -2,3 +2,6 @@
 *.cfg
 *.txt
 *.csv
+*.json
+__pycache__/*.*
+*.pyc

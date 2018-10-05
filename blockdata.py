@@ -65,3 +65,6 @@ class blockdata:
             return(True)
         except:
             return(False)
+
+    def __len__(self):
+        return(len(self.blocks))
