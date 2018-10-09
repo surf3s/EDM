@@ -448,7 +448,7 @@ ScreenManager:
             size: self.size
     text: root.text
     id: root.id
-    on_press: root.callback(root.recno, root.field)
+    on_press: root.callback(root.key, root.field, root.db)
     background_color: DATAGRID_ODD if root.is_even else DATAGRID_EVEN
     font_size: "12dp"
     halign: "center"

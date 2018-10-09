@@ -69,51 +69,47 @@ DATAGRID_EVEN = (189.0/255, 189.0/255, 189.0/255, 1)
 
 # use pySerial for serial communications
 
-class points:
+class points(dbs):
     MAX_FIELDS = 30
-
-    class field:
-        def __init__(self, name):
-            self.name = name
-            self.type = 'Text'
-            self.menulist = []
-            self.prompt = name
-            self.maxlen = 10
-            self.increment = False
-            self.required = False
-            self.carry = False 
-            self.unique = False
+    db = None
+    filename = None
+    db_name = 'points'
 
     def __init__(self, filename):
+        if filename=='':
+            filename = 'EDM_points.json'
         self.filename = filename
-        # check to see if this file exists already and if so read in the data
-        # if no file exists are after opening the file there are no fields, insert default fields
-        self.fields = []
-        self.records = []
+        self.db = TinyDB(self.filename)
 
     def status(self):
         txt = 'The points file is %s\n' % self.filename
-        txt += '%s points in the data file\n' % self.record_count()
+        txt += '%s points in the data file\n' % len(self.db)
         txt += 'with %s fields per point' % self.field_count()
         return(txt)
 
     def create_defaults(self):
         pass
 
+    def get(self, name):
+        unit, id = name.split('-')
+        p = self.db.search( (where('unit')==unit) & (where('id')==id) )
+        if p:
+            return(p)
+        else:
+            return(None)
+
     def names(self):
         name_list = []
-        for field in self.fields:
-            name_list.append(field.name)
+        for row in self.db:
+            name_list.append(row['unit'] + '-' + row['id'])
         return(name_list)
 
-    def field_count(self):
-        return(len(self.fields))
+    def fields(self):
+        global edm_cfg 
+        return(edm_cfg.fields())
 
-    def record_count(self):
-        pass
-    
     def delete_all(self):
-        self.records = []
+        self.db.purge()
 
     def export_csv(self):
         pass
@@ -122,9 +118,6 @@ class points:
         pass
 
     def add_record(self):
-        pass
-
-    def initialize(self):
         pass
 
 class datums(dbs):
@@ -307,6 +300,10 @@ class cfg(blockdata):
         prompt = ''
         length = 0
         menu = ''
+        increment = False
+        required = False
+        carry = False 
+        unique = False
         def __init__(self, name):
             self.name = name
 
@@ -792,11 +789,38 @@ class MenuList(Popup):
         self.size = (400, 400)
         self.auto_dismiss = True
 
+class TextNumericInput(Popup):
+    def __init__(self, title, call_back, **kwargs):
+        super(TextNumericInput, self).__init__(**kwargs)
+        __content = GridLayout(cols = 1, spacing = 5, size_hint_y = None)
+        __content.bind(minimum_height=__content.setter('height'))
+        __content.add_widget(TextInput(size_hint_y = None, multiline = False, id = 'new_item'))
+        __add_button = Button(text = 'Next', size_hint_y = None,
+                                    color = BUTTON_COLOR,
+                                    background_color = BUTTON_BACKGROUND,
+                                    background_normal = '', id = title)
+        __content.add_widget(__add_button)
+        __add_button.bind(on_press = call_back)
+        __button1 = Button(text = 'Back', size_hint_y = None,
+                                color = BUTTON_COLOR,
+                                background_color = BUTTON_BACKGROUND,
+                                background_normal = '')
+        __content.add_widget(__button1)
+        __button1.bind(on_press = self.dismiss)
+        __root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
+        __root.add_widget(__content)
+        self.title = title
+        self.content = __root
+        self.size_hint = (None, None)
+        self.size = (400, 400)
+        self.auto_dismiss = True
+
 class EditPointScreen(Screen):
 
     global edm_cfg
     global edm_station
     global edm_prisms
+    global edm_points
 
     popup = ObjectProperty(None)
 
@@ -844,9 +868,9 @@ class EditPointScreen(Screen):
                     prism_button.bind(on_press = self.show_menu)
             else:
                 if f.inputtype == 'TEXT':
-                    layout.add_widget(TextInput(multiline=False))
+                    layout.add_widget(TextInput(multiline=False, id = field_name))
                 if f.inputtype == 'NUMERIC':
-                    layout.add_widget(TextInput())
+                    layout.add_widget(TextInput(id = field_name))
                 if f.inputtype == 'MENU':
                     button1 = Button(text = 'MENU', size_hint_y = None,
                                     color = OPTIONBUTTON_COLOR,
@@ -902,10 +926,19 @@ class EditPointScreen(Screen):
         self.popup.dismiss()
 
     def save(self, value):
+        new_record = {}
+        for widget in self.walk():
+            for f in edm_points.fields():
+                if widget.id == f:
+                    new_record[f] = widget.text
+        edm_points.db.insert(new_record)
         self.parent.current = 'MainScreen'
 
 class EditPointsScreen(Screen):
-    pass
+    def __init__(self,**kwargs):
+        super(EditPointsScreen, self).__init__(**kwargs)
+        global edm_points
+        self.add_widget(DfguiWidget(edm_points))
 
 class EditPrismsScreen(Screen):
     def __init__(self,**kwargs):
@@ -1160,7 +1193,9 @@ class TableData(RecycleView):
     ncols = NumericProperty(None)
     rgrid = ObjectProperty(None)
 
-    def __init__(self, list_dicts=[], column_names = None, *args, **kwargs):
+    popup = ObjectProperty(None)
+
+    def __init__(self, list_dicts=[], column_names = None, df_name = None, *args, **kwargs):
         self.nrows = len(list_dicts)
         self.ncols = len(column_names)
 
@@ -1171,28 +1206,63 @@ class TableData(RecycleView):
             is_even = i % 2 == 0
             #row_vals = ord_dict.values()
             k = -1
+            if df_name=='points':
+                key = list(ord_dict)[0] + '-' + list(ord_dict)[1]
+            else:
+                key = list(ord_dict)[0]
             for text in ord_dict:
                 k += 1
                 self.data.append({'text': str(text), 'is_even': is_even,
                                     'callback': self.editcell,
-                                    'recno': i, 'field': column_names[k]})
+                                    'key': key, 'field': column_names[k],
+                                    'db': df_name, 'id': 'datacell' })
 
     def sort_data(self):
         #TODO: Use this to sort table, rather than clearing widget each time.
         pass
 
-    def editcell(self, recno, field):
-        print(self, recno, field)
+    def editcell(self, key, field, db):
+        self.key = key
+        self.field = field
+        self.db = db
+        if db == 'points':
+            cfg_field = edm_cfg.get(field)
+            self.inputtype = cfg_field.inputtype
+            if cfg_field.inputtype == 'MENU':
+                self.popup = MenuList(field, edm_cfg.get(field).menu, self.menu_selection)
+                self.popup.open()
+            if cfg_field.inputtype in ['TEXT','NUMERIC']:
+                self.popup = TextNumericInput(field, self.menu_selection)
+                self.popup.open()
+
+    def menu_selection(self, value):
+        if self.db == 'points':
+            print(value.id)
+            unit, id = self.key.split('-')
+            new_data = {}
+            if self.inputtype=='MENU':
+                new_data[self.field] = value.text
+            else:
+                for widget in self.popup.walk():
+                    if widget.id == 'new_item':
+                        new_data[self.field] = widget.text
+            field_record = Query()
+            edm_points.db.update(new_data, (field_record.UNIT == unit) & (field_record.ID == id))
+            for widget in self.walk():
+                if widget.id=='datacell':
+                    if widget.key == self.key and widget.field == self.field:
+                        widget.text = new_data[self.field]
+        self.popup.dismiss()
 
 class Table(BoxLayout):
 
-    def __init__(self, list_dicts=[], column_names = None, *args, **kwargs):
+    def __init__(self, list_dicts=[], column_names = None, df_name = None, *args, **kwargs):
 
         super(Table, self).__init__(*args, **kwargs)
         self.orientation = "vertical"
 
         self.header = TableHeader(column_names)
-        self.table_data = TableData(list_dicts = list_dicts, column_names = column_names)
+        self.table_data = TableData(list_dicts = list_dicts, column_names = column_names, df_name = df_name)
 
         self.table_data.fbind('scroll_x', self.scroll_with_header)
 
@@ -1211,6 +1281,7 @@ class DataframePanel(BoxLayout):
         self.df_orig = df
         self.sort_key = None
         self.column_names = self.df_orig.fields()
+        self.df_name = df.db_name 
         self._generate_table()
 
     def _generate_table(self, sort_key=None, disabled=None):
@@ -1219,7 +1290,7 @@ class DataframePanel(BoxLayout):
         for row in self.df_orig.db:
             data.append(row.values())
         #data = sorted(data, key=lambda k: k[self.sort_key]) 
-        self.add_widget(Table(list_dicts = data, column_names = self.column_names))
+        self.add_widget(Table(list_dicts = data, column_names = self.column_names, df_name = self.df_name))
 
 class AddNewPanel(BoxLayout):
     
