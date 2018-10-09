@@ -4,6 +4,8 @@
 #:set MENU_COLOR [0, 0, 0]
 #:set SUBMENU_COLOR [255, 255, 255]
 #:set WINDOW_COLOR (0, 0, 0, 1)
+#:set DATAGRID_ODD [224.0/255, 224.0/255, 224.0/255, 1]
+#:set DATAGRID_EVEN [189.0/255, 189.0/255, 189.0/255, 1]
 
 ScreenManager:
     id: screen_manager
@@ -402,6 +404,8 @@ ScreenManager:
                 on_release: root.save(filechooser.path, text_input.text)
 
 
+
+
 ## code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 
 <HeaderCell>:
@@ -412,6 +416,7 @@ ScreenManager:
     height: '30dp'
     background_disabled_normal: '' 
     disabled_color: (1, 1, 1, 1)
+    color: (1, 1, 1, 1)
     canvas.before:
         Color:
             rgba: 0.165, 0.165, 0.165, 1
@@ -419,8 +424,6 @@ ScreenManager:
             pos: self.pos
             size: self.size
     on_release: root.parent.parent.parent.parent._generate_table(self.text)
-
-
 
 <TableHeader>:
     header: header
@@ -436,15 +439,17 @@ ScreenManager:
         width: self.minimum_width
         height: self.minimum_height
 
-
 <ScrollCell>:
     canvas.before:
         Color:
-            rgba: [0.23, 0.23, 0.23, 1] if root.is_even else [0.2, 0.2, 0.2, 1]
+            rgba: DATAGRID_ODD if root.is_even else DATAGRID_EVEN
         Rectangle:
             pos: self.pos
             size: self.size
     text: root.text
+    id: root.id
+    on_press: root.callback(root.recno, root.field)
+    background_color: DATAGRID_ODD if root.is_even else DATAGRID_EVEN
     font_size: "12dp"
     halign: "center"
     valign: "middle"
@@ -452,7 +457,6 @@ ScreenManager:
     size_hint: 1, 1
     height: 60
     width: 400
-
 
 <TableData>:
     rgrid: rgrid
@@ -472,48 +476,35 @@ ScreenManager:
         height: self.minimum_height
 
 
+
 <DfguiWidget>:
     panel1: data_frame_panel
-    panel3: fil_select_panel
     panel4: add_new_panel
     do_default_tab: False
     TabbedPanelItem:
         text: 'Data Frame'
         on_release: root.open_panel1()
+        color: BUTTON_COLOR
+        background_color: BUTTON_BACKGROUND
+        background_normal: ''
         DataframePanel:
             id: data_frame_panel
     TabbedPanelItem:
-        text: 'Filters'
-        FilterPanel:
-            id: fil_select_panel
-    TabbedPanelItem:
         text: 'Add New'
+        color: BUTTON_COLOR
+        background_color: BUTTON_BACKGROUND
+        background_normal: ''
         AddNewPanel:
             id: add_new_panel
     TabbedPanelItem:
         text: 'Close'
         on_release: app.root.current = 'MainScreen'
-
+        color: BUTTON_COLOR
+        background_color: BUTTON_BACKGROUND
+        background_normal: ''
 
 <DataframePanel>:
     orientation: 'vertical'
-
-<FilterPanel>:
-    filter_list: filter_list
-    orientation: 'vertical'
-    ScrollView:
-        do_scroll_x: False
-        do_scroll_y: True
-        size_hint: 1, 1
-        scroll_timeout: 150
-        GridLayout:
-            id: filter_list
-            padding: "10sp"
-            spacing: "5sp"
-            cols:1
-            row_default_height: '55dp'
-            row_force_default: True
-            size_hint_y: None
 
 <AddNewPanel>:
     addnew_list: addnew_list

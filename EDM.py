@@ -61,6 +61,9 @@ BUTTON_COLOR =  (0, 0, 0, 1) # black
 WINDOW_BACKGROUND = (255/255, 255/255, 255/255, 1) #FFFFFF
 WINDOW_COLOR = (0, 0, 0, 1)
 
+DATAGRID_ODD = (224.0/255, 224.0/255, 224.0/255, 1)
+DATAGRID_EVEN = (189.0/255, 189.0/255, 189.0/255, 1)
+
 # get anglr.py library
 # or get angles.py library (looks maybe better)
 
@@ -168,6 +171,9 @@ class datums(dbs):
     def delete(self, name):
         pass
 
+    def fields(self):
+        return(['name','x','y','z','date_created'])
+
 class prisms(dbs):
     MAX_PRISMS = 20
     db = None
@@ -205,6 +211,9 @@ class prisms(dbs):
 
     def delete(self, name):
         pass
+
+    def fields(self):
+        return(['name','height','offset'])
 
 class units(dbs):
     MAX_UNITS = 100
@@ -256,7 +265,10 @@ class units(dbs):
 
     def delete(self, unit_name):
         pass
-        
+
+    def fields(self):
+        return(['name','x1','y1','x2','y2','radius'])
+
 class ini(blockdata):
     
     blocks = []
@@ -832,7 +844,7 @@ class EditPointScreen(Screen):
                     prism_button.bind(on_press = self.show_menu)
             else:
                 if f.inputtype == 'TEXT':
-                    layout.add_widget(TextInput())
+                    layout.add_widget(TextInput(multiline=False))
                 if f.inputtype == 'NUMERIC':
                     layout.add_widget(TextInput())
                 if f.inputtype == 'MENU':
@@ -899,38 +911,34 @@ class EditPrismsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditPrismsScreen, self).__init__(**kwargs)
         global edm_prisms
-        ###self.add_widget(DfguiWidget(edm_prisms.prisms, "prisms"))
+        self.add_widget(DfguiWidget(edm_prisms))
 
 class EditUnitsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditUnitsScreen, self).__init__(**kwargs)
         global edm_units
-        ###self.add_widget(DfguiWidget(edm_units.units, "units"))
+        self.add_widget(DfguiWidget(edm_units))
 
 class EditDatumsScreen(Screen):
     def __init__(self,**kwargs):
         super(EditDatumsScreen, self).__init__(**kwargs)
         global edm_datums
-        ###self.add_widget(DfguiWidget(edm_datums.datums, "datums"))
-
+        self.add_widget(DfguiWidget(edm_datums))
 
 class datumlist(RecycleView, Screen):
     def __init__(self, **kwargs):
         super(datumlist, self).__init__(**kwargs)
         self.data = [{'text': str(x)} for x in range(100)]
 
-
 class MessageBox(Popup):
 
     def popup_dismiss(self):
         self.dismiss()
 
-
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior, RecycleBoxLayout):
     """ Adds selection and focus behaviour to the view. """
     selected_value = StringProperty('')
     btn_info = ListProperty(['Button 0 Text', 'Button 1 Text', 'Button 2 Text'])
-
 
 class SelectableButton(RecycleDataViewBehavior, Button):
     """ Add selection support to the Label """
@@ -947,14 +955,12 @@ class SelectableButton(RecycleDataViewBehavior, Button):
     def on_release(self):
         MessageBox().open()
 
-
 class RV(RecycleView):
     rv_layout = ObjectProperty(None)
 
     def __init__(self, **kwargs):
         super(RV, self).__init__(**kwargs)
         self.data = [{'text': "Datum " + str(x), 'id': str(x)} for x in range(30)]
-
 
 class DatumLister(BoxLayout,Screen):
     def __init__(self, list_dicts=[], *args, **kwargs):
@@ -963,10 +969,8 @@ class DatumLister(BoxLayout,Screen):
         self.orientation = "vertical"
         self.add_widget(RV())
 
-
 class EditDatumScreen(Screen):
     pass
-
 
 class StationConfigurationScreen(Screen):
     def __init__(self,**kwargs):
@@ -1079,18 +1083,14 @@ class StationConfigurationScreen(Screen):
                 ## need code to open com port here
         self.parent.current = 'MainScreen'
 
-
 class AboutScreen(Screen):
     pass
-
 
 class DebugScreen(Screen):
     pass
 
-
 class LogScreen(Screen):
     pass
-
 
 class StatusScreen(Screen):
     def __init__(self,**kwargs):
@@ -1132,37 +1132,12 @@ class StatusScreen(Screen):
     def go_back(self, value):
         self.parent.current = 'MainScreen'
 
-
 # Code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 
-def create_dummy_data(size):
-
-    user_ids = np.random.randint(1, 1000000, 10)
-    product_ids = np.random.randint(1, 1000000, 100)
-
-    def choice(*values):
-        return np.random.choice(values, size)
-
-    random_dates = [
-        datetime.date(2016, 1, 1) + datetime.timedelta(days=int(delta))
-        for delta in np.random.randint(1, 50, size)
-    ]
-    return pd.DataFrame.from_items([
-        ("Date", random_dates),
-        ("UserID", choice(*user_ids)),
-        ("ProductID", choice(*product_ids)),
-        ("IntColumn", choice(1, 2, 3)),
-        ("FloatColumn", choice(np.nan, 1.0, 2.0, 3.0)),
-        ("StringColumn", choice("A", "B", "C")),
-        ("Gaussian 1", np.random.normal(0, 1, size)),
-        ("Gaussian 2", np.random.normal(0, 1, size)),
-        ("Uniform", np.random.uniform(0, 1, size)),
-        ("Binomial", np.random.binomial(20, 0.1, size)),
-        ("Poisson", np.random.poisson(1.0, size)),
-    ])
-
 class HeaderCell(Button):
-    pass
+    color = BUTTON_COLOR
+    background_color: BUTTON_BACKGROUND
+    background_normal: ''
 
 class TableHeader(ScrollView):
     """Fixed table header that scrolls x with the data table"""
@@ -1172,11 +1147,13 @@ class TableHeader(ScrollView):
         super(TableHeader, self).__init__(*args, **kwargs)
 
         for title in titles:
-            self.header.add_widget(HeaderCell(text=title))
+            self.header.add_widget(HeaderCell(text = title))
 
-class ScrollCell(Label):
+class ScrollCell(Button):
     text = StringProperty(None)
     is_even = BooleanProperty(None)
+    color = BUTTON_COLOR
+    background_normal = ''
 
 class TableData(RecycleView):
     nrows = NumericProperty(None)
@@ -1192,14 +1169,21 @@ class TableData(RecycleView):
         self.data = []
         for i, ord_dict in enumerate(list_dicts):
             is_even = i % 2 == 0
-            row_vals = ord_dict.values()
-            for text in row_vals:
-                self.data.append({'text': text, 'is_even': is_even})
+            #row_vals = ord_dict.values()
+            k = -1
+            for text in ord_dict:
+                k += 1
+                self.data.append({'text': str(text), 'is_even': is_even,
+                                    'callback': self.editcell,
+                                    'recno': i, 'field': column_names[k]})
 
     def sort_data(self):
         #TODO: Use this to sort table, rather than clearing widget each time.
         pass
-        
+
+    def editcell(self, recno, field):
+        print(self, recno, field)
+
 class Table(BoxLayout):
 
     def __init__(self, list_dicts=[], column_names = None, *args, **kwargs):
@@ -1225,118 +1209,26 @@ class DataframePanel(BoxLayout):
 
     def populate_data(self, df):
         self.df_orig = df
-        self.original_columns = self.df_orig.columns[:]
-        self.current_columns = self.df_orig.columns[:]
-        self._disabled = []
         self.sort_key = None
-        self._reset_mask()
+        self.column_names = self.df_orig.fields()
         self._generate_table()
 
     def _generate_table(self, sort_key=None, disabled=None):
         self.clear_widgets()
-        df = self.get_filtered_df()
         data = []
-        if disabled is not None:
-            self._disabled = disabled
-        keys = [x for x in df.columns[:] if x not in self._disabled]
-        if sort_key is not None:
-            self.sort_key = sort_key
-        elif self.sort_key is None or self.sort_key in self._disabled:
-            self.sort_key = keys[0]
-        for i1 in range(len(df.iloc[:, 0])):
-            row = OrderedDict.fromkeys(keys)
-            for i2 in range(len(keys)):
-                row[keys[i2]] = str(df.iloc[i1, i2])
-            data.append(row)
-        data = sorted(data, key=lambda k: k[self.sort_key]) 
-        self.add_widget(Table(list_dicts=data, column_names = df.columns))
-        
-    def apply_filter(self, conditions):
-        """
-        External interface to set a filter.
-        """
-        old_mask = self.mask.copy()
-
-        if len(conditions) == 0:
-            self._reset_mask()
-
-        else:
-            self._reset_mask()  # set all to True for destructive conjunction
-
-            no_error = True
-            for column, condition in conditions:
-                if condition.strip() == '':
-                    continue
-                condition = condition.replace("_", "self.df_orig['{}']".format(column))
-                print("Evaluating condition:", condition)
-                try:
-                    tmp_mask = eval(condition)
-                    if isinstance(tmp_mask, pd.Series) and tmp_mask.dtype == np.bool:
-                        self.mask &= tmp_mask
-                except Exception as e:
-                    print("Failed with:", e)
-                    no_error = False
-
-        has_changed = any(old_mask != self.mask)
-
-    def get_filtered_df(self):
-        return self.df_orig.loc[self.mask, :]
-
-    def _reset_mask(self):
-        pass
-        self.mask = pd.Series([True] *
-                              self.df_orig.shape[0],
-                              index=self.df_orig.index)
-
-class FilterPanel(BoxLayout):
-    
-    def populate(self, columns):            
-        self.filter_list.bind(minimum_height=self.filter_list.setter('height'))
-        for col in columns:
-            self.filter_list.add_widget(FilterOption(columns))
-
-    def get_filters(self):
-        result=[]
-        for opt_widget in self.filter_list.children:
-            if opt_widget.is_option_set():
-                result.append(opt_widget.get_filter())
-        return [x.get_filter() for x in self.filter_list.children
-                if x.is_option_set]
-
-class FilterOption(BoxLayout):
-        
-    def __init__(self, columns, **kwargs):
-        super(FilterOption, self).__init__(**kwargs)
-        self.height="30sp"
-        self.size_hint=(0.9, None)
-        self.spacing=10
-        options = ["Select Column"]
-        options.extend(columns)
-        self.spinner = Spinner(text='Select Column',
-                               values= options,
-                               size_hint=(0.25, None),
-                               height="30sp",
-                               pos_hint={'center_x': .5, 'center_y': .5})
-        self.txt = TextInput(multiline=False, size_hint=(0.75, None),\
-                             font_size="15sp")
-        self.txt.bind(minimum_height=self.txt.setter('height'))
-        self.add_widget(self.spinner)
-        self.add_widget(self.txt)
-
-    def is_option_set(self):
-        return self.spinner.text != 'Select Column'
-
-    def get_filter(self):
-        return (self.spinner.text, self.txt.text)
+        for row in self.df_orig.db:
+            data.append(row.values())
+        #data = sorted(data, key=lambda k: k[self.sort_key]) 
+        self.add_widget(Table(list_dicts = data, column_names = self.column_names))
 
 class AddNewPanel(BoxLayout):
     
-    def populate(self, columns, df_name):
-        self.df_name = df_name            
+    def populate(self, df):
+        self.df_name = df.db_name            
         self.addnew_list.bind(minimum_height=self.addnew_list.setter('height'))
-        for col in columns:
-            self.addnew_list.add_widget(AddNew(col, df_name))
-        self.addnew_list.add_widget(AddNew('Save', df_name))
+        for col in df.fields():
+            self.addnew_list.add_widget(AddNew(col, df.db_name))
+        self.addnew_list.add_widget(AddNew('Save', df.db_name))
 
     def get_addnews(self):
         result=[]
@@ -1345,6 +1237,10 @@ class AddNewPanel(BoxLayout):
         return(result)
 
 class AddNew(BoxLayout):
+
+    global edm_datums
+    global edm_prisms
+    global edm_units
 
     def __init__(self, col, df_name, **kwargs):
         super(AddNew, self).__init__(**kwargs)
@@ -1355,13 +1251,16 @@ class AddNew(BoxLayout):
         self.spacing=10
         if col=='Save':
             self.label = Label(text = "")
-            self.button = Button(text = "Save", size_hint=(0.75, 1), font_size="15sp")
+            self.button = Button(text = "Save", size_hint=(0.75, 1), font_size="15sp",
+                        color = BUTTON_COLOR,
+                        background_color = BUTTON_BACKGROUND,
+                        background_normal = '')
             self.button.bind(on_press = self.append_data)
             self.add_widget(self.label)
             self.add_widget(self.button)
             self.widget_type = 'button'
         else:
-            self.label = Label(text = col)
+            self.label = Label(text = col, color = WINDOW_COLOR)
             self.txt = TextInput(multiline=False, size_hint=(0.75, None), font_size="15sp")
             self.txt.bind(minimum_height=self.txt.setter('height'))
             self.add_widget(self.label)
@@ -1376,37 +1275,35 @@ class AddNew(BoxLayout):
             if obj.widget_type=='data':
                 result[obj.label.text] = obj.txt.text 
                 obj.txt.text = ''
-        new_data = pd.DataFrame(result, index=[result['Name']])
+        sorted_result = {}
+        if self.df_name == 'prisms':
+            for f in edm_prisms.fields():
+                sorted_result[f] = result[f]
+            edm_prisms.db.insert(sorted_result)
+        if self.df_name == 'units':
+            for f in edm_units.fields():
+                sorted_result[f] = result[f]
+            edm_units.db.insert(sorted_result)
         if self.df_name == 'datums':
-            EDMpy.edm_datums.datums = EDMpy.edm_datums.datums.append(new_data)
-            EDMpy.edm_datums.save()
-        elif self.df_name == 'prisms':
-            EDMpy.edm_prisms.prisms = EDMpy.edm_prisms.prisms.append(new_data)
-            EDMpy.edm_prisms.save()
-        elif self.df_name == 'units':
-            EDMpy.edm_units.units = EDMpy.edm_units.units.append(new_data)
-            EDMpy.edm_units.save()
+            for f in edm_datums.fields():
+                sorted_result[f] = result[f]
+            edm_datums.db.insert(sorted_result)
 
 class DfguiWidget(TabbedPanel):
 
-    def __init__(self, df, df_name, **kwargs):
+    def __init__(self, df, **kwargs):
         super(DfguiWidget, self).__init__(**kwargs)
         self.df = df
-        self.df_name = df_name
+        self.df_name = df.db_name
         self.panel1.populate_data(df)
-        #self.panel2.populate_columns(df.columns[:])
-        self.panel3.populate(df.columns[:])
-        self.panel4.populate(df.columns[:], df_name)
-        #self.panel4.populate_options(df.columns[:])
-        #self.panel5.populate_options(df.columns[:])
+        self.panel4.populate(df)
+        self.color = BUTTON_COLOR
+        self.background_color = WINDOW_BACKGROUND
+        self.background_image = ''
 
     # This should be changed so that the table isn't rebuilt
     # each time settings change.
     def open_panel1(self):
-        arr = self.panel3.get_filters()
-        #print(str(arr))
-        self.panel1.apply_filter(self.panel3.get_filters())
-        #self.panel1._generate_table(disabled=self.panel2.get_disabled_columns())
         self.panel1._generate_table()
     
     def cancel(self):
