@@ -37,12 +37,11 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.tabbedpanel import TabbedPanel
 from kivy.core.window import Window
 
-import os
-import string
+import os 
 import random
-import numpy as np
+#import numpy as np
 import datetime
-import pandas as pd 
+#import pandas as pd 
 import logging
 
 # My libraries for this project
@@ -235,6 +234,9 @@ class units(dbs):
         self.filename = filename
         self.db = TinyDB(self.filename)
 
+    def point_in(self, X, Y, Z):
+        pass
+
     def add(self, unit):
         new_data = {}
         new_data['name'] = unit.name
@@ -313,6 +315,16 @@ class cfg(blockdata):
         self.load(filename)
         self.validate()
     
+    def valid_datarecord(self, data_record):
+        for field in data_record:
+            f = self.get(field)
+            value = data_record[field]
+            if f.required and not value:
+                return('Required field %s is empty.  Please provide a value.' % field)
+            if f.length!=0 and len(value) > f.length:
+                return('Maximum length for %s is set to %s.  Please shorten your response.  Field lengths can be set in the CFG file.  A value of 0 means no length limit.')
+        return(True)
+
     def get(self, field_name):
         f = self.field(field_name)
         f.inputtype = self.get_value(field_name, 'TYPE')
@@ -383,6 +395,8 @@ class cfg(blockdata):
             if f.prompt == '':
                 f.prompt = field_name
             f.inputtype = f.inputtype.upper()
+            if field_name in ['UNIT','ID','SUFFIX','X','Y','Z']:
+                f.required = True
             self.put(field_name, f)
 
     def save(self):
@@ -815,6 +829,27 @@ class TextNumericInput(Popup):
         self.size = (400, 400)
         self.auto_dismiss = True
 
+class MessageBox(Popup):
+    def __init__(self, title, message, **kwargs):
+        super(MessageBox, self).__init__(**kwargs)
+        __content = BoxLayout(orientation = 'vertical')
+        __label = Label(text = message, size_hint=(1, 1), valign='middle', halign='center')
+        __label.bind(
+            width=lambda *x: __label.setter('text_size')(__label, (__label.width, None)),
+            texture_size=lambda *x: __label.setter('height')(__label, __label.texture_size[1]))
+        __content.add_widget(__label)
+        __button1 = Button(text = 'Back', size_hint_y = .2,
+                            color = BUTTON_COLOR,
+                            background_color = BUTTON_BACKGROUND,
+                            background_normal = '')
+        __content.add_widget(__button1)
+        __button1.bind(on_press = self.dismiss)
+        self.title = title
+        self.content = __content
+        self.size_hint = (.8, .8)
+        self.size=(400, 400)
+        self.auto_dismiss = True
+
 class EditPointScreen(Screen):
 
     global edm_cfg
@@ -931,8 +966,13 @@ class EditPointScreen(Screen):
             for f in edm_points.fields():
                 if widget.id == f:
                     new_record[f] = widget.text
-        edm_points.db.insert(new_record)
-        self.parent.current = 'MainScreen'
+        valid = edm_cfg.valid_datarecord(new_record)
+        if valid:
+            edm_points.db.insert(new_record)
+            self.parent.current = 'MainScreen'
+        else:
+            self.popup = MessageBox('Save Error', valid_record)
+            self.popup.open()
 
 class EditPointsScreen(Screen):
     def __init__(self,**kwargs):
@@ -963,10 +1003,6 @@ class datumlist(RecycleView, Screen):
         super(datumlist, self).__init__(**kwargs)
         self.data = [{'text': str(x)} for x in range(100)]
 
-class MessageBox(Popup):
-
-    def popup_dismiss(self):
-        self.dismiss()
 
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior, RecycleBoxLayout):
     """ Adds selection and focus behaviour to the view. """
@@ -1169,8 +1205,8 @@ class StatusScreen(Screen):
 
 class HeaderCell(Button):
     color = BUTTON_COLOR
-    background_color: BUTTON_BACKGROUND
-    background_normal: ''
+    background_color = BUTTON_BACKGROUND
+    background_normal = ''
 
 class TableHeader(ScrollView):
     """Fixed table header that scrolls x with the data table"""

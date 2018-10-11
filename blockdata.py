@@ -1,3 +1,6 @@
+import logging
+import os
+
 class blockdata:
     def update_value(self, blockname, varname, vardata, append = False):
         block_exists = False
