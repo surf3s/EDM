@@ -12,3 +12,10 @@ class dbs:
     def names(self):
         return([row['name'] for row in self.db])
 
+    def replace(self, data_record):
+        ###
+        pass
+
+    def duplicate(self, data_record):
+        ###
+        pass

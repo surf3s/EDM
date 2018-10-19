@@ -207,6 +207,21 @@ class prisms(dbs):
     def fields(self):
         return(['name','height','offset'])
 
+    def valid(self, data_record):
+        if data_record['name'] == '':
+            return('A name field is required.')
+        if len(data_record['name']) > 20:
+            return('Prism names should be 20 characters or less.')
+        if data_record['height'] == '':
+            return('A prism height is required.')
+        if float(data_record['height'])>10:
+            return('Prism height looks to large.  Prism heights are in meters.')
+        if data_record['offset'] == '':
+            data_record['offset'] == '0.0'
+        if float(data_record['offset']) > .2:
+            return('Prism offset looks to be too large.  Prism offsets are expressed in meters.')
+        return(None)
+
 class units(dbs):
     MAX_UNITS = 100
     filename = None
@@ -227,15 +242,19 @@ class units(dbs):
             self.x2 = x2
             self.y2 = y2
             self.radius = radius
-
+ 
     def __init__(self, filename):
         if filename=='':
             filename == 'EDM_units.json'
         self.filename = filename
         self.db = TinyDB(self.filename)
 
-    def point_in(self, X, Y, Z):
-        pass
+    def point_in(self, x, y, z):
+        for unit_name in self.db.names():
+            unit = self.get(unit_name)
+            if x<=unit.x2 and x>=unit.x1 and y<=unit.y2 and y>=unit.y1:
+                return(unit)
+        return(None)
 
     def add(self, unit):
         new_data = {}
@@ -244,9 +263,18 @@ class units(dbs):
         new_data['y1'] = unit.y1
         new_data['x2'] = unit.x2
         new_data['y2'] = unit.y2
-        new_data['x1'] = unit.x1
         new_data['radius'] = unit.radius
         self.db.insert(new_data)
+
+    def put(self, unit):
+        new_data = {}
+        new_data['x1'] = unit.x1
+        new_data['x2'] = unit.x2
+        new_data['y1'] = unit.y1
+        new_data['y2'] = unit.y2
+        new_data['radius'] = unit.radius
+        unit_record = Query()
+        edm_points.db.update(new_data, (unit_record.name == unit.name))
 
     def get(self, unit_name):
         u = self.db.search(where('name')==unit_name)
@@ -257,6 +285,22 @@ class units(dbs):
              u[0]['radius']))
         else:
             return(None)
+
+    # This represents a dramatic change made to generalize the concept of linking fields
+    # The idea is that the linked fields are listed in the CFG as an attribute of a field
+    # And now any field can be a link driven field.
+    # The issue is where to store the data - I think I try in the CFG as well.
+    def update_linked_fields(self, new_record):
+        for field_name in edm_cfg.fields():
+            field = edm_cfg.get(field_name)
+            if field.link_fields:
+                defaults = {}
+                for link_field in field.link_fields:
+                    defaults[link_field] = new_record[link_field]
+                field.defaults = defaults
+                #edm_cfg.put(field)
+                # Need a database for each of these
+                # The name field in the database should be the key with is the fieldname 
 
     def delete(self, unit_name):
         pass
@@ -306,6 +350,7 @@ class cfg(blockdata):
         required = False
         carry = False 
         unique = False
+        link_fields = []
         def __init__(self, name):
             self.name = name
 
@@ -331,6 +376,7 @@ class cfg(blockdata):
         f.prompt = self.get_value(field_name, 'PROMPT')
         f.length = self.get_value(field_name, 'LENGTH')
         f.menu = self.get_value(field_name, 'MENU').split(",")
+        f.link_fields = self.get_value(field_name, 'LINKED').split(",")
         return(f)
 
     def put(self, field_name, f):
@@ -398,6 +444,14 @@ class cfg(blockdata):
             if field_name in ['UNIT','ID','SUFFIX','X','Y','Z']:
                 f.required = True
             self.put(field_name, f)
+        
+        # This is a legacy issue.  Linked fields are now listed with each field.
+        unit_fields = self.get_value('EDM', 'UNITFIELDS')
+        if unit_fields:
+            f = self.get('UNIT')
+            f.link_fields = unit_fields
+            self.put('UNIT', f)
+            # Delete UNITIFIELDS from the EDM block of teh CFG
 
     def save(self):
         self.write_blocks()
@@ -594,37 +648,54 @@ class MainScreen(Screen):
         global edm_cfg
 
         layout = GridLayout(cols = 3, spacing = 10, size_hint_y = .8)
+        button_count = 0
 
         if edm_cfg.get_value('BUTTON1','TITLE'):
             button1 = record_button(text = edm_cfg.get_value('BUTTON1','TITLE'), id = 'button1')
             layout.add_widget(button1)
             button1.bind(on_press = self.take_shot)
+            button_count += 1
 
         if edm_cfg.get_value('BUTTON2','TITLE'):
             button2  = record_button(text = edm_cfg.get_value('BUTTON2','TITLE'), id = 'button2')
             layout.add_widget(button2)
             button2.bind(on_press = self.take_shot)
+            button_count += 1
 
         if edm_cfg.get_value('BUTTON3','TITLE'):
             button3  = record_button(text = edm_cfg.get_value('BUTTON3','TITLE'), id = 'button3')
             layout.add_widget(button3)
             button3.bind(on_press = self.take_shot)
+            button_count += 1
 
         if edm_cfg.get_value('BUTTON4','TITLE'):
             button4  = record_button(text = edm_cfg.get_value('BUTTON4','TITLE'), id = 'button4')
             layout.add_widget(button4)
             button4.bind(on_press = self.take_shot)
+            button_count += 1
 
         if edm_cfg.get_value('BUTTON5','TITLE'):
             button5  = record_button(text = edm_cfg.get_value('BUTTON5','TITLE'), id = 'button5')
             layout.add_widget(button5)
             button5.bind(on_press = self.take_shot)
+            button_count += 1
 
         if edm_cfg.get_value('BUTTON6','TITLE'):
             button6  = record_button(text = edm_cfg.get_value('BUTTON6','TITLE'), id = 'button6')
             layout.add_widget(button6)
             button6.bind(on_press = self.take_shot)
+            button_count += 1
 
+        if button_count % 3 !=0:
+            button_empty = Button(text = '', size_hint_y = None, id = '',
+                            color = WINDOW_BACKGROUND,
+                            background_color = WINDOW_BACKGROUND,
+                            background_normal = '')
+            layout.add_widget(button_empty)
+
+        if button_count % 3 == 2:
+            layout.add_widget(button_empty)
+            
         button_rec = Button(text = 'Record', size_hint_y = None, id = 'record',
                         color = BUTTON_COLOR,
                         background_color = BUTTON_BACKGROUND,
@@ -850,6 +921,33 @@ class MessageBox(Popup):
         self.size=(400, 400)
         self.auto_dismiss = True
 
+class YesNo(Popup):
+    def __init__(self, title, message, yes_callback, no_callback, **kwargs):
+        super(YesNo, self).__init__(**kwargs)
+        __content = BoxLayout(orientation = 'vertical')
+        __label = Label(text = message, size_hint=(1, 1), valign='middle', halign='center')
+        __label.bind(
+            width=lambda *x: __label.setter('text_size')(__label, (__label.width, None)),
+            texture_size=lambda *x: __label.setter('height')(__label, __label.texture_size[1]))
+        __content.add_widget(__label)
+        __button1 = Button(text = 'Yes', size_hint_y = .2,
+                            color = BUTTON_COLOR,
+                            background_color = BUTTON_BACKGROUND,
+                            background_normal = '')
+        __content.add_widget(__button1)
+        __button1.bind(on_press = yes_callback)
+        __button2 = Button(text = 'No', size_hint_y = .2,
+                            color = BUTTON_COLOR,
+                            background_color = BUTTON_BACKGROUND,
+                            background_normal = '')
+        __content.add_widget(__button2)
+        __button2.bind(on_press = no_callback)
+        self.title = title
+        self.content = __content
+        self.size_hint = (.8, .8)
+        self.size=(400, 400)
+        self.auto_dismiss = True
+
 class EditPointScreen(Screen):
 
     global edm_cfg
@@ -969,6 +1067,7 @@ class EditPointScreen(Screen):
         valid = edm_cfg.valid_datarecord(new_record)
         if valid:
             edm_points.db.insert(new_record)
+            edm_units.update_defaults(new_record)
             self.parent.current = 'MainScreen'
         else:
             self.popup = MessageBox('Save Error', valid_record)
@@ -1002,7 +1101,6 @@ class datumlist(RecycleView, Screen):
     def __init__(self, **kwargs):
         super(datumlist, self).__init__(**kwargs)
         self.data = [{'text': str(x)} for x in range(100)]
-
 
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior, RecycleBoxLayout):
     """ Adds selection and focus behaviour to the view. """
@@ -1270,8 +1368,12 @@ class TableData(RecycleView):
             if cfg_field.inputtype in ['TEXT','NUMERIC']:
                 self.popup = TextNumericInput(field, self.menu_selection)
                 self.popup.open()
+        else:
+            self.popup = TextNumericInput(field, self.menu_selection)
+            self.popup.open()
 
     def menu_selection(self, value):
+        ### need some data validation
         if self.db == 'points':
             print(value.id)
             unit, id = self.key.split('-')
@@ -1348,6 +1450,9 @@ class AddNew(BoxLayout):
     global edm_datums
     global edm_prisms
     global edm_units
+    
+    popup = ObjectProperty(None)
+    sorted_result = None
 
     def __init__(self, col, df_name, **kwargs):
         super(AddNew, self).__init__(**kwargs)
@@ -1378,15 +1483,23 @@ class AddNew(BoxLayout):
 
     def append_data(self, instance):
         result = {}
+        message = ''
         for obj in instance.parent.parent.children:
             if obj.widget_type=='data':
                 result[obj.label.text] = obj.txt.text 
                 obj.txt.text = ''
         sorted_result = {}
+        ### this code needs one set of if/then that then sets a variable that refres
+        ### to the class that is being operated on
         if self.df_name == 'prisms':
             for f in edm_prisms.fields():
                 sorted_result[f] = result[f]
-            edm_prisms.db.insert(sorted_result)
+            if edm_prisms.duplicate(sorted_result):
+                message = 'Overwrite existing prism named %s' % sorted_result['name']
+            else:
+                message = edm_prisms.valid(sorted_result)
+                if not message:
+                    edm_prisms.db.insert(sorted_result)
         if self.df_name == 'units':
             for f in edm_units.fields():
                 sorted_result[f] = result[f]
@@ -1395,6 +1508,27 @@ class AddNew(BoxLayout):
             for f in edm_datums.fields():
                 sorted_result[f] = result[f]
             edm_datums.db.insert(sorted_result)
+        if message:
+            self.sorted_result = sorted_result
+            self.popup = YesNo('Edit', message, self.replace, self.do_nothing)
+        else:
+            for obj in instance.parent.parent.children:
+                if obj.widget_type=='data':
+                    obj.txt.text = ''
+
+    def replace(self, value):
+        if self.df_name == 'prisms':
+            edm_prisms.replace(self.sorted_result)
+        if self.df_name == 'units':
+            edm_units.replace(self.sorted_result)
+        if self.df_name == 'datums':
+            edm_datums.replace(self.sorted_result)
+        ### Need to clear form here as well
+        self.popup.dismiss()
+
+    def do_nothing(self, value):
+        self.popup.dismiss()
+
 
 class DfguiWidget(TabbedPanel):
 
