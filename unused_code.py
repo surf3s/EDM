@@ -1,12 +1,3 @@
-class LoadDialog(FloatLayout):
-    start_path =  ObjectProperty(None)
-    load = ObjectProperty(None)
-    cancel = ObjectProperty(None)
-
-class SaveDialog(FloatLayout):
-    save = ObjectProperty(None)
-    text_input = ObjectProperty(None)
-    cancel = ObjectProperty(None)
 
 class Root(FloatLayout):
     loadfile = ObjectProperty(None)
