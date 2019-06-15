@@ -1,18 +1,14 @@
 
-# Need a datum select pop-up 
-# Need a setup screen to set the total station type to simulation
-# Need a select prism pop-up
-# Need the program flow from record point, to select prism, to edit point, to save
 # Need a read and write ini to be able to easily resume the program
-# Need status screen
 # Then start working on the flow for more complex setups
-# See if individual items in the data grid can be selected
-# Add communications parameters to setup
 # Add serial port communications
 # Add bluetooth communications
 
-__version__ = '1.0.0'
+__program__ = 'EDM'
+__version__ = '1.0.1'
+__date__ = 'April, 2019'
 
+#Region Imports
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.factory import Factory
@@ -37,48 +33,56 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.tabbedpanel import TabbedPanel
 from kivy.core.window import Window
 
+# The explicit mention of this package here
+# triggers its inclusions in the pyinstaller spec file.
+# It is needed for the filechooser widget.
+try:
+    import win32timezone
+except:
+    pass
+
 import os 
 import random
-#import numpy as np
 import datetime
-#import pandas as pd 
+
 import logging
+import logging.handlers as handlers
 
 # My libraries for this project
 from blockdata import blockdata
 from dbs import dbs
+from e5_widgets import *
+from constants import *
+from colorscheme import *
+from misc import *
 
 # The database - pure Python
 from tinydb import TinyDB, Query, where
 
 from collections import OrderedDict
 
-OPTIONBUTTON_BACKGROUND = (128/255, 216/255, 255/255, 1) #80D8FF (lighter blue)
-OPTIONBUTTON_COLOR = (0, 0, 0, 1) # black
-BUTTON_BACKGROUND = (0, .69, 255/255, 1) #00B0FF (deep blue)
-BUTTON_COLOR =  (0, 0, 0, 1) # black
-WINDOW_BACKGROUND = (255/255, 255/255, 255/255, 1) #FFFFFF
-WINDOW_COLOR = (0, 0, 0, 1)
-
-DATAGRID_ODD = (224.0/255, 224.0/255, 224.0/255, 1)
-DATAGRID_EVEN = (189.0/255, 189.0/255, 189.0/255, 1)
+#endregion
 
 # get anglr.py library
 # or get angles.py library (looks maybe better)
 
 # use pySerial for serial communications
 
+#Region Data Classes
 class points(dbs):
     MAX_FIELDS = 30
     db = None
     filename = None
     db_name = 'points'
 
-    def __init__(self, filename):
-        if filename=='':
-            filename = 'EDM_points.json'
+    def __init__(self, filename = ''):
         self.filename = filename
-        self.db = TinyDB(self.filename)
+        if self.filename:
+            self.db = TinyDB(self.filename)
+
+    def open(self, filename):
+        self.db = TinyDB(filename)
+        self.filename = filename
 
     def status(self):
         txt = 'The points file is %s\n' % self.filename
@@ -122,7 +126,6 @@ class points(dbs):
 class datums(dbs):
     MAX_DATUMS = 100
     db = None
-    filename = None
     db_name = 'datums'
 
     class datum:
@@ -138,11 +141,11 @@ class datums(dbs):
             self.z = z
             self.date_created = date_created
     
-    def __init__(self, filename):
-        if filename=='':
-            filename = 'EDM_datums.json'
-        self.filename = filename
-        self.db = TinyDB(self.filename)
+    def __init__(self, db = None):
+        self.db = db
+
+    def open(self, db):
+        self.db = db
 
     def add(self, datum):
         new_data = {}
@@ -169,7 +172,6 @@ class datums(dbs):
 class prisms(dbs):
     MAX_PRISMS = 20
     db = None
-    filename = None
     db_name = 'prisms'
 
     class prism:
@@ -181,11 +183,11 @@ class prisms(dbs):
             self.height = height
             self.offset = offset
 
-    def __init__(self, filename):
-        if filename=='':
-            filename = 'EDM_prisms.json'
-        self.filename = filename
-        self.db = TinyDB(self.filename)
+    def __init__(self, db = None):
+        self.db = db
+    
+    def open(self, db):
+        self.db = db
 
     def add(self, prism):
         new_data = {}
@@ -207,9 +209,23 @@ class prisms(dbs):
     def fields(self):
         return(['name','height','offset'])
 
+    def valid(self, data_record):
+        if data_record['name'] == '':
+            return('A name field is required.')
+        if len(data_record['name']) > 20:
+            return('Prism names should be 20 characters or less.')
+        if data_record['height'] == '':
+            return('A prism height is required.')
+        if float(data_record['height'])>10:
+            return('Prism height looks to large.  Prism heights are in meters.')
+        if data_record['offset'] == '':
+            data_record['offset'] == '0.0'
+        if float(data_record['offset']) > .2:
+            return('Prism offset looks to be too large.  Prism offsets are expressed in meters.')
+        return(None)
+
 class units(dbs):
     MAX_UNITS = 100
-    filename = None
     db = None
     db_name = 'units'
 
@@ -227,15 +243,19 @@ class units(dbs):
             self.x2 = x2
             self.y2 = y2
             self.radius = radius
+ 
+    def __init__(self, db = None):
+        self.db = db
 
-    def __init__(self, filename):
-        if filename=='':
-            filename == 'EDM_units.json'
-        self.filename = filename
-        self.db = TinyDB(self.filename)
+    def open(self, db):
+        self.db = db
 
-    def point_in(self, X, Y, Z):
-        pass
+    def point_in(self, x, y, z):
+        for unit_name in self.db.names():
+            unit = self.get(unit_name)
+            if x<=unit.x2 and x>=unit.x1 and y<=unit.y2 and y>=unit.y1:
+                return(unit)
+        return(None)
 
     def add(self, unit):
         new_data = {}
@@ -244,9 +264,18 @@ class units(dbs):
         new_data['y1'] = unit.y1
         new_data['x2'] = unit.x2
         new_data['y2'] = unit.y2
-        new_data['x1'] = unit.x1
         new_data['radius'] = unit.radius
         self.db.insert(new_data)
+
+    def put(self, unit):
+        new_data = {}
+        new_data['x1'] = unit.x1
+        new_data['x2'] = unit.x2
+        new_data['y1'] = unit.y1
+        new_data['y2'] = unit.y2
+        new_data['radius'] = unit.radius
+        unit_record = Query()
+        edm_points.db.update(new_data, (unit_record.name == unit.name))
 
     def get(self, unit_name):
         u = self.db.search(where('name')==unit_name)
@@ -257,6 +286,22 @@ class units(dbs):
              u[0]['radius']))
         else:
             return(None)
+
+    # This represents a dramatic change made to generalize the concept of linking fields
+    # The idea is that the linked fields are listed in the CFG as an attribute of a field
+    # And now any field can be a link driven field.
+    # The issue is where to store the data - I think I try in the CFG as well.
+    def update_linked_fields(self, new_record):
+        for field_name in edm_cfg.fields():
+            field = edm_cfg.get(field_name)
+            if field.link_fields:
+                defaults = {}
+                for link_field in field.link_fields:
+                    defaults[link_field] = new_record[link_field]
+                field.defaults = defaults
+                #edm_cfg.put(field)
+                # Need a database for each of these
+                # The name field in the database should be the key with is the fieldname 
 
     def delete(self, unit_name):
         pass
@@ -269,15 +314,46 @@ class ini(blockdata):
     blocks = []
     filename = ''
 
-    def __init__(self, filename):
+    def __init__(self, filename = ''):
         if filename=='':
-            filename = 'EDMpy.ini'
+            filename = 'E5.ini'
         self.filename = filename
-        self.blocks = self.read_blocks()
+        self.incremental_backups = False
+        self.backup_interval = 0
+        self.first_time = True
 
-    def update(self):
-        global edm_station
-        global edm_cfg
+    def open(self, filename = ''):
+        if filename:
+            self.filename = filename
+        self.blocks = self.read_blocks()
+        self.first_time = (self.blocks == [])
+        self.is_valid()
+        self.incremental_backups = self.get_value('EDM','IncrementalBackups').upper() == 'TRUE'
+        self.backup_interval = int(self.get_value('EDM','BackupInterval'))
+
+    def is_valid(self):
+        for field_option in ['DARKMODE','INCREMENTALBACKUPS']:
+            if self.get_value('EDM',field_option):
+                if self.get_value('EDM',field_option).upper() == 'YES':
+                    self.update_value('EDM',field_option,'TRUE')
+            else:
+                self.update_value('EDM',field_option,'FALSE')
+
+        if self.get_value('EDM', "BACKUPINTERVAL"):
+            test = False
+            try:
+                test = int(self.get_value('EDM', "BACKUPINTERVAL"))
+                if test < 0:
+                    test = 0
+                elif test > 200:
+                    test = 200
+                self.update_value('EDM', 'BACKUPINTERVAL', test)
+            except:
+                self.update_value('EDM', 'BACKUPINTERVAL', 0)
+        else:
+            self.update_value('EDM', 'BACKUPINTERVAL', 0)
+
+    def update(self, edm_station, edm_cfg):
         self.update_value('STATION','TotalStation', edm_station.make)
         self.update_value('STATION','Communication', edm_station.communication)
         self.update_value('STATION','COMPort', edm_station.comport)
@@ -293,9 +369,6 @@ class ini(blockdata):
 
 class cfg(blockdata):
 
-    blocks = []
-    filename = ""
-
     class field:
         name = ''
         inputtype = ''
@@ -306,15 +379,34 @@ class cfg(blockdata):
         required = False
         carry = False 
         unique = False
+        link_fields = []
         def __init__(self, name):
             self.name = name
 
-    def __init__(self, filename):
-        if filename=='':
-            filename = 'EDMpy.cfg'
-        self.load(filename)
-        self.validate()
+    def __init__(self, filename = ''):
+        self.initialize()
+        if filename:
+            self.filename = filename
+
+    def initialize(self):
+        self.blocks = []
+        self.filename = ""
+        self.path = ""
+        self.current_field = None
+        self.current_record = {}
+        self.BOF = True
+        self.EOF = False
+        self.has_errors = False
+        self.has_warnings = False
+        self.key_field = None   # not implimented yet
+        self.description = ''   # not implimented yet
+        self.gps = False
     
+    def open(self, filename = ''):
+        if filename:
+            self.filename = filename
+        self.load()
+
     def valid_datarecord(self, data_record):
         for field in data_record:
             f = self.get(field)
@@ -331,6 +423,7 @@ class cfg(blockdata):
         f.prompt = self.get_value(field_name, 'PROMPT')
         f.length = self.get_value(field_name, 'LENGTH')
         f.menu = self.get_value(field_name, 'MENU').split(",")
+        f.link_fields = self.get_value(field_name, 'LINKED').split(",")
         return(f)
 
     def put(self, field_name, f):
@@ -397,10 +490,15 @@ class cfg(blockdata):
             f.inputtype = f.inputtype.upper()
             if field_name in ['UNIT','ID','SUFFIX','X','Y','Z']:
                 f.required = True
-            if f.length=='':
-                f.length=0
-            f.length = int(f.length)
             self.put(field_name, f)
+        
+        # This is a legacy issue.  Linked fields are now listed with each field.
+        unit_fields = self.get_value('EDM', 'UNITFIELDS')
+        if unit_fields:
+            f = self.get('UNIT')
+            f.link_fields = unit_fields
+            self.put('UNIT', f)
+            # Delete UNITIFIELDS from the EDM block of teh CFG
 
     def save(self):
         self.write_blocks()
@@ -573,81 +671,50 @@ class totalstation:
 class EditDatums(Screen):
     pass
 
-class record_button(Button):
-    def __init__(self,id,text,**kwargs):
-        super(Button, self).__init__(**kwargs)
-        self.text = text
-        self.id = id
-        self.size_hint_y = None
-        self.id = id
-        self.color = BUTTON_COLOR
-        self.background_color = BUTTON_BACKGROUND
-        self.background_normal = ''
+#endregion
 
 class MainScreen(Screen):
 
-    global edm_prisms
-    global edm_station
-
     popup = ObjectProperty(None)
+    popup_open = False
+    text_color = (0, 0, 0, 1)
 
-    def __init__(self,**kwargs):
+    def __init__(self, edm_points = None, edm_cfg = None, edm_ini = None, colors = None, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
 
-        global edm_cfg
+        self.colors = colors if colors else ColorScheme()
+        self.edm_cfg = edm_cfg if edm_cfg else cfg()
+        self.edm_ini = edm_ini if edm_ini else ini()
+        self.edm_points = edm_points if edm_points else points()
 
         layout = GridLayout(cols = 3, spacing = 10, size_hint_y = .8)
+        button_count = 0
 
-        if edm_cfg.get_value('BUTTON1','TITLE'):
-            button1 = record_button(text = edm_cfg.get_value('BUTTON1','TITLE'), id = 'button1')
-            layout.add_widget(button1)
-            button1.bind(on_press = self.take_shot)
+        for button_no in range(1,7):
+            if edm_cfg.get_value('BUTTON' + str(button_no), 'TITLE'):
+                layout.add_widget(e5_button(text = edm_cfg.get_value('BUTTON' + str(button_no), 'TITLE'),
+                                             id = 'button' + str(button_no),
+                                             call_back = self.take_shot))
+                button_count += 1
 
-        if edm_cfg.get_value('BUTTON2','TITLE'):
-            button2  = record_button(text = edm_cfg.get_value('BUTTON2','TITLE'), id = 'button2')
-            layout.add_widget(button2)
-            button2.bind(on_press = self.take_shot)
+        if button_count % 3 !=0:
+            button_empty = Button(text = '', size_hint_y = None, id = '',
+                            color = self.colors.window_background,
+                            background_color = self.colors.window_background,
+                            background_normal = '')
+            layout.add_widget(button_empty)
 
-        if edm_cfg.get_value('BUTTON3','TITLE'):
-            button3  = record_button(text = edm_cfg.get_value('BUTTON3','TITLE'), id = 'button3')
-            layout.add_widget(button3)
-            button3.bind(on_press = self.take_shot)
+        if button_count % 3 == 2:
+            layout.add_widget(button_empty)
+            
+        layout.add_widget(e5_button(text = 'Record', id = 'record',
+                        colors = self.colors, call_back = self.take_shot))
 
-        if edm_cfg.get_value('BUTTON4','TITLE'):
-            button4  = record_button(text = edm_cfg.get_value('BUTTON4','TITLE'), id = 'button4')
-            layout.add_widget(button4)
-            button4.bind(on_press = self.take_shot)
+        layout.add_widget(e5_button(text = 'Continue', id = 'continue',
+                        colors = self.colors, call_back = self.take_shot))
 
-        if edm_cfg.get_value('BUTTON5','TITLE'):
-            button5  = record_button(text = edm_cfg.get_value('BUTTON5','TITLE'), id = 'button5')
-            layout.add_widget(button5)
-            button5.bind(on_press = self.take_shot)
-
-        if edm_cfg.get_value('BUTTON6','TITLE'):
-            button6  = record_button(text = edm_cfg.get_value('BUTTON6','TITLE'), id = 'button6')
-            layout.add_widget(button6)
-            button6.bind(on_press = self.take_shot)
-
-        button_rec = Button(text = 'Record', size_hint_y = None, id = 'record',
-                        color = BUTTON_COLOR,
-                        background_color = BUTTON_BACKGROUND,
-                        background_normal = '')
-        layout.add_widget(button_rec)
-        button_rec.bind(on_press = self.take_shot)
-
-        button_continue = Button(text = 'Continue', size_hint_y = None, id = 'continue',
-                        color = BUTTON_COLOR,
-                        background_color = BUTTON_BACKGROUND,
-                        background_normal = '')
-        layout.add_widget(button_continue)
-        button_continue.bind(on_press = self.take_shot)
-
-        button_measure = Button(text = 'Measure', size_hint_y = None, id = 'measure',
-                        color = BUTTON_COLOR,
-                        background_color = BUTTON_BACKGROUND,
-                        background_normal = '')
-        layout.add_widget(button_measure)
-        button_measure.bind(on_press = self.take_shot)
+        layout.add_widget(e5_button(text = 'Measure', id = 'measure',
+                        colors = self.colors, call_back = self.take_shot))
 
         self.add_widget(layout)
 
@@ -671,32 +738,53 @@ class MainScreen(Screen):
         layout_popup.add_widget(button2)
         root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
         root.add_widget(layout_popup)
-        self.popup = Popup(title = 'Prism Height',
+        self._popup = Popup(title = 'Prism Height',
                     content = root,
                     size_hint = (None, None),
                     size = (400, 400),
                     #pos_hint = {None, None},
                     auto_dismiss = False)
-        button2.bind(on_press = self.popup.dismiss)
-        self.popup.open()
+        button2.bind(on_press = self._popup.dismiss)
+        self._popup.open()
 
     def show_edit_screen(self, value):
-        self.popup.dismiss()
+        self._popup.dismiss()
         edm_station.prism = edm_prisms.get(value.text).height 
         self.parent.current = 'EditPointScreen'
 
+    def show_save_csvs(self):
+        if self.edm_cfg.filename and self.edm_data.filename:
+            content = e5_SaveDialog(start_path = self.edm_cfg.path,
+                                save = self.save_csvs, 
+                                cancel = self.dismiss_popup,
+                                button_color = self.colors.button_color,
+                                button_background = self.colors.button_background)
+            self.popup = Popup(title = "Select a folder for the  CSV files",
+                                content = content,
+                                size_hint = (0.9, 0.9))
+        else:
+            self.popup = e5_MessageBox('EDM', '\nOpen a CFG before exporting to CSV',
+                                    call_back = self.dismiss_popup,
+                                    colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+        
     def show_load_cfg(self):
-        content = LoadDialog(load = self.load, 
+        if self.edm_cfg.filename and self.edm_cfg.path:
+            start_path = self.edm_cfg.path
+        else:
+            start_path = self.edm_ini.get_value('EDM','APP_PATH')
+        content = e5_LoadDialog(load = self.load, 
                             cancel = self.dismiss_popup,
-                            start_path = os.path.dirname(os.path.abspath( __file__ )))
-        self._popup = Popup(title = "Load CFG file", content = content,
+                            start_path = start_path,
+                            button_color = self.colors.button_color,
+                            button_background = self.colors.button_background)
+        self.popup = Popup(title = "Load CFG file", content = content,
                             size_hint = (0.9, 0.9))
-        self._popup.open()
+        self.popup.open()
 
     def load(self, path, filename):
-        global edm_cfg, edm_ini
-        edm_cfg.load(os.path.join(path, filename[0]))
-        edm_ini.update()
+        self.edm_cfg.load(os.path.join(path, filename[0]))
         self.dismiss_popup()
 
     def dismiss_popup(self):
@@ -769,89 +857,6 @@ class InitializeThreePointScreen(Screen):
         super(InitializeThreePointScreen, self).__init__(**kwargs)
         self.add_widget(InitializeOnePointHeader())
         self.add_widget(DatumLister())
-
-class MenuList(Popup):
-    def __init__(self, title, menu_list, call_back, **kwargs):
-        super(MenuList, self).__init__(**kwargs)
-        __content = GridLayout(cols = 1, spacing = 5, size_hint_y = None)
-        __content.bind(minimum_height=__content.setter('height'))
-        for menu_item in menu_list:
-            __button = Button(text = menu_item, size_hint_y = None, id = title,
-                        color = OPTIONBUTTON_COLOR,
-                        background_color = OPTIONBUTTON_BACKGROUND,
-                        background_normal = '')
-            __content.add_widget(__button)
-            __button.bind(on_press = call_back)
-        if title!='PRISM':
-            __new_item = GridLayout(cols = 2, spacing = 5, size_hint_y = None)
-            __new_item.add_widget(TextInput(size_hint_y = None, id = 'new_item'))
-            __add_button = Button(text = 'Add', size_hint_y = None,
-                                    color = BUTTON_COLOR,
-                                    background_color = BUTTON_BACKGROUND,
-                                    background_normal = '', id = title)
-            __new_item.add_widget(__add_button)
-            __add_button.bind(on_press = call_back)
-            __content.add_widget(__new_item)
-        __button1 = Button(text = 'Back', size_hint_y = None,
-                                color = BUTTON_COLOR,
-                                background_color = BUTTON_BACKGROUND,
-                                background_normal = '')
-        __content.add_widget(__button1)
-        __button1.bind(on_press = self.dismiss)
-        __root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
-        __root.add_widget(__content)
-        self.title = title
-        self.content = __root
-        self.size_hint = (None, None)
-        self.size = (400, 400)
-        self.auto_dismiss = True
-
-class TextNumericInput(Popup):
-    def __init__(self, title, call_back, **kwargs):
-        super(TextNumericInput, self).__init__(**kwargs)
-        __content = GridLayout(cols = 1, spacing = 5, size_hint_y = None)
-        __content.bind(minimum_height=__content.setter('height'))
-        __content.add_widget(TextInput(size_hint_y = None, multiline = False, id = 'new_item'))
-        __add_button = Button(text = 'Next', size_hint_y = None,
-                                    color = BUTTON_COLOR,
-                                    background_color = BUTTON_BACKGROUND,
-                                    background_normal = '', id = title)
-        __content.add_widget(__add_button)
-        __add_button.bind(on_press = call_back)
-        __button1 = Button(text = 'Back', size_hint_y = None,
-                                color = BUTTON_COLOR,
-                                background_color = BUTTON_BACKGROUND,
-                                background_normal = '')
-        __content.add_widget(__button1)
-        __button1.bind(on_press = self.dismiss)
-        __root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
-        __root.add_widget(__content)
-        self.title = title
-        self.content = __root
-        self.size_hint = (None, None)
-        self.size = (400, 400)
-        self.auto_dismiss = True
-
-class MessageBox(Popup):
-    def __init__(self, title, message, **kwargs):
-        super(MessageBox, self).__init__(**kwargs)
-        __content = BoxLayout(orientation = 'vertical')
-        __label = Label(text = message, size_hint=(1, 1), valign='middle', halign='center')
-        __label.bind(
-            width=lambda *x: __label.setter('text_size')(__label, (__label.width, None)),
-            texture_size=lambda *x: __label.setter('height')(__label, __label.texture_size[1]))
-        __content.add_widget(__label)
-        __button1 = Button(text = 'Back', size_hint_y = .2,
-                            color = BUTTON_COLOR,
-                            background_color = BUTTON_BACKGROUND,
-                            background_normal = '')
-        __content.add_widget(__button1)
-        __button1.bind(on_press = self.dismiss)
-        self.title = title
-        self.content = __content
-        self.size_hint = (.8, .8)
-        self.size=(400, 400)
-        self.auto_dismiss = True
 
 class EditPointScreen(Screen):
 
@@ -928,10 +933,7 @@ class EditPointScreen(Screen):
                         background_color = BUTTON_BACKGROUND,
                         background_normal = '')
         layout.add_widget(button3)
-        root = ScrollView(size_hint=(1, None),
-                             size=(Window.width, Window.height),
-                             scroll_type = ['bars'],
-                             bar_margin = 0, bar_width = 20)
+        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height))
         root.add_widget(layout)
         self.add_widget(root)
 
@@ -975,40 +977,17 @@ class EditPointScreen(Screen):
         valid = edm_cfg.valid_datarecord(new_record)
         if valid:
             edm_points.db.insert(new_record)
+            edm_units.update_defaults(new_record)
             self.parent.current = 'MainScreen'
         else:
-            self.popup = MessageBox('Save Error', valid_record)
+            self.popup = e5_MessageBox('Save Error', valid_record)
             self.popup.open()
 
-class EditPointsScreen(Screen):
-    def __init__(self,**kwargs):
-        super(EditPointsScreen, self).__init__(**kwargs)
-        global edm_points
-        self.add_widget(DfguiWidget(edm_points))
-
-class EditPrismsScreen(Screen):
-    def __init__(self,**kwargs):
-        super(EditPrismsScreen, self).__init__(**kwargs)
-        global edm_prisms
-        self.add_widget(DfguiWidget(edm_prisms))
-
-class EditUnitsScreen(Screen):
-    def __init__(self,**kwargs):
-        super(EditUnitsScreen, self).__init__(**kwargs)
-        global edm_units
-        self.add_widget(DfguiWidget(edm_units))
-
-class EditDatumsScreen(Screen):
-    def __init__(self,**kwargs):
-        super(EditDatumsScreen, self).__init__(**kwargs)
-        global edm_datums
-        self.add_widget(DfguiWidget(edm_datums))
 
 class datumlist(RecycleView, Screen):
     def __init__(self, **kwargs):
         super(datumlist, self).__init__(**kwargs)
         self.data = [{'text': str(x)} for x in range(100)]
-
 
 class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior, RecycleBoxLayout):
     """ Adds selection and focus behaviour to the view. """
@@ -1028,7 +1007,7 @@ class SelectableButton(RecycleDataViewBehavior, Button):
         self.parent.selected_value = 'Selected: {}'.format(self.parent.btn_info[int(self.id)])
 
     def on_release(self):
-        MessageBox().open()
+        e5_MessageBox().open()
 
 class RV(RecycleView):
     rv_layout = ObjectProperty(None)
@@ -1045,6 +1024,18 @@ class DatumLister(BoxLayout,Screen):
         self.add_widget(RV())
 
 class EditDatumScreen(Screen):
+    pass
+
+class EditPointsScreen(e5_DatagridScreen):
+    pass
+
+class EditPrismsScreen(e5_DatagridScreen):
+    pass
+
+class EditUnitsScreen(e5_DatagridScreen):
+    pass
+
+class EditDatumsScreen(e5_DatagridScreen):
     pass
 
 class StationConfigurationScreen(Screen):
@@ -1158,326 +1149,270 @@ class StationConfigurationScreen(Screen):
                 ## need code to open com port here
         self.parent.current = 'MainScreen'
 
-class AboutScreen(Screen):
-    pass
+class EDMSettingsScreen(Screen):
+    def __init__(self, edm_cfg = None, edm_ini = None, colors = None, **kwargs):
+        super(EDMSettingsScreen, self).__init__(**kwargs)
+        self.colors = colors if  colors else ColorScheme()
+        self.edm_ini = edm_ini
+        self.edm_cfg = edm_cfg
 
-class DebugScreen(Screen):
-    pass
+    def on_enter(self):
+        self.build_screen()
 
-class LogScreen(Screen):
-    pass
+    def build_screen(self):
+        self.clear_widgets()
+        layout = GridLayout(cols = 1,
+                                size_hint_y = 1,
+                                id = 'settings_box',
+                                spacing = 5, padding = 5)
+        layout.bind(minimum_height = layout.setter('height'))
 
-class StatusScreen(Screen):
-    def __init__(self,**kwargs):
-        super(StatusScreen, self).__init__(**kwargs)
+        darkmode = GridLayout(cols = 2, size_hint_y = .1, spacing = 5, padding = 5)
+        darkmode.add_widget(e5_label('Dark Mode', colors = self.colors))
+        darkmode_switch = Switch(active = self.colors.darkmode)
+        darkmode_switch.bind(active = self.darkmode)
+        darkmode.add_widget(darkmode_switch)
+        layout.add_widget(darkmode)
 
-        global edm_station, edm_datums, edm_units, edm_prisms
-        global edm_cfg
+        colorscheme = GridLayout(cols = 2, size_hint_y = .6, spacing = 5, padding = 5)
+        colorscheme.add_widget(e5_label('Color Scheme', colors = self.colors))
+        colorscheme.add_widget(e5_scrollview_menu(self.colors.color_names(),
+                                                  menu_selected = '',
+                                                  call_back = self.color_scheme_selected))
+        temp = ColorScheme()
+        for widget in colorscheme.walk():
+            if widget.id in self.colors.color_names():
+                temp.set_to(widget.text)
+                widget.background_color = temp.button_background
+        layout.add_widget(colorscheme)
+        
+        backups = GridLayout(cols = 2, size_hint_y = .3, spacing = 5, padding = 5)
+        backups.add_widget(e5_label('Auto-backup after\nevery %s\nrecords entered.' % self.edm_ini.backup_interval,
+                                    id = 'label_backup_interval',
+                                    colors = self.colors))
+        slide = Slider(min = 0, max = 200,
+                        value = self.edm_ini.backup_interval,
+                        orientation = 'horizontal', id = 'backup_interval',
+                        value_track = True, value_track_color= self.colors.button_background)
+        backups.add_widget(slide)
+        slide.bind(value = self.update_backup_interval)
+        backups.add_widget(e5_label('Use incremental backups?', self.colors))
+        backups_switch = Switch(active = self.e5_ini.incremental_backups)
+        backups_switch.bind(active = self.incremental_backups)
+        backups.add_widget(backups_switch)
+        layout.add_widget(backups)
 
-        layout = GridLayout(cols = 1, size_hint_y = None)
-        layout.bind(minimum_height=layout.setter('height'))
-        txt = edm_station.status() + edm_datums.status() + edm_prisms.status()
-        txt += edm_units.status()
-        label = Label(text = txt, size_hint_y = None,
-                     color = (0,0,0,1), id = 'content',
-                     halign = 'left',
-                     font_size = 20)
-        layout.add_widget(label)
-        label.bind(texture_size = label.setter('size'))
-        label.bind(size_hint_min_x = label.setter('width'))
-        button = Button(text = 'Back', size_hint_y = None,
-                        color = BUTTON_COLOR,
-                        background_color = BUTTON_BACKGROUND,
-                        background_normal = '')
-        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height))
-        root.add_widget(layout)
-        self.add_widget(root)
-        self.add_widget(button)
-        button.bind(on_press = self.go_back)
+        settings_layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
+        scrollview = ScrollView(size_hint = (1, 1),
+                                 bar_width = SCROLLBAR_WIDTH)
+        scrollview.add_widget(layout)
+        settings_layout.add_widget(scrollview)
 
-    def on_pre_enter(self):
-        global edm_station, edm_datums, edm_units, edm_prisms
-        global edm_cfg
+        self.back_button = e5_button('Back', selected = True,
+                                             call_back = self.go_back,
+                                             colors = self.colors)
+        settings_layout.add_widget(self.back_button)
+        self.add_widget(settings_layout)
+
+    def update_backup_interval(self, instance, value):
+        self.edm_ini.backup_interval = int(value)
         for widget in self.walk():
-            if widget.id=='content':
-                txt = edm_station.status() + edm_datums.status() + edm_prisms.status()
-                txt += edm_units.status() + edm_cfg.status()
-                widget.text = txt
+            if widget.id == 'label_backup_interval':
+                widget.text = 'Auto-backup after\nevery %s\nrecords entered.' % self.edm_ini.backup_interval
+                break
 
-    def go_back(self, value):
+    def incremental_backups(self, instance, value):
+        self.edm_ini.incremental_backups = value
+
+    def darkmode(self, instance, value):
+        self.colors.darkmode = value
+        self.colors.set_colormode()
+        self.build_screen()
+
+    def color_scheme_selected(self, instance):
+        self.colors.set_to(instance.text)
+        self.back_button.background_color = self.colors.button_background
+        self.back_button.color = self.colors.button_color
+        
+    def go_back(self, instance):
+        self.edm_ini.update(self.colors, self.edm_cfg)
         self.parent.current = 'MainScreen'
 
-# Code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
+#Region Help Screens
 
-class HeaderCell(Button):
-    color = BUTTON_COLOR
-    background_color = BUTTON_BACKGROUND
-    background_normal = ''
+class AboutScreen(e5_InfoScreen):
+    def on_pre_enter(self):
+        self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + __version__ + ' Alpha\nApple Pie\n\n'
+        self.content.text += 'Build using Python 3.6, Kivy 1.10.1 and TinyDB 3.11.1\n\n'
+        self.content.text += 'An OldStoneAge.Com Production\n\n' + __date__ 
+        self.content.halign = 'center'
+        self.content.valign = 'middle'
+        self.content.color = self.colors.text_color
+        self.back_button.background_color = self.colors.button_background
+        self.back_button.color = self.colors.button_color
 
-class TableHeader(ScrollView):
-    """Fixed table header that scrolls x with the data table"""
-    header = ObjectProperty(None)
+class StatusScreen(e5_InfoScreen):
 
-    def __init__(self, titles = None, *args, **kwargs):
-        super(TableHeader, self).__init__(*args, **kwargs)
+    def __init__(self, edm_points = None, edm_ini = None, edm_cfg = None, **kwargs):
+        super(StatusScreen, self).__init__(**kwargs)
+        self.edm_data = edm_points
+        self.edm_ini = edm_ini
+        self.edm_cfg = edm_cfg
 
-        for title in titles:
-            self.header.add_widget(HeaderCell(text = title))
+    def on_pre_enter(self):
+        txt = self.edm_data.status() if self.edm_data else 'A data file has not been initialized or opened.\n\n'
+        txt += self.edm_cfg.status() if self.edm_cfg else 'A CFG is not open.\n\n'
+        txt += self.edm_ini.status() if self.edm_ini else 'An INI file is not available.\n\n'
+        txt += '\nThe default user path is %s.\n' % self.edm_ini.get_value("E5","APP_PATH")
+        txt += '\nThe operating system is %s.\n' % platform_name()
+        self.content.text = txt
+        self.content.color = self.colors.text_color
+        self.back_button.background_color = self.colors.button_background
+        self.back_button.color = self.colors.button_color
 
-class ScrollCell(Button):
-    text = StringProperty(None)
-    is_even = BooleanProperty(None)
-    color = BUTTON_COLOR
-    background_normal = ''
 
-class TableData(RecycleView):
-    nrows = NumericProperty(None)
-    ncols = NumericProperty(None)
-    rgrid = ObjectProperty(None)
+#endregion
 
-    popup = ObjectProperty(None)
+sm = ScreenManager(id = 'screen_manager')
 
-    def __init__(self, list_dicts=[], column_names = None, df_name = None, *args, **kwargs):
-        self.nrows = len(list_dicts)
-        self.ncols = len(column_names)
+class EDMApp(App):
 
-        super(TableData, self).__init__(*args, **kwargs)
+    def __init__(self, **kwargs):
+        super(EDMApp, self).__init__(**kwargs)
 
-        self.data = []
-        for i, ord_dict in enumerate(list_dicts):
-            is_even = i % 2 == 0
-            #row_vals = ord_dict.values()
-            k = -1
-            if df_name=='points':
-                key = list(ord_dict)[0] + '-' + list(ord_dict)[1]
+        app_path = self.user_data_dir
+
+        logger.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh = logging.FileHandler(os.path.join(app_path, __program__ + '.log'))
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+
+        self.main_colors = ColorScheme()
+        self.main_ini = ini()
+        self.main_cfg = cfg()
+
+        self.edm_station = totalstation()
+        self.edm_points = points()
+        self.edm_units = units()
+        self.edm_prisms = prisms()
+        self.edm_datums = datums()
+
+        self.main_ini.open(os.path.join(app_path, __program__ + '.ini'))
+
+        if not self.main_ini.first_time:
+            if self.main_ini.get_value(__program__,'ColorScheme'):
+                self.main_colors.set_to(self.main_ini.get_value(__program__,'ColorScheme'))
+            if self.main_ini.get_value(__program__,'DarkMode').upper() == 'TRUE':
+                self.main_colors.darkmode = True
             else:
-                key = list(ord_dict)[0]
-            for text in ord_dict:
-                k += 1
-                self.data.append({'text': str(text), 'is_even': is_even,
-                                    'callback': self.editcell,
-                                    'key': key, 'field': column_names[k],
-                                    'db': df_name, 'id': 'datacell' })
+                self.main_colors.darkmode = False
 
-    def sort_data(self):
-        #TODO: Use this to sort table, rather than clearing widget each time.
-        pass
+            if self.main_ini.get_value(__program__, "CFG"):
+                self.main_cfg.open(self.main_ini.get_value(__program__, "CFG"))
+                if self.main_cfg.filename:
+                    if self.main_cfg.get_value(__program__,'DATABASE'):
+                        self.edm_points.open(self.main_cfg.get_value(__program__,'DATABASE'))
+                    else:
+                        database = os.path.split(self.main_cfg.filename)[1]
+                        if "." in database:
+                            database = database.split('.')[0]
+                        database = database + '.json'
+                        self.edm_points.open(os.path.join(self.main_cfg.path, database))
+                    if self.main_cfg.get_value(__program__,'TABLE'):    
+                        self.edm_points.table = self.main_cfg.get_value(__program__,'TABLE')
+                    else:
+                        self.edm_points.table = '_default'
+                    self.edm_datums.open(self.edm_points.db)
+                    self.edm_prisms.open(self.edm_points.db)
+                    self.edm_units.open(self.edm_points.db)
+                    self.main_cfg.update_value(__program__,'DATABASE', self.edm_points.filename)
+                    self.main_cfg.update_value(__program__,'TABLE', self.edm_points.table)
+                    self.main_cfg.save()
+            self.main_ini.update(self.main_colors, self.main_cfg)
+            self.main_ini.save()
+        self.main_colors.set_colormode()
+        self.main_colors.need_redraw = False    
+        self.main_ini.update_value(__program__,'APP_PATH', self.user_data_dir)
 
-    def editcell(self, key, field, db):
-        self.key = key
-        self.field = field
-        self.db = db
-        if db == 'points':
-            cfg_field = edm_cfg.get(field)
-            self.inputtype = cfg_field.inputtype
-            if cfg_field.inputtype == 'MENU':
-                self.popup = MenuList(field, edm_cfg.get(field).menu, self.menu_selection)
-                self.popup.open()
-            if cfg_field.inputtype in ['TEXT','NUMERIC']:
-                self.popup = TextNumericInput(field, self.menu_selection)
-                self.popup.open()
-
-    def menu_selection(self, value):
-        if self.db == 'points':
-            print(value.id)
-            unit, id = self.key.split('-')
-            new_data = {}
-            if self.inputtype=='MENU':
-                new_data[self.field] = value.text
-            else:
-                for widget in self.popup.walk():
-                    if widget.id == 'new_item':
-                        new_data[self.field] = widget.text
-            field_record = Query()
-            edm_points.db.update(new_data, (field_record.UNIT == unit) & (field_record.ID == id))
-            for widget in self.walk():
-                if widget.id=='datacell':
-                    if widget.key == self.key and widget.field == self.field:
-                        widget.text = new_data[self.field]
-        self.popup.dismiss()
-
-class Table(BoxLayout):
-
-    def __init__(self, list_dicts=[], column_names = None, df_name = None, *args, **kwargs):
-
-        super(Table, self).__init__(*args, **kwargs)
-        self.orientation = "vertical"
-
-        self.header = TableHeader(column_names)
-        self.table_data = TableData(list_dicts = list_dicts, column_names = column_names, df_name = df_name)
-
-        self.table_data.fbind('scroll_x', self.scroll_with_header)
-
-        self.add_widget(self.header)
-        self.add_widget(self.table_data)
-
-    def scroll_with_header(self, obj, value):
-        self.header.scroll_x = value
-
-class DataframePanel(BoxLayout):
-    """
-    Panel providing the main data frame table view.
-    """
-
-    def populate_data(self, df):
-        self.df_orig = df
-        self.sort_key = None
-        self.column_names = self.df_orig.fields()
-        self.df_name = df.db_name 
-        self._generate_table()
-
-    def _generate_table(self, sort_key=None, disabled=None):
-        self.clear_widgets()
-        data = []
-        for row in self.df_orig.db:
-            data.append(row.values())
-        #data = sorted(data, key=lambda k: k[self.sort_key]) 
-        self.add_widget(Table(list_dicts = data, column_names = self.column_names, df_name = self.df_name))
-
-class AddNewPanel(BoxLayout):
-    
-    def populate(self, df):
-        self.df_name = df.db_name            
-        self.addnew_list.bind(minimum_height=self.addnew_list.setter('height'))
-        for col in df.fields():
-            self.addnew_list.add_widget(AddNew(col, df.db_name))
-        self.addnew_list.add_widget(AddNew('Save', df.db_name))
-
-    def get_addnews(self):
-        result=[]
-        for opt_widget in self.addnew_list.children:
-            result.append(opt_widget.get_addnew())
-        return(result)
-
-class AddNew(BoxLayout):
-
-    global edm_datums
-    global edm_prisms
-    global edm_units
-
-    def __init__(self, col, df_name, **kwargs):
-        super(AddNew, self).__init__(**kwargs)
-        self.df_name = df_name
-        self.widget_type = 'data'
-        self.height="30sp"
-        self.size_hint=(0.9, None)
-        self.spacing=10
-        if col=='Save':
-            self.label = Label(text = "")
-            self.button = Button(text = "Save", size_hint=(0.75, 1), font_size="15sp",
-                        color = BUTTON_COLOR,
-                        background_color = BUTTON_BACKGROUND,
-                        background_normal = '')
-            self.button.bind(on_press = self.append_data)
-            self.add_widget(self.label)
-            self.add_widget(self.button)
-            self.widget_type = 'button'
-        else:
-            self.label = Label(text = col, color = WINDOW_COLOR)
-            self.txt = TextInput(multiline=False, size_hint=(0.75, None), font_size="15sp")
-            self.txt.bind(minimum_height=self.txt.setter('height'))
-            self.add_widget(self.label)
-            self.add_widget(self.txt)
-
-    def get_addnew(self):
-        return (self.label.text, self.txt.text)
-
-    def append_data(self, instance):
-        result = {}
-        for obj in instance.parent.parent.children:
-            if obj.widget_type=='data':
-                result[obj.label.text] = obj.txt.text 
-                obj.txt.text = ''
-        sorted_result = {}
-        if self.df_name == 'prisms':
-            for f in edm_prisms.fields():
-                sorted_result[f] = result[f]
-            edm_prisms.db.insert(sorted_result)
-        if self.df_name == 'units':
-            for f in edm_units.fields():
-                sorted_result[f] = result[f]
-            edm_units.db.insert(sorted_result)
-        if self.df_name == 'datums':
-            for f in edm_datums.fields():
-                sorted_result[f] = result[f]
-            edm_datums.db.insert(sorted_result)
-
-class DfguiWidget(TabbedPanel):
-
-    def __init__(self, df, **kwargs):
-        super(DfguiWidget, self).__init__(**kwargs)
-        self.df = df
-        self.df_name = df.db_name
-        self.panel1.populate_data(df)
-        self.panel4.populate(df)
-        self.color = BUTTON_COLOR
-        self.background_color = WINDOW_BACKGROUND
-        self.background_image = ''
-
-    # This should be changed so that the table isn't rebuilt
-    # each time settings change.
-    def open_panel1(self):
-        self.panel1._generate_table()
-    
-    def cancel(self):
-        pass
-
-# End code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
-
-class YesNoCancel(Popup):
-    def __init__(self, caption, cancel = False, **kwargs):
-        super(YesNoCancel, self).__init__(**kwargs)
-        box = BoxLayout()
-        self.label = Label(text = caption)
-        self.button1 = Button(text = "Yes", size_hint=(0.75, 1), font_size="15sp")
-        self.button1.bind(on_press = self.yes)
-        self.button2 = Button(text = "No", size_hint=(0.75, 1), font_size="15sp")
-        self.button2.bind(on_press = self.no)
-        box.add_widget(self.label)
-        box.add_widget(self.button1)
-        box.add_widget(self.button2)
-        if cancel == True:
-            box.button3 = Button(text = "Cancel", size_hint=(0.75, 1), font_size="15sp")
-            box.button3.bind(on_press = self.cancel)
-            box.add_widget(self.button3)
-        self.add_widget(box)
-        self.open()
-    def yes(self, instance):
-        return('Yes')
-    def no(self, instance):
-        return('No')
-    def cancel(self, instance):
-        return('Cancel')
-
-class EDMpy(App):
+        #database = 'EDM'
+        #self.edm_cfg = cfg(self.edm_ini.get_value("EDM", "CFG"))
+        ##self.edm_points = points(database + '_points.json')
+        ##if not self.edm_cfg.filename:
+        #    self.edm_cfg.filename = 'EDM.cfg'
+        #self.edm_cfg.save()
+        #self.edm_ini.update(self.edm_station, self.edm_cfg)
+        #self.edm_ini.save()
 
     def build(self):
-        Window.clearcolor = WINDOW_BACKGROUND
-        self.title = "EDMpy 1.0"
 
-        #sm.current = 'main'
-        #df = create_dummy_data(0)
-        #df = edm_datums.datums 
-        #test = YesNoCancel("This is a test of a yes no popup box", cancel=False)
-        #print(test)
-        #return(DfguiWidget(EDMpy.edm_datums.datums, "datums"))
-    
-Factory.register('EDMpy', cls=EDMpy)
+        sm.add_widget(MainScreen(name = 'MainScreen', id = 'main_screen',
+                                 colors = self.main_colors,
+                                 edm_ini = self.main_ini,
+                                 edm_cfg = self.main_cfg,
+                                 edm_points = self.edm_points))
+
+        sm.add_widget(EditPointsScreen(name = 'EditPointsScreen', id = 'editpoints_screen',
+                                        colors = self.main_colors,
+                                        main_data = self.edm_points,
+                                        main_tablename = '_default',
+                                        main_cfg = self.main_cfg))
+
+        sm.add_widget(EditDatumsScreen(name = 'EditDatumsScreen', id = 'editdatums_screen',
+                                        colors = self.main_colors,
+                                        main_data = self.edm_datums,
+                                        main_tablename = 'datums',
+                                        main_cfg = self.main_cfg))
+
+        sm.add_widget(EditPrismsScreen(name = 'EditPrismsScreen', id = 'editprisms_screen',
+                                        colors = self.main_colors,
+                                        main_data = self.edm_prisms,
+                                        main_tablename = 'prisms',
+                                        main_cfg = self.main_cfg))
+
+        sm.add_widget(EditUnitsScreen(name = 'EditUnitsScreen', id = 'editunits_screen',
+                                        colors = self.main_colors,
+                                        main_data = self.edm_units,
+                                        main_tablename = 'units',
+                                        main_cfg = self.main_cfg))
+
+        sm.add_widget(StatusScreen(name = 'StatusScreen', id = 'status_screen',
+                                    colors = self.main_colors,
+                                    edm_cfg = self.main_cfg,
+                                    edm_ini = self.main_ini,
+                                    edm_points = self.edm_points))
+
+        sm.add_widget(e5_LogScreen(name = 'LogScreen', id = 'log_screen',
+                                colors = self.main_colors,
+                                logger = logger))
+
+        sm.add_widget(e5_CFGScreen(name = 'CFGScreen', id = 'cfg_screen',
+                                colors = self.main_colors,
+                                cfg = self.main_cfg))
+
+        sm.add_widget(e5_INIScreen(name = 'INIScreen', id = 'ini_screen',
+                                colors = self.main_colors,
+                                ini = self.main_ini))
+
+        sm.add_widget(AboutScreen(name = 'AboutScreen', id = 'about_screen',
+                                    colors = self.main_colors))
+
+        sm.add_widget(EDMSettingsScreen(name = 'EDMSettingsScreen', id = 'edmsettings_screen',
+                                        colors = self.main_colors,
+                                        edm_ini = self.main_ini,
+                                        edm_cfg = self.main_cfg))
+
+        restore_window_size_position(__program__, self.main_ini)
+
+        self.title = __program__ + " " + __version__
+
+        logger.info('EDM started, logger initialized, and application built.')
+
+        return(sm)
+
+Factory.register(__program__, cls=EDMApp)
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='EDMpy.log', filemode='w', level=logging.DEBUG)
-    database = 'EDM'
-    edm_ini = ini('EDMpy.ini')
-    edm_station = totalstation()
-    edm_cfg = cfg(edm_ini.get_value("EDM", "CFG"))
-    edm_points = points(database + '_points.json')
-    edm_units = units(database + '_units.json')
-    edm_prisms = prisms(database + '_prisms.json')
-    edm_datums = datums(database + '_datums.json')
-    if not edm_cfg.filename:
-        edm_cfg.filename = 'EDMpy.cfg'
-    edm_cfg.save()
-    edm_ini.update()
-    edm_ini.save()
-    
-    EDMpy(kv_file='EDMpy.kv').run()
+    logger = logging.getLogger('EDM')
+    EDMApp().run()

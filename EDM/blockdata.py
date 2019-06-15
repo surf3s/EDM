@@ -1,3 +1,6 @@
+# To Do
+#   Consider implications of not writing the block data after each update
+
 import logging
 import os
 
@@ -15,13 +18,13 @@ class blockdata:
                     block[varname.upper()] = [block[varname.upper()] , vardata]
                 else:
                     block[varname.upper()] = vardata 
-                return(self.write_blocks())
+                return(True)
         if not block_exists:
             temp = {}
             temp['BLOCKNAME'] = blockname.upper()
             temp[varname.upper()] = vardata
             self.blocks.append(temp)
-            return(self.write_blocks())
+            return(True)
         return(False)
 
     def read_blocks(self):
@@ -82,13 +85,16 @@ class blockdata:
                 for block in self.blocks:
                     f.write("[%s]\n" % block['BLOCKNAME'])
                     for item in block.keys():
-                        if not item=='BLOCKNAME':
+                        if not item == 'BLOCKNAME' and not item[:2] == "__":
                             if block[item]:
                                 f.write(item + "=%s\n" % block[item])
                     f.write("\n")
             return(True)
         except:
             return(False)
+
+    def save(self):
+        self.write_blocks()
 
     def __len__(self):
         return(len(self.blocks))
