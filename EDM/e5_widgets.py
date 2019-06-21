@@ -1,3 +1,5 @@
+from kivy.app import App
+from kivy.clock import Clock, mainthread
 from kivy.uix.textinput import TextInput
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
@@ -8,13 +10,20 @@ from kivy.uix.popup import Popup
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.screenmanager import Screen
+from kivy.uix.filechooser import FileChooser, FileChooserListView
 from kivy.uix.recycleview import RecycleView
 from kivy.properties import ObjectProperty, NumericProperty, StringProperty, BooleanProperty, ListProperty
 from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.switch import Switch
+from kivy.uix.slider import Slider
 
-from constants import BLACK, WHITE, SCROLLBAR_WIDTH, GOOGLE_COLORS
+from constants import BLACK, WHITE, SCROLLBAR_WIDTH, GOOGLE_COLORS, __program__
 from colorscheme import ColorScheme, make_rgb
-from misc import platform_name
+from misc import platform_name, locate_file
+import ntpath
+import os
+from shutil import copyfile
+from datetime import datetime
 
 class e5_label(Label):
     def __init__(self, text, popup = False, colors = None, **kwargs):
@@ -190,6 +199,371 @@ class e5_scrollview_label(ScrollView):
         self.id = widget_id + '_scroll'
         self.add_widget(scrollbox)
 
+class e5_MainScreen(Screen):
+
+    popup = ObjectProperty(None)
+    popup_open = False
+    event = ObjectProperty(None)
+    widget_with_focus = ObjectProperty(None)
+    text_color = (0, 0, 0, 1)
+
+    def get_path(self):
+        if self.ini.get_value(__program__, "CFG"):
+            return(ntpath.split(self.ini.get_value(__program__, "CFG"))[0])
+        else:
+            return(os.getcwd())
+
+    def get_files(self, fpath, exts = None):
+        files = []
+        for (dirpath, dirnames, filenames) in os.walk(fpath):
+            files.extend(filenames)
+            break
+        if exts:
+            return([filename for filename in files if filename.upper().endswith(exts.upper())])
+        else:
+            return(files)
+
+    def open_db(self):
+        database = locate_file(self.cfg.get_value(__program__,'DATABASE'), self.cfg.path)
+        if not database:
+            database = os.path.split(self.cfg.filename)[1]
+            if "." in database:
+                database = database.split('.')[0]
+            database = os.path.join(self.cfg.path, database + '.json')
+        self.data.open(database)
+        if self.cfg.get_value(__program__,'TABLE'):    
+            self.data.table = self.cfg.get_value(__program__,'TABLE')
+        else:
+            self.data.table = '_default'
+        self.cfg.update_value(__program__,'DATABASE', self.data.filename)
+        self.cfg.update_value(__program__,'TABLE', self.data.table)
+        self.cfg.save()
+
+    def show_popup_message(self, dt):
+        self.event.cancel()
+        if self.cfg.has_errors or self.cfg.has_warnings:
+            if self.cfg.has_errors:
+                message_text = 'The following errors in the configuration file %s must be fixed before data entry can begin.\n\n' % self.cfg.filename
+                self.cfg.filename = ''
+                title = 'CFG File Errors'                
+            elif self.cfg.has_warnings:
+                self.cfg.has_warnings = False
+                message_text = '\nThough data entry can start, there are the following warnings in the configuration file %s.\n\n' % self.cfg.filename
+                title = 'Warnings'
+            message_text = message_text + '\n\n'.join(self.cfg.errors)
+        else:
+            title = __program__
+            message_text = SPLASH_HELP
+        self.popup = e5_MessageBox(title, message_text, call_back = self.close_popup, colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+
+    def get_widget_by_id(self, id):
+        for widget in self.walk():
+            if widget.id == id:
+                return(widget)
+        return(None)
+
+    def get_info(self):
+        if self.cfg.current_field.infofile:
+            fname = os.path.join(self.cfg.path, self.cfg.current_field.infofile)
+            if os.path.exists(fname):
+                try:
+                    with open(fname, 'r') as f:
+                        return(f.read())
+                except:
+                    return('Could not open file %s.' % fname)
+            else:
+                return('The file %s does not exist.' % fname)
+        else:
+            return(self.cfg.current_field.info)
+
+    def save_window_location(self):
+        self.ini.update_value(__program__,'TOP', Window.top)
+        self.ini.update_value(__program__,'LEFT', Window.left)
+        self.ini.update_value(__program__,'WIDTH', Window.width)
+        self.ini.update_value(__program__,'HEIGHT', Window.height)
+        self.ini.save()
+
+    def dismiss_popup(self, *args):
+        self.popup_open = False
+        self.popup.dismiss()
+        self.parent.current = 'MainScreen'
+
+    def save_record(self):
+        valid = self.cfg.validate_current_record()
+        if valid:
+            if self.data.save(self.cfg.current_record):
+                self.make_backup()
+            else:
+                pass
+        else:
+            self.popup = e5_MessageBox('Save Error', valid, call_back = self.close_popup, colors = self.colors)
+            self.popup.open()
+            self.popup_open = True
+
+    def make_backup(self):
+        if self.ini.backup_interval > 0:
+            try:
+                record_counter = int(self.cfg.get_value('E5','RECORDS UNTIL BACKUP')) if self.cfg.get_value('E5','RECORDS UNTIL BACKUP') else self.ini.backup_interval
+                record_counter -= 1
+                if record_counter <= 0:
+                    backup_path, backup_file = os.path.split(self.data.filename)
+                    backup_file, backup_file_ext = backup_file.split('.')
+                    backup_file += self.time_stamp() if self.ini.incremental_backups else '_backup'
+                    backup_file += backup_file_ext
+                    backup_file = os.path.join(backup_path, backup_file)
+                    copyfile(self.ini.filename, backup_file)
+                    record_counter = self.ini.backup_interval
+                self.cfg.update_value('E5','RECORDS UNTIL BACKUP',str(record_counter))
+            except:
+                self.popup = e5_MessageBox('Backup Error', "\nAn error occurred while attempting to make a backup.  Check the backup settings and that the disk has enough space for a backup.",
+                                            call_back = self.close_popup, colors = self.colors)
+                self.popup.open()
+                self.popup_open = True
+
+    def time_stamp(self):
+        time_stamp = '%s' % datetime.now().replace(microsecond=0)
+        time_stamp = time_stamp.replace('-','_')
+        time_stamp = time_stamp.replace(' ','_')
+        time_stamp = time_stamp.replace(':','_')
+        return('_' + time_stamp)
+
+    def close_popup(self, value):
+        self.popup.dismiss()
+        self.popup_open = False
+        self.event = Clock.schedule_once(self.set_focus, 1)
+
+    def set_focus(self, value):
+        self.widget_with_focus.focus = True
+
+    def show_delete_last_record(self):
+        last_record = self.data.last_record()
+        if last_record:
+            message_text = '\n'
+            for field in self.cfg.fields():
+                if field in last_record:
+                    message_text += field + " : " + last_record[field] + '\n'
+            self.popup = e5_MessageBox('Delete Last Record', message_text, response_type = "YESNO",
+                                        call_back = [self.delete_last_record, self.close_popup],
+                                        colors = self.colors)
+        else:
+            self.popup = e5_MessageBox('Delete Last Record', 'No records in table to delete.',
+                                        call_back = self.close_popup,
+                                        colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+
+    def delete_last_record(self, value):
+        last_record = self.data.last_record()
+        self.data.delete(last_record.doc_id)
+        self.close_popup(value)
+
+    def show_delete_all_records(self):
+        message_text = '\nYou are asking to delete all of the records in the current database table. Are you sure you want to do this?'
+        self.popup = e5_MessageBox('Delete All Records', message_text, response_type = "YESNO",
+                                    call_back = [self.delete_all_records1, self.close_popup],
+                                    colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+
+    def delete_all_records1(self, value):
+        self.close_popup(value)
+        message_text = '\nThis is your last chance.  All records will be deleted when you press Yes.'
+        self.popup = e5_MessageBox('Delete All Records', message_text, response_type = "YESNO",
+                                    call_back = [self.delete_all_records2, self.close_popup],
+                                    colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+        
+    def delete_all_records2(self, value):
+        self.data.delete_all()
+        self.close_popup(value)
+
+    def show_save_csvs(self):
+        if self.e5_cfg.filename and self.e5_data.filename:
+            filename = ntpath.split(self.e5_cfg.filename)[1].split(".")[0]
+            filename = filename + "_" + self.e5_data.table + '.csv' 
+            content = e5_SaveDialog(filename = filename,
+                                start_path = self.e5_cfg.path,
+                                save = self.save_csvs, 
+                                cancel = self.dismiss_popup)
+            self.popup = Popup(title = "Export CSV file",
+                                content = content,
+                                size_hint = (0.9, 0.9))
+        else:
+            self.popup = e5_MessageBox('E5', '\nOpen a CFG before exporting to CSV',
+                                    call_back = self.dismiss_popup,
+                                    colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+
+    def save_csvs(self, instance):
+
+        path = self.popup.content.filesaver.path
+        filename = self.popup.content.filename
+
+        self.popup.dismiss()
+
+        filename = os.path.join(path, filename)
+
+        table = self.e5_data.db.table(self.e5_data.table)
+
+        errors = self.e5_cfg.write_csvs(filename, table)
+        title = 'CSV Export'
+        if errors:
+            self.popup = e5_MessageBox(title, errors, call_back = self.close_popup, colors = self.colors)
+        else:
+            self.popup = e5_MessageBox(title, '\nThe table %s was successfully written as the file %s.' % (self.e5_data.table, filename),
+                call_back = self.close_popup, colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+
+    def show_save_geojson(self):
+        if self.e5_cfg.filename and self.e5_data.filename:
+            geojson_compatible = 0
+            for fieldname in self.e5_cfg.fields():
+                if fieldname in ['X','Y','Z']:
+                    geojson_compatible += 1
+                elif fieldname in ['LATITUDE','LONGITUDE','ELEVATION']:
+                    geojson_compatible += 1
+                else:
+                    field = self.e5_cfg.get(fieldname)
+                    if field.inputtype in ['GPS']:
+                        geojson_compatible = 2
+                if geojson_compatible > 1:
+                        break
+            if geojson_compatible:
+                filename = ntpath.split(self.e5_cfg.filename)[1].split(".")[0]
+                filename = filename + '_' + self.e5_data.table + '.geojson' 
+
+                content = e5_SaveDialog(filename = filename,
+                                    start_path = self.e5_cfg.path,
+                                    save = self.save_geojson, 
+                                    cancel = self.dismiss_popup)
+                self.popup = Popup(title = "Export geoJSON file",
+                                    content = content,
+                                    size_hint = (0.9, 0.9))
+            else:
+                self.popup = e5_MessageBox('E5', '\nA geoJSON file requires a GPS type field or fields named XY(Z) or Latitude, Longitude and optionally Elevation.',
+                                        call_back = self.dismiss_popup,
+                                        colors = self.colors)
+        else:
+            self.popup = e5_MessageBox('E5', '\nOpen a CFG before exporting to geoJSON.',
+                                    call_back = self.dismiss_popup,
+                                    colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+        
+    def save_geojson(self, path):
+        path = self.popup.content.filesaver.path
+        filename = self.popup.content.filename
+
+        self.popup.dismiss()
+
+        filename = os.path.join(path, filename)
+
+        table = self.e5_data.db.table(self.e5_data.table)
+
+        errors = self.e5_cfg.write_geojson(filename, table)
+        title = 'geoJSON Export'
+        if errors:
+            self.popup = e5_MessageBox(title, errors, call_back = self.close_popup, colors = self.colors)
+        else:
+            self.popup = e5_MessageBox(title, '\nThe table %s was successfully written as geoJSON to the file %s.' % (self.e5_data.table, filename),
+                call_back = self.close_popup, colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+
+class e5_SettingsScreen(Screen):
+    def __init__(self, cfg = None, ini = None, colors = None, **kwargs):
+        super(e5_SettingsScreen, self).__init__(**kwargs)
+        self.colors = colors if  colors else ColorScheme()
+        self.ini = ini
+        self.cfg = cfg
+
+    def on_enter(self):
+        self.build_screen()
+
+    def build_screen(self):
+        self.clear_widgets()
+        layout = GridLayout(cols = 1,
+                                size_hint_y = 1,
+                                id = 'settings_box',
+                                spacing = 5, padding = 5)
+        layout.bind(minimum_height = layout.setter('height'))
+
+        darkmode = GridLayout(cols = 2, size_hint_y = .1, spacing = 5, padding = 5)
+        darkmode.add_widget(e5_label('Dark Mode', colors = self.colors))
+        darkmode_switch = Switch(active = self.colors.darkmode)
+        darkmode_switch.bind(active = self.darkmode)
+        darkmode.add_widget(darkmode_switch)
+        layout.add_widget(darkmode)
+
+        colorscheme = GridLayout(cols = 2, size_hint_y = .6, spacing = 5, padding = 5)
+        colorscheme.add_widget(e5_label('Color Scheme', colors = self.colors))
+        colorscheme.add_widget(e5_scrollview_menu(self.colors.color_names(),
+                                                  menu_selected = '',
+                                                  call_back = [self.color_scheme_selected]))
+        temp = ColorScheme()
+        for widget in colorscheme.walk():
+            if widget.id in self.colors.color_names():
+                temp.set_to(widget.text)
+                widget.background_color = temp.button_background
+        layout.add_widget(colorscheme)
+        
+        backups = GridLayout(cols = 2, size_hint_y = .3, spacing = 5, padding = 5)
+        backups.add_widget(e5_label('Auto-backup after\nevery %s\nrecords entered.' % self.ini.backup_interval,
+                                    id = 'label_backup_interval',
+                                    colors = self.colors))
+        slide = Slider(min = 0, max = 200,
+                        value = self.ini.backup_interval,
+                        orientation = 'horizontal', id = 'backup_interval',
+                        value_track = True, value_track_color= self.colors.button_background)
+        backups.add_widget(slide)
+        slide.bind(value = self.update_backup_interval)
+        backups.add_widget(e5_label('Use incremental backups?', colors = self.colors))
+        backups_switch = Switch(active = self.ini.incremental_backups)
+        backups_switch.bind(active = self.incremental_backups)
+        backups.add_widget(backups_switch)
+        layout.add_widget(backups)
+
+        settings_layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
+        scrollview = ScrollView(size_hint = (1, 1),
+                                 bar_width = SCROLLBAR_WIDTH)
+        scrollview.add_widget(layout)
+        settings_layout.add_widget(scrollview)
+
+        self.back_button = e5_button('Back', selected = True,
+                                             call_back = self.go_back,
+                                             colors = self.colors)
+        settings_layout.add_widget(self.back_button)
+        self.add_widget(settings_layout)
+
+    def update_backup_interval(self, instance, value):
+        self.ini.backup_interval = int(value)
+        for widget in self.walk():
+            if widget.id == 'label_backup_interval':
+                widget.text = 'Auto-backup after\nevery %s\nrecords entered.' % self.ini.backup_interval
+                break
+
+    def incremental_backups(self, instance, value):
+        self.ini.incremental_backups = value
+
+    def darkmode(self, instance, value):
+        self.colors.darkmode = value
+        self.colors.set_colormode()
+        self.build_screen()
+
+    def color_scheme_selected(self, instance):
+        self.colors.set_to(instance.text)
+        self.back_button.background_color = self.colors.button_background
+        self.back_button.color = self.colors.button_color
+        
+    def go_back(self, instance):
+        self.ini.update(self.colors, self.cfg)
+        self.parent.current = 'MainScreen'
+
 class e5_InfoScreen(Screen):
 
     content = ObjectProperty(None)
@@ -270,12 +644,62 @@ class e5_LoadDialog(FloatLayout):
     button_color = ObjectProperty(None)
     button_background = ObjectProperty(None)
 
-class e5_SaveDialog(FloatLayout):
+class e5_SaveDialog(BoxLayout):
     save = ObjectProperty(None)
     cancel = ObjectProperty(None)
-    button_color = ObjectProperty(None)
-    button_background = ObjectProperty(None)
     start_path = ObjectProperty(None)
+    filename = ObjectProperty(None)
+    path = ObjectProperty(None)
+
+    def __init__(self, colors = None, **kwargs):
+        super(e5_SaveDialog, self).__init__(**kwargs)
+        self.colors = colors if colors else ColorScheme()
+
+        content = BoxLayout(orientation = 'vertical', padding = 5, spacing = 5)
+        self.filesaver = FileChooserListView(path = self.start_path)
+        self.filesaver.bind(selection = self.path_selected)
+        content.add_widget(self.filesaver)
+
+        self.txt = TextInput(text = self.filename, 
+                        multiline = False,
+                        size_hint = (1, .1),
+                        id = 'filename')
+        self.txt.bind(text = self.update_filename)
+        content.add_widget(self.txt)
+
+        content.add_widget(e5_side_by_side_buttons(text = ['Save','Cancel'],
+                                                id = ['save','cancel'],
+                                                call_back = [self.does_file_exist, self.cancel],
+                                                selected = [True, True],
+                                                colors = self.colors))
+
+        self.add_widget(content)
+        self.path = self.start_path
+
+    def update_filename(self, instance, value):
+        self.filename = value
+
+    def path_selected(self, instance, value):
+        self.path = instance.path
+        self.txt.text = ntpath.split(value[0])[1]
+
+    def does_file_exist(self, instance):
+        filename = os.path.join(self.path, self.filename)
+        if os.path.isfile(filename):
+            self.popup = e5_MessageBox('Overwrite existing file?', '\nYou are about to overwrite an existing file - %s.\nContinue?' % filename,
+                                        response_type = "YESNO",
+                                        call_back = [self.overwrite_file, self.close_popup],
+                                        colors = self.colors)
+            self.popup.open()    
+        else:
+            self.save(instance)
+ 
+    def overwrite_file(self, instance):
+        self.popup.dismiss()
+        self.save(instance)
+
+    def close_popup(self, instance):
+        self.popup.dismiss()
 
 class e5_RecordEditScreen(Screen):
 
@@ -410,7 +834,7 @@ class e5_DatagridScreen(Screen):
 
     def _on_keyboard_down(self, *args):
         ascii_code = args[1]
-        text_str = args[3]  
+        #text_str = args[3]  
         if ascii_code in [273, 274, 275, 276, 278, 279] and self.datagrid.popup_scrollmenu:
             self.datagrid.popup_scrollmenu.move_scroll_menu_item(ascii_code)
             return False 
@@ -475,6 +899,44 @@ class e5_MessageBox(Popup):
         self.size_hint = (.8, .8)
         self.size = (400, 400)
         self.auto_dismiss = False
+
+class e5_Program(App):
+
+    def setup_program(self):
+        self.ini.open(os.path.join(self.app_path, __program__ + '.ini'))
+
+        if not self.ini.first_time:
+
+            if self.ini.get_value(__program__,'ColorScheme'):
+                self.colors.set_to(self.ini.get_value(__program__,'ColorScheme'))
+            if self.ini.get_value(__program__,'DarkMode').upper() == 'TRUE':
+                self.colors.darkmode = True
+            else:
+                self.colors.darkmode = False
+
+            if self.ini.get_value(__program__, "CFG"):
+                self.cfg.open(self.ini.get_value(__program__, "CFG"))
+                if self.cfg.filename:
+                    if self.cfg.get_value(__program__,'DATABASE'):
+                        self.data.open(self.cfg.get_value(__program__,'DATABASE'))
+                    else:
+                        database = os.path.split(self.cfg.filename)[1]
+                        if "." in database:
+                            database = database.split('.')[0]
+                        database = database + '.json'
+                        self.data.open(os.path.join(self.cfg.path, database))
+                    if self.cfg.get_value(__program__,'TABLE'):    
+                        self.data.table = self.cfg.get_value(__program__,'TABLE')
+                    else:
+                        self.data.table = '_default'
+                    self.cfg.update_value(__program__,'DATABASE', self.data.filename)
+                    self.cfg.update_value(__program__,'TABLE', self.data.table)
+                    self.cfg.save()
+            self.ini.update(self.colors, self.cfg)
+            self.ini.save()
+        self.colors.set_colormode()
+        self.colors.need_redraw = False    
+        self.ini.update_value(__program__,'APP_PATH', self.user_data_dir)
 
 #region Data Grid
 #### Code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py

@@ -52,15 +52,35 @@
                         on_press: app.root.current = 'AboutScreen'
                         color: SUBMENU_COLOR
                 ActionGroup:
-                    text: 'Edit'
+                    text: 'Delete'
                     color: root.text_color
                     background_color: (.5, .5, .5, 1)
                     background_normal: ''
                     ActionButton:
                         text: 'The last point'
                         color: SUBMENU_COLOR
+                        on_press: app.root.current = root.show_delete_last_record()
+                        minimum_width: '140sp'
                     ActionButton:
-                        text: 'Points'
+                        text: 'The last object'
+                        color: SUBMENU_COLOR
+                        on_press: app.root.current = root.show_delete_last_object()
+                    ActionButton:
+                        text: 'All points'
+                        color: SUBMENU_COLOR
+                        on_press: app.root.current = root.show_delete_all_records()
+                ActionGroup:
+                    text: 'Edit'
+                    color: root.text_color
+                    background_color: (.5, .5, .5, 1)
+                    background_normal: ''
+                    ActionButton:
+                        text: 'The last points'
+                        color: SUBMENU_COLOR
+                        on_press: app.root.current = 'EditLastRecordScreen'
+                        minimum_width: '140sp'
+                    ActionButton:
+                        text: 'All Points'
                         on_press: app.root.current = 'EditPointsScreen'
                         color: SUBMENU_COLOR
                     ActionButton:
@@ -75,6 +95,10 @@
                         text: 'Prims'
                         on_press: app.root.current = 'EditPrismsScreen'
                         color: SUBMENU_COLOR
+                    ActionButton:
+                        text: 'Settings'
+                        on_press: app.root.current = 'EDMSettingsScreen'
+                        color: SUBMENU_COLOR
                 ActionGroup:
                     text: 'Setup'
                     color: root.text_color
@@ -84,25 +108,14 @@
                         text: 'Configure Station'
                         on_press: app.root.current = 'StationConfigurationScreen'
                         color: SUBMENU_COLOR
+                        minimum_width: '140sp'
                     ActionButton:
-                        text: 'Direct'
-                        on_press: app.root.current = 'InitializeDirectScreen'
+                        text: 'Initialize Station'
+                        on_press: app.root.current = 'InitializeStationScreen'
                         color: SUBMENU_COLOR
                     ActionButton:
-                        text: 'Set Angle Only'
-                        on_press: app.root.current = 'InitializeSetAngleScreen'
-                        color: SUBMENU_COLOR
-                    ActionButton:
-                        text: 'Shoot One Point'
-                        on_press: app.root.current = 'InitializeOnePointScreen'
-                        color: SUBMENU_COLOR
-                    ActionButton:
-                        text: 'Over One Point +\nShoot One Point'
-                        on_press: app.root.current = 'InitializeTwoPointScreen'
-                        color: SUBMENU_COLOR
-                    ActionButton:
-                        text: 'Shoot Two Points'
-                        on_press: app.root.current = 'InitializeThreePointScreen'
+                        text: 'Verify Station'
+                        on_press: app.root.current = 'VerifyStationScreen'
                         color: SUBMENU_COLOR
                 ActionGroup:
                     text: 'File'
@@ -113,9 +126,14 @@
                         text: 'Open CFG'
                         on_release: root.show_load_cfg()
                         color: SUBMENU_COLOR
+                        minimum_width: '140sp'
                     ActionButton:
-                        text: 'Export data as CSVs'
+                        text: 'Export CSVs'
                         on_release: root.show_save_csvs()
+                        color: SUBMENU_COLOR
+                    ActionButton:
+                        text: 'Export GeoJSON'
+                        on_release: root.show_save_geojson()
                         color: SUBMENU_COLOR
                     ActionButton:
                         text: 'Exit'
