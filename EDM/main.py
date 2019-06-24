@@ -9,6 +9,7 @@ __date__ = 'June, 2019'
 from constants import __program__ 
 
 #Region Imports
+from kivy.graphics import Color, Rectangle
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.factory import Factory
@@ -713,6 +714,139 @@ class VerifyStationScreen(Screen):
         # Back button
         pass
         
+class setups(ScrollView):
+    def __init__(self, setup_type, parent = None, colors = None, **kwargs):
+        super(setups, self).__init__(**kwargs)
+
+        self.colors = colors
+        
+        y_sizes = {"Horizontal Angle Only" : 1.2,
+                    "Over a datum": 1.1,
+                    "Over a datum + Record a datum" : 1.6,
+                    "Record two datums" : 1.6,
+                    "Three datum shift" : 1.6}
+        
+        self.scrollbox = GridLayout(cols = 1,
+                                size_hint_y = y_sizes[setup_type],
+                                id = 'setups_box',
+                                spacing = 5)
+        self.scrollbox.bind(minimum_height = self.scrollbox.setter('height'))
+
+        instructions = Label(color = self.colors.text_color)
+
+        if setup_type == "Horizontal Angle Only":
+            instructions.text = 'Enter the angle to be uploaded to the station.'
+            self.scrollbox.add_widget(instructions)
+
+            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content1.add_widget(e5_label('Horizontal angle to the point\n(use ddd.mmss)'))
+            content1.add_widget(TextInput(text = '', multiline = False, id = 'h_angle'))
+            self.scrollbox.add_widget(content1)
+
+            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2.add_widget(e5_button(text = 'Upload angle', selected = True, call_back = parent.set_hangle))
+            self.scrollbox.add_widget(content2)
+
+        elif setup_type == "Over a datum":
+            instructions.text = 'Enter select the datum point under the station and enter the station height.  Note this option assumes the horizontal angle is already correct or will be otherwise set.'
+            self.scrollbox.add_widget(instructions)
+
+            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content1.add_widget(e5_button(text = 'Select the datum\nunder the station', selected = True, call_back = parent.select_datum))
+            content1.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum1'))
+            self.scrollbox.add_widget(content1)
+
+            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2.add_widget(e5_label('Height over datum'))
+            content2.add_widget(TextInput(text = '', multiline = False,
+                                            id = 'station_height'))
+            self.scrollbox.add_widget(content2)
+
+        elif setup_type == "Over a datum + Record a datum":
+            instructions.text = "Select the datum under the station and a datum to be recorded.  EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
+            self.scrollbox.add_widget(instructions)
+
+            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content1.add_widget(e5_button(text = 'Select datum\nunder the station', selected = True, call_back = parent.select_datum))
+            content1.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum1'))
+            self.scrollbox.add_widget(content1)
+
+            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2.add_widget(e5_button(text = 'Select datum\nto record', selected = True, call_back = parent.select_datum))
+            content2.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
+            self.scrollbox.add_widget(content2)
+            
+            content3 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content3.add_widget(e5_button(text = 'Record datum', selected = True, call_back = parent.select_datum))
+            content3.add_widget(e5_label('Error X:\nError Y:\nError Z:', id = 'result'))
+            self.scrollbox.add_widget(content3)
+
+        elif setup_type == "Record two datums":
+            instructions.text = "Select two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
+            self.scrollbox.add_widget(instructions)
+
+            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content1.add_widget(e5_button(text = 'Select first datum\nto record', selected = True, call_back = parent.select_datum))
+            content1.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum1'))
+            self.scrollbox.add_widget(content1)
+
+            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2.add_widget(e5_button(text = 'Select second datum\nto record', selected = True, call_back = parent.select_datum))
+            content2.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
+            self.scrollbox.add_widget(content2)
+
+            content3 = BoxLayout(orientation = 'horizontal', padding = 10, spacing = 5)
+            content3.add_widget(e5_button(text = 'Record first\ndatum', selected = True, call_back = parent.select_datum))
+            content3.add_widget(e5_button(text = 'Record second\ndatum', selected = True, call_back = parent.select_datum))
+            content3.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result'))
+            self.scrollbox.add_widget(content3)
+
+        elif setup_type == "Three datum shift":
+            instructions.text = "This option is designed to let one grid be rotated into another and is best for when a block of sediment is being excavated in a lab.  It requires three datums points."
+            self.scrollbox.add_widget(instructions)
+
+            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content1.add_widget(e5_button(text = 'Select datum 1', selected = True, call_back = self.select_datum))
+            content1.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum1'))
+            content1.add_widget(e5_button(text = 'Record datum 1', selected = True, call_back = self.select_datum))
+            content1.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result1'))
+            self.scrollbox.add_widget(content1)
+            
+            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2.add_widget(e5_button(text = 'Select datum 2',selected = True, call_back = self.select_datum))
+            content2.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
+            content2.add_widget(e5_button(text = 'Record datum 2',selected = True, call_back = self.select_datum))
+            content2.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result2'))
+            self.scrollbox.add_widget(content2)
+            
+            content3 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content3.add_widget(e5_button(text = 'Select datum 3',selected = True, call_back = self.select_datum))
+            content3.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
+            content3.add_widget(e5_button(text = 'Record datum 3',selected = True, call_back = self.select_datum))
+            content3.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result3'))
+            self.scrollbox.add_widget(content3)
+            
+        instructions.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
+        instructions.bind(width=lambda instance, value: setattr(instance, 'text_size', (value * .95, None)))
+        
+        self.size_hint = (1, 1)
+        self.id = 'setup_scroll'
+        self.add_widget(self.scrollbox)
+
+        def draw_background(widget, prop):
+            with widget.canvas.before:
+                Color(0.8, 0.8, 0.8, 1)  # green; colors range from 0-1 instead of 0-255
+                Rectangle(size=self.size, pos=self.pos)
+
+        self.bind(size=draw_background)
+        self.bind(pos=draw_background)
+
+    def select_datum(self):
+        pass
+    
+    def record_datum(self):
+        pass
+
 class InitializeStationScreen(Screen):
 
     def __init__(self, colors = None, **kwargs):
@@ -721,95 +855,49 @@ class InitializeStationScreen(Screen):
         # scroll box with instructions and then options for that initialization type plus results
         # save and cancel
         self.colors = colors if colors else ColorScheme()
-        content = GridLayout(cols = 1, size_hint_y = 1)
-        self.setup_type = Spinner(text="Horizontal Angle Only",
+
+        self.setup = "Horizontal Angle Only"
+
+        self.content = BoxLayout(orientation = 'vertical',
+                                size_hint_y = .9,
+                                size_hint_x = .8,
+                                pos_hint={'center_x': .5},
+                                id = 'content',
+                                padding = 20,
+                                spacing = 20)
+        self.add_widget(self.content)
+
+        setup_type_box = GridLayout(cols = 2, size_hint = (1, .2))
+        setup_type_box.add_widget(e5_label('Setup type', colors = self.colors))
+        self.setup_type = Spinner(text = self.setup,
                                     values=["Horizontal Angle Only",
                                             "Over a datum",
                                             "Over a datum + Record a datum",
                                             "Record two datums",
                                             "Three datum shift"],
                                     id = 'setup_type',
-                                    size_hint = (.5, None),
+                                    size_hint = (.7, None)
                                     #pos_hint = {'center_x': .5, 'center_y': .5},
-                                    color = self.colors.optionbutton_color,
-                                    background_color = self.colors.optionbutton_background,
-                                    background_normal = '')
-        content.add_widget(self.setup_type)
-        self.setup = GridLayout(cols = 1, size_hint_y = None, spacing = 5, padding = 5)
-        self.make_setup(None, None)
-        scroll = ScrollView(size_hint = (1, 1))
-        scroll.add_widget(self.setup)
-        content.add_widget(scroll)
-        content.add_widget(e5_side_by_side_buttons(text = ['Back','Accept Setup'],
+                                    )
+        setup_type_box.add_widget(self.setup_type)
+        self.setup_type.bind(text = self.rebuild)
+        self.content.add_widget(setup_type_box)
+
+        self.scroll_content = BoxLayout(orientation = 'vertical', size_hint = (1, .6),
+                                        spacing = 5, padding = 5)
+        self.content.add_widget(self.scroll_content)
+
+        self.scroll_content.add_widget(setups(self.setup_type.text, parent = self, colors = self.colors))
+
+        self.content.add_widget(e5_side_by_side_buttons(text = ['Back','Accept Setup'],
                                                         id = ['back','accept'],
                                                         call_back = [self.go_back, self.accept_setup],
                                                         selected = [True, True]))
-        self.add_widget(content)
-        self.setup_type.bind(text = self.make_setup)
 
-    def make_setup(self, instance, value):
-        self.setup.clear_widgets()
-        if self.setup_type.text == "Horizontal Angle Only":
-            self.setup.add_widget(e5_label('Enter the angle to be uploaded to the station.'))
-            content = GridLayout(cols = 2, size_hint_y = .2)
-            content.add_widget(e5_label('Horizontal angle to the point\n(use ddd.mmss)'))
-            content.add_widget(TextInput(text = '', multiline = False, id = 'h_angle'))
-            self.setup.add_widget(content)
-            content.add_widget(e5_button(text = 'Upload angle', call_back = self.set_hangle))
-        elif self.setup_type.text == "Over a datum":
-            self.setup.add_widget(e5_label('Enter select the datum point under the station and enter the station height.  Note this option assumes the horizontal angle is already correct or will be otherwise set.'))
-            content1 = GridLayout(cols = 2)
-            content1.add_widget(e5_label('Height over datum'))
-            content1.add_widget(TextInput(text = '', multiline = False, id = 'station_height'))
-            self.setup.add_widget(content1)
-            content2 = GridLayout(cols = 2)
-            content2.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content2.add_widget(e5_label('', id = 'datum'))
-            self.setup.add_widget(content2)
-        elif self.setup_type.text == "Over a datum + Record a datum":
-            self.setup.add_widget(e5_label("Select the datum under the station and a datum to be recorded.  EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."))
-            content1 = GridLayout(cols = 3)
-            content1.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content1.add_widget(e5_button(text = 'Record datum', call_back = self.select_datum))
-            content1.add_widget(e5_label('', id = 'datum1'))
-            self.setup.add_widget(content1)
-            content2 = GridLayout(cols = 3)
-            content2.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content2.add_widget(e5_button(text = 'Record datum', call_back = self.select_datum))
-            content2.add_widget(e5_label('', id = 'datum2'))
-            self.setup.add_widget(content2)
-            self.setup.add_widget(e5_label('', id = 'result'))
-        elif self.setup_type.text == "Record two datums":
-            self.setup.add_widget(e5_label("Select two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."))
-            content1 = GridLayout(cols = 3, size_hint_y = .2)
-            content1.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content1.add_widget(e5_button(text = 'Record datum', call_back = self.select_datum))
-            content1.add_widget(e5_label('', id = 'datum1'))
-            self.setup.add_widget(content1)
-            content2 = GridLayout(cols = 3, size_hint_y = .2)
-            content2.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content2.add_widget(e5_button(text = 'Record datum', call_back = self.select_datum))
-            content2.add_widget(e5_label('', id = 'datum2'))
-            self.setup.add_widget(content2)
-            self.setup.add_widget(e5_label('', id = 'result'))
-        elif self.setup_type.text == "Three datum shift":
-            self.setup.add_widget(e5_label("This option is designed to let one grid be rotated into another and is best for when a block of sediment is being excavated in a lab.  It requires three datums points."))
-            content1 = GridLayout(cols = 3, size_hint_y = .2)
-            content1.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content1.add_widget(e5_button(text = 'Record datum', call_back = self.select_datum))
-            content1.add_widget(e5_label('', id = 'datum1'))
-            self.setup.add_widget(content1)
-            content2 = GridLayout(cols = 3, size_hint_y = .2)
-            content2.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content2.add_widget(e5_button(text = 'Record datum', call_back = self.select_datum))
-            content2.add_widget(e5_label('', id = 'datum2'))
-            self.setup.add_widget(content2)
-            content3 = GridLayout(cols = 3, size_hint_y = .2)
-            content3.add_widget(e5_button(text = 'Select datum', call_back = self.select_datum))
-            content3.add_widget(e5_button(text = 'Record datum', call_back = self.select_datum))
-            content3.add_widget(e5_label('', id = 'datum2'))
-            self.setup.add_widget(content3)
-            self.setup.add_widget(e5_label('', id = 'result'))
+    def rebuild(self, instance, value):
+        self.setup = value
+        self.scroll_content.clear_widgets()
+        self.scroll_content.add_widget(setups(self.setup_type.text, parent = self, colors = self.colors))
 
     def set_hangle(self, instance):
         pass
