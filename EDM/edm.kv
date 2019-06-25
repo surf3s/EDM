@@ -92,7 +92,7 @@
                         on_press: app.root.current = 'EditUnitsScreen'
                         color: SUBMENU_COLOR
                     ActionButton:
-                        text: 'Prims'
+                        text: 'Prisms'
                         on_press: app.root.current = 'EditPrismsScreen'
                         color: SUBMENU_COLOR
                     ActionButton:
@@ -140,131 +140,6 @@
                         on_release: app.stop()
                         color: SUBMENU_COLOR
 
-<StatusScreen>:
-
-<LogScreen>:
-
-<AboutScreen>:
-
-<StationConfigureScreen>:
-    name: 'stationconfigure'
-
-<InitializeDirectScreen>:
-    name: 'datums'
-    popup: None
-    BoxLayout:
-        orientation: 'vertical'
-        spacing: 5
-        Label:
-            text: 'Use this option to set the station coordinates only.\n  This option assumes that the horizontal angle is already correct.'
-            size_hint_y: .8
-            valign: 'middle'
-            halign: 'center'
-            font_size: 20
-            color: WINDOW_COLOR
-        BoxLayout:
-            orientation: 'horizontal'
-            spacing: 5
-            size_hint_y: .2
-            Button:
-                text: 'Next'
-                on_press: root.datum_list()
-                default_size: None, dp(56)
-                default_size_hint: 1, None
-                color: BUTTON_COLOR
-                background_color: BUTTON_BACKGROUND
-                background_normal: ''
-            Button:
-                text: 'Back'
-                on_press: app.root.current = 'MainScreen'
-                default_size: None, dp(56)
-                default_size_hint: 1, None
-                color: BUTTON_COLOR
-                background_color: BUTTON_BACKGROUND
-                background_normal: ''
-
-<datumlist>:
-    RecycleBoxLayout:
-        default_size: None, dp(56)
-        default_size_hint: 1, None
-        size_hint_y: None
-        height: self.minimum_height
-        orientation: 'vertical'
-
-<SelectableButton>:
-    # Draw a background to indicate selection
-    canvas.before:
-        Color:
-            rgba: (0.0, 0.9, 0.1, 0.3)
-        Rectangle:
-            pos: self.pos
-            size: self.size
-
-<DatumLister>:
-    BoxLayout:
-        orientation: "vertical"
-        size_hint_y: None
-        height: 30
-        Label:
-            text: 'Select a datum or define a new one.'
-        Button:
-            text: "New"
-        Button:
-            text: "Cancel"
-
-
-<InitializeSetAngleScreen>:
-    BoxLayout:
-        size_hint_y: None
-        orientation: "vertical"
-        Label:
-            text: 'Set an angle. Either enter the angle to the point or from the point.'
-        BoxLayout:
-            orientation: "horizontal"
-            Label:
-                text: 'Anlge to the point :'
-            TextInput:
-                id: foreshot
-        BoxLayout:
-            orientation: "horizontal"
-            Label:
-                text: 'or angle from the point :'
-            TextInput:
-                id: backshot
-        BoxLayout:
-            orientation: "horizontal"
-            Button:
-                text: "Set Angle"
-                on_press: root.set_angle(foreshot.text, backshot.text)
-            Button:
-                text: "Cancel"
-                on_press: app.root.current = 'MainScreen'
-
-
-<InitializeOnePointScreen>:
-    BoxLayout:
-        size_hint_y: None
-        orientation: "vertical"
-
-
-<InitializeOnePointHeader>:
-    Label:
-        text: 'Initialize the station by recording one known point.  This method assumes that the horizontal angle is already correct. Select the datum to record.'
-
-
-<InitializeOnePointFooter>:
-    BoxLayout:
-        orientation: "horizontal"
-        Button:
-            text: "Record datum"
-            on_press: root.one_point()
-        Button:
-            text: "Cancel"
-            on_press: app.root.current = 'MainScreen'
-
-<EditPointsScreen>:
-<EditPointScreen>:
-
 
 <e5_LoadDialog>:
     BoxLayout:
@@ -292,34 +167,6 @@
                 background_color: root.button_background
                 background_normal: ''
 
-<e5_SaveDialog>:
-    #text_input: text_input
-    BoxLayout:
-        size: root.size
-        pos: root.pos
-        orientation: "vertical"
-        FileChooserListView:
-            id: filechooser
-            #on_selection: text_input.text = self.selection and self.selection[0] or ''
-            path: root.start_path
-
-        BoxLayout:
-            size_hint_y: None
-            spacing: 5
-            padding: 5
-            Button:
-                text: "Cancel"
-                on_release: root.cancel()
-                color: root.button_color
-                background_color: root.button_background
-                background_normal: ''
-
-            Button:
-                text: "Save"
-                on_release: root.save(filechooser.path)
-                color: root.button_color
-                background_color: root.button_background
-                background_normal: ''
 
 #region code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 
@@ -356,8 +203,8 @@
 
 <DataGridScrollCell>:
     canvas.before:
-        Color:
-            rgba: root.datagrid_odd if root.is_even else root.datagrid_even
+        #Color:
+        #    rgba: root.datagrid_odd if root.is_even else root.datagrid_even
         Rectangle:
             pos: self.pos
             size: self.size
@@ -392,7 +239,9 @@
 
 <DataGridWidget>:
     panel1: data_frame_panel
-    panel2: add_new_panel
+    panel2: edit_panel
+    panel3: delete_panel
+    panel4: addnew_panel
     do_default_tab: False
     TabbedPanelItem:
         text: 'Data'
@@ -401,11 +250,23 @@
         DataGridGridPanel:
             id: data_frame_panel
     TabbedPanelItem:
-        text: 'Edit Record'
+        text: 'Edit'
         background_normal: ''
         on_release: root.open_panel2()
         DataGridCasePanel:
-            id: add_new_panel
+            id: edit_panel
+    TabbedPanelItem:
+        text: 'Delete'
+        background_normal: ''
+        on_release: root.open_panel3()
+        DataGridDeletePanel:
+            id: delete_panel
+    TabbedPanelItem:
+        text: 'Add New'
+        background_normal: ''
+        on_release: root.open_panel4()
+        DataGridAddNewPanel:
+            id: addnew_panel
     TabbedPanelItem:
         text: 'Close'
         on_release: root.close_panels()
@@ -414,7 +275,7 @@
 <DataGridGridPanel>:
     orientation: 'vertical'
 
-<DataGridCasePanel>:
+<DataGridAddNewPanel>:
     addnew_list: addnew_list
     orientation: 'vertical'
     ScrollView:
@@ -430,5 +291,25 @@
             row_default_height: '35dp'
             row_force_default: True
             size_hint_y: None
+
+<DataGridCasePanel>:
+    edit_list: edit_list
+    orientation: 'vertical'
+    ScrollView:
+        do_scroll_x: False
+        do_scroll_y: True
+        size_hint: 1, 1
+        scroll_timeout: 150
+        GridLayout:
+            id: edit_list
+            padding: "10sp"
+            spacing: "5sp"
+            cols:1
+            row_default_height: '35dp'
+            row_force_default: True
+            size_hint_y: None
+
+<DataGridDeletePanel>:
+    orientation: 'vertical'
 
 #endregion end code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py

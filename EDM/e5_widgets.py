@@ -802,22 +802,26 @@ class e5_DatagridScreen(Screen):
 
     datagrid = ObjectProperty(None)
 
-    def __init__(self, main_data = None, main_tablename = '_default', main_cfg = None, colors = None, **kwargs):
+    def __init__(self, main_data = None, main_tablename = '_default', main_cfg = None, colors = None, addnew = False, **kwargs):
         super(e5_DatagridScreen, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
 
         if platform_name() == 'Android':
             self.colors.datagrid_font_size = "11sp"
 
-        self.datagrid = DataGridWidget(colors = self.colors)
-        self.add_widget(self.datagrid)
-        if main_data:
-            if main_data.db:
-                self.datagrid.data = main_data.db.table(main_tablename)
-                self.datagrid.fields = main_cfg
         self.e5_data = main_data
         self.e5_cfg = main_cfg
         self.tablename = main_tablename
+
+        self.datagrid = DataGridWidget(data = main_data.db.table(main_tablename) if main_tablename else None,
+                                        fields = self.e5_cfg,
+                                        colors = self.colors,
+                                        addnew = addnew)
+        self.add_widget(self.datagrid)
+        if main_data:
+            if main_data.db.tables:
+                self.datagrid.data = main_data.db.table(main_tablename)
+                self.datagrid.fields = main_cfg
 
     def on_pre_enter(self):
         if self.e5_data:
@@ -830,7 +834,7 @@ class e5_DatagridScreen(Screen):
     def on_enter(self):
         Window.bind(on_key_down = self._on_keyboard_down)
         if self.datagrid:
-            self.datagrid.switch_to(self.datagrid.tab_list[3])
+            self.datagrid.switch_to(self.datagrid.tab_list[len(self.datagrid.tab_list) - 1])
 
     def _on_keyboard_down(self, *args):
         ascii_code = args[1]
@@ -1184,10 +1188,10 @@ class DataGridCasePanel(BoxLayout):
     
     def populate(self, data, fields, colors = None):
         self.colors = colors if colors else ColorScheme()
-        self.addnew_list.bind(minimum_height = self.addnew_list.setter('height'))
-        self.addnew_list.clear_widgets()
+        self.edit_list.bind(minimum_height = self.edit_list.setter('height'))
+        self.edit_list.clear_widgets()
         for col in fields.fields():
-            self.addnew_list.add_widget(DataGridLabelAndField(col = col, colors = self.colors))
+            self.edit_list.add_widget(DataGridLabelAndField(col = col, colors = self.colors))
     
 class DataGridLabelAndField(BoxLayout):
 
@@ -1227,6 +1231,18 @@ class DataGridDeletePanel(GridLayout):
             self.add_widget(e5_scrollview_label('\nSelect a record in the grid view first, and then delete that record here.',
                                                  popup = False, colors = self.colors))
 
+class DataGridAddNewPanel(BoxLayout):
+
+    def populate(self, data, fields, colors = None, addnew = False, call_back = None):
+        self.colors = colors if colors else ColorScheme()
+        if addnew:
+            self.addnew_list.bind(minimum_height = self.addnew_list.setter('height'))
+            self.addnew_list.clear_widgets()
+            for col in fields.fields():
+                self.addnew_list.add_widget(DataGridLabelAndField(col = col, colors = self.colors))
+            self.add_widget(e5_button('Add record', id = 'addnew', selected = True,
+                                        call_back = call_back, colors = self.colors))
+
 class DataGridWidget(TabbedPanel):
     data = ObjectProperty(None)
     fields = ObjectProperty(None)
@@ -1238,22 +1254,27 @@ class DataGridWidget(TabbedPanel):
     popup_textbox = None
     popup_field_widget = None
 
-    def __init__(self, data = None, fields = None, colors = None, **kwargs):
+    def __init__(self, data = None, fields = None, colors = None, addnew = False, **kwargs):
         super(DataGridWidget, self).__init__(**kwargs)
         self.textboxes_will_update_db = False
 
-        if data:
-            self.data = data
-        if fields:
-            self.fields = fields
+        self.addnew = addnew
 
-        if data and fields:
-            self.populate_panels()
+        if data is not None:
+            self.data = data
+        if fields is not None:
+            self.fields = fields
 
         self.colors = colors if colors else ColorScheme()
         self.color = self.colors.text_color 
         self.background_color = self.colors.window_background 
         self.background_image = ''
+
+        if data is not None and fields is not None:
+            self.populate_panels()
+
+        #if not addnew:
+        #    self.tab_list.remove(self.get_tab_by_name('Add New'))
 
         for tab in self.tab_list:
             tab.color = self.colors.button_color
@@ -1262,7 +1283,7 @@ class DataGridWidget(TabbedPanel):
                 tab.font_size = self.colors.datagrid_font_size
 
     def record_count(self):
-        datatable = self.get_widget_by_id(self.tab_list[3].content, 'datatable')
+        datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
         return(datatable.nrows if datatable else 0)
 
     def reload_data(self):
@@ -1277,17 +1298,22 @@ class DataGridWidget(TabbedPanel):
         self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
         self.panel2.populate(data = self.data, fields = self.fields, colors = self.colors)
         self.panel3.populate(colors = self.colors)
-        self.get_widget_by_id(self.tab_list[3].content, 'datatable').datatable_widget = self
+        self.panel4.populate(addnew = self.addnew,
+                             data = self.data,
+                             fields = self.fields,
+                             colors = self.colors,
+                             call_back = self.addnew_record)
+        self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable').datatable_widget = self
 
     def open_panel1(self):
         self.textboxes_will_update_db = False
 
     def open_panel2(self):
-        datatable = self.get_widget_by_id(self.tab_list[3].content, 'datatable')
-        if datatable:
-            if datatable.datagrid_doc_id:
+        datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
+        if datatable is not None:
+            if datatable.datagrid_doc_id is not None:
                 data_record = self.data.get(doc_id = int(datatable.datagrid_doc_id))
-                for widget in self.ids.add_new_panel.children[0].walk():
+                for widget in self.ids.edit_panel.children[0].walk():
                     if widget.id in self.fields.fields():
                         widget.text = data_record[widget.id] if widget.id in data_record else ''
                         widget.bind(text = self.update_db)
@@ -1295,13 +1321,13 @@ class DataGridWidget(TabbedPanel):
                 self.textboxes_will_update_db = True
             else:
                 cfg_fields = self.fields.fields()
-                for widget in self.ids.add_new_panel.children[0].walk():
+                for widget in self.ids.edit_panel.children[0].walk():
                     if widget.id in cfg_fields:
                         widget.text = ''
                 self.textboxes_will_update_db = False
 
     def open_panel3(self):
-        datatable = self.get_widget_by_id(self.tab_list[3].content, 'datatable')
+        datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
         if datatable:
             if datatable.datagrid_doc_id:
                 data_record = self.data.get(doc_id = int(datatable.datagrid_doc_id))
@@ -1311,6 +1337,9 @@ class DataGridWidget(TabbedPanel):
                 self.panel3.populate(message = serialize_record,
                                         call_back = self.delete_record1, 
                                         colors = self.colors)
+
+    def open_panel4(self):
+        pass
 
     def show_menu(self, instance, value):
         if instance.focus:
@@ -1330,9 +1359,21 @@ class DataGridWidget(TabbedPanel):
         self.popup_field_widget = None
         self.popup_scrollmenu = None
 
+    def addnew_record(self, instance):
+        new_record = {}
+        cfg_fields = self.fields.fields()
+        for widget in self.ids.addnew_panel.children[1].walk():
+            if widget.id in cfg_fields:
+                if widget.text:
+                    new_record[widget.id] = widget.text
+                    widget.text = ''
+        self.data.insert(new_record)
+        self.data.new_data = True  #Needs to reference parent
+        self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
+
     def update_db(self, instance, value):
         if self.textboxes_will_update_db:
-            datatable = self.get_widget_by_id(self.tab_list[3].content, 'datatable')
+            datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
             if datatable:
                 for widget in datatable.datagrid_widget_row:
                     if widget.field == instance.id and widget.key == datatable.datagrid_doc_id:
@@ -1351,7 +1392,7 @@ class DataGridWidget(TabbedPanel):
 
     def delete_record2(self, value):
         self.close_popup(value)
-        datatable = self.get_widget_by_id(self.tab_list[3].content, 'datatable')
+        datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
         if datatable:
             doc_id = int(datatable.datagrid_doc_id)
             self.data.remove(doc_ids = [doc_id])
@@ -1370,6 +1411,12 @@ class DataGridWidget(TabbedPanel):
         for widget in start.walk():
             if widget.id == id:
                 return(widget)
+        return(None)
+
+    def get_tab_by_name(self, text = ''):
+        for tab in self.tab_list:
+            if tab.text == text:
+                return(tab)
         return(None)
 
     def close_panels(self):

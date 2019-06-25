@@ -105,15 +105,20 @@ class DB(dbs):
         else:
             return(None)
 
-    def names(self):
+    def unit_ids(self):
         name_list = []
-        for row in self.db:
+        for row in self.db.table(self.table):
             name_list.append(row['unit'] + '-' + row['id'])
         return(name_list)
 
+    def names(self, table_name):
+        name_list = []
+        for row in self.db.table(table_name):
+            name_list.append(row['name'])
+        return(name_list)
+
     def fields(self):
-        global edm_cfg 
-        return(edm_cfg.fields())
+        pass
 
     def delete_all(self):
         self.db.purge()
@@ -329,6 +334,58 @@ class CFG(blockdata):
                 field_names.remove(del_field)
         return(field_names)
 
+    def build_prism(self):
+        self.update_value('NAME', 'Prompt', 'Name :')
+        self.update_value('NAME', 'Type', 'Text')
+        self.update_value('NAME', 'Length', 20)
+
+        self.update_value('HEIGHT', 'Prompt', 'Height :')
+        self.update_value('HEIGHT', 'Type', 'Numeric')
+
+        self.update_value('OFFSET', 'Prompt', 'Offset :')
+        self.update_value('OFFSET', 'Type', 'Numeric')
+
+    def build_unit(self):
+        self.update_value('NAME', 'Prompt', 'Name :')
+        self.update_value('NAME', 'Type', 'Text')
+        self.update_value('NAME', 'Length', 20)
+
+        self.update_value('XMIN', 'Prompt', 'X Minimum :')
+        self.update_value('XMIN', 'Type', 'Numeric')
+
+        self.update_value('YMIN', 'Prompt', 'Y Minimum :')
+        self.update_value('YMIN', 'Type', 'Numeric')
+
+        self.update_value('XMAX', 'Prompt', 'X Maximum :')
+        self.update_value('XMAX', 'Type', 'Numeric')
+
+        self.update_value('YMAX', 'Prompt', 'Y Maximum :')
+        self.update_value('YMAX', 'Type', 'Numeric')
+
+        self.update_value('RADIUS', 'Prompt', 'or enter a Radius :')
+        self.update_value('RADIUS', 'Type', 'Text')
+        self.update_value('RADIUS', 'Length', 20)
+
+        self.update_value('CENTERX', 'Prompt', 'and a Center X :')
+        self.update_value('CENTERX', 'Type', 'Numeric')
+
+        self.update_value('CENTERY', 'Prompt', 'and Center Y :')
+        self.update_value('CENTERY', 'Type', 'Numeric')
+
+    def build_datum(self):
+        self.update_value('NAME', 'Prompt', 'Name :')
+        self.update_value('NAME', 'Type', 'Text')
+        self.update_value('NAME', 'Length', 20)
+
+        self.update_value('X', 'Prompt', 'X :')
+        self.update_value('X', 'Type', 'Numeric')
+
+        self.update_value('Y', 'Prompt', 'Y :')
+        self.update_value('Y', 'Type', 'Numeric')
+
+        self.update_value('Z', 'Prompt', 'Z :')
+        self.update_value('Z', 'Type', 'Numeric')
+        
     def build_default(self):
         self.update_value('UNIT', 'Prompt', 'Unit :')
         self.update_value('UNIT', 'Type', 'Text')
@@ -392,10 +449,16 @@ class CFG(blockdata):
     def save(self):
         self.write_blocks()
 
-    def load(self, filename):
-        self.filename = filename 
-        self.blocks = self.read_blocks()
-        if self.blocks==[]:
+    def load(self, filename = ''):
+        if filename:
+            self.filename = filename
+        self.path = ntpath.split(self.filename)[0]
+
+        self.blocks = []
+        if os.path.isfile(self.filename):
+            self.blocks = self.read_blocks()
+        else:
+            self.filename = 'default.cfg'
             self.build_default()
     
     def status(self):
@@ -565,14 +628,14 @@ class MainScreen(e5_MainScreen):
     popup_open = False
     text_color = (0, 0, 0, 1)
 
-    def __init__(self, data = None, cfg = None, ini = None, colors = None, total_station = None, **kwargs):
+    def __init__(self, data = None, cfg = None, ini = None, colors = None, station = None, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
 
         self.colors = colors if colors else ColorScheme()
         self.ini = ini if ini else INI()
         self.data = data if data else DB()
         self.cfg = cfg 
-        self.total_station = total_station if total_station else totalstation()
+        self.station = station if station else totalstation()
 
         self.layout = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
@@ -609,31 +672,43 @@ class MainScreen(e5_MainScreen):
         self.info.bind(texture_size = self.info.setter('size'))
         self.info.bind(size_hint_min_x = self.info.setter('width'))
 
-        grid = GridLayout(cols = 3, spacing = 10)
+        #grid = GridLayout(cols = 3, spacing = 10)
         scroll_content = BoxLayout(orientation = 'horizontal',
                                     size_hint = (1, size_hints['option_buttons']),
                                     id = 'option_buttons',
                                     spacing = 20)
-        button_count = 0
+        self.layout.add_widget(scroll_content)
 
+        button_count = 0
+        button_text = []
+        button_selected = []
         for button_no in range(1,7):
             if self.cfg.get_value('BUTTON' + str(button_no), 'TITLE'):
-                scroll_content.add_widget(e5_button(text = self.cfg.get_value('BUTTON' + str(button_no), 'TITLE'),
-                                             id = 'button' + str(button_no),
-                                             call_back = self.take_shot))
+                button_text.append(self.cfg.get_value('BUTTON' + str(button_no), 'TITLE'))
+                button_selected.append(False)
                 button_count += 1
 
-        if button_count % 3 !=0:
-            button_empty = Button(text = '', size_hint_y = None, id = '',
-                            color = self.colors.window_background,
-                            background_color = self.colors.window_background,
-                            background_normal = '')
-            scroll_content.add_widget(button_empty)
+        if button_count > 0:
+            self.scroll_menu = e5_scrollview_menu(button_text,
+                                                        menu_selected = button_selected,
+                                                        widget_id = 'buttons',
+                                                        call_back = [self.take_shot],
+                                                        ncols = 3,
+                                                        colors = self.colors)
+            scroll_content.add_widget(self.scroll_menu)
 
-        if button_count % 3 == 2:
-            scroll_content.add_widget(button_empty)
 
-        self.layout.add_widget(scroll_content)
+        #if button_count % 3 !=0:
+        #    button_empty = Button(text = '', size_hint_y = None, id = '',
+        #                    color = self.colors.window_background,
+        #                    background_color = self.colors.window_background,
+        #                    background_normal = '')
+        #    scroll_content.add_widget(button_empty)
+
+        #if button_count % 3 == 2:
+        #    scroll_content.add_widget(button_empty)
+
+        #self.layout.add_widget(scroll_content)
 
         shot_buttons = GridLayout(cols = 3, size_hint = (1, size_hints['shot_buttons']), spacing = 20)
         
@@ -650,43 +725,23 @@ class MainScreen(e5_MainScreen):
 
     def take_shot(self, value):
         
-        self.total_station.take_shot()
-
-        layout_popup = GridLayout(cols = 1, spacing = 10, size_hint_y = None)
-        layout_popup.bind(minimum_height=layout_popup.setter('height'))
-        for prism in self.data.prisms.names():
-            button1 = Button(text = prism, size_hint_y = None, id = prism,
-                        color = OPTIONBUTTON_COLOR,
-                        background_color = OPTIONBUTTON_BACKGROUND,
-                        background_normal = '')
-            layout_popup.add_widget(button1)
-            button1.bind(on_press = self.show_edit_screen)
-        button2 = Button(text = 'Back', size_hint_y = None,
-                        color = BUTTON_COLOR,
-                        background_color = BUTTON_BACKGROUND,
-                        background_normal = '')
-        layout_popup.add_widget(button2)
-        root = ScrollView(size_hint=(1, None), size=(Window.width, Window.height/1.9))
-        root.add_widget(layout_popup)
-        self._popup = Popup(title = 'Prism Height',
-                    content = root,
-                    size_hint = (None, None),
-                    size = (400, 400),
-                    #pos_hint = {None, None},
-                    auto_dismiss = False)
-        button2.bind(on_press = self._popup.dismiss)
-        self._popup.open()
+        self.station.take_shot()
+        self.popup = DataGridMenuList(title = "Prism Height",
+                                        menu_list = self.data.names('prisms'),
+                                        menu_selected = '',
+                                        call_back = self.show_edit_point)
+        self.popup.open()
 
     def show_edit_screen(self, value):
-        self._popup.dismiss()
-        edm_station.prism = edm_prisms.get(value.text).height 
+        self.popup.dismiss()
+        #self.station.prism = self.data.prisms.get(value.text).height 
         self.parent.current = 'EditPointScreen'
         
     def show_load_cfg(self):
-        if self.edm_cfg.filename and self.edm_cfg.path:
-            start_path = self.edm_cfg.path
+        if self.cfg.filename and self.cfg.path:
+            start_path = self.cfg.path
         else:
-            start_path = self.edm_ini.get_value('EDM','APP_PATH')
+            start_path = self.ini.get_value('EDM','APP_PATH')
         content = e5_LoadDialog(load = self.load_cfg, 
                             cancel = self.dismiss_popup,
                             start_path = start_path,
@@ -698,10 +753,10 @@ class MainScreen(e5_MainScreen):
 
     def load_cfg(self, path, filename):
         self.dismiss_popup()
-        self.edm_cfg.load(os.path.join(path, filename[0]))
-        if self.edm_cfg.filename:
+        self.cfg.load(os.path.join(path, filename[0]))
+        if self.cfg.filename:
             self.open_db()
-        self.edm_ini.update(self.colors, self.edm_cfg)
+        self.ini.update(self.colors, self.cfg)
         self.build_mainscreen()
 
 class VerifyStationScreen(Screen):
@@ -1256,23 +1311,32 @@ class EDMApp(e5_Program):
                                         main_tablename = '_default',
                                         main_cfg = self.cfg))
 
+        datum_cfg = CFG()
+        datum_cfg.build_datum()
         sm.add_widget(EditPointsScreen(name = 'EditDatumsScreen', id = 'editdatums_screen',
                                         colors = self.colors,
                                         main_data = self.data,
                                         main_tablename = 'datums',
-                                        main_cfg = self.cfg))
+                                        main_cfg = datum_cfg,
+                                        addnew = True))
 
+        prism_cfg = CFG()
+        prism_cfg.build_prism()
         sm.add_widget(EditPointsScreen(name = 'EditPrismsScreen', id = 'editprisms_screen',
                                         colors = self.colors,
                                         main_data = self.data,
                                         main_tablename = 'prisms',
-                                        main_cfg = self.cfg))
+                                        main_cfg = prism_cfg,
+                                        addnew = True))
 
+        units_cfg = CFG()
+        units_cfg.build_unit()
         sm.add_widget(EditPointsScreen(name = 'EditUnitsScreen', id = 'editunits_screen',
                                         colors = self.colors,
                                         main_data = self.data,
                                         main_tablename = 'units',
-                                        main_cfg = self.cfg))
+                                        main_cfg = units_cfg,
+                                        addnew = True))
 
         sm.add_widget(StatusScreen(name = 'StatusScreen', id = 'status_screen',
                                     colors = self.colors,
