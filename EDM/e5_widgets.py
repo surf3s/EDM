@@ -705,12 +705,13 @@ class e5_RecordEditScreen(Screen):
 
     can_update_data_table = False
 
-    def __init__(self, data_table = None, doc_id = None, e5_cfg = None, colors = None, **kwargs):
+    def __init__(self, data_table = None, doc_id = None, e5_cfg = None, colors = None, one_record_only = False, **kwargs):
         super(e5_RecordEditScreen, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
         self.e5_cfg = e5_cfg
         self.data_table = data_table
         self.doc_id = doc_id
+        self.one_record_only = one_record_only
         self.can_update_data_table = False
         self.layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
         self.data_fields = GridLayout(cols = 1, size_hint_y = None, spacing = 5, padding = 5)
@@ -718,12 +719,19 @@ class e5_RecordEditScreen(Screen):
         scroll = ScrollView(size_hint = (1, 1))
         scroll.add_widget(self.data_fields)
         self.layout.add_widget(scroll)
-        self.layout.add_widget(e5_side_by_side_buttons(text = ['Previous record','Next record'],
-                                                        id = ['previous','next'],
-                                                        call_back = [self.previous_record, self.next_record],
-                                                        selected = [True, True]))
-        self.layout.add_widget(e5_button('Back', id = 'back', selected = True,
-                                    call_back = self.call_back, colors = self.colors))
+        if not self.one_record_only:
+            self.layout.add_widget(e5_side_by_side_buttons(text = ['Previous record','Next record'],
+                                                            id = ['previous','next'],
+                                                            call_back = [self.previous_record, self.next_record],
+                                                            selected = [True, True]))
+            self.layout.add_widget(e5_button('Back', id = 'back', selected = True,
+                                        call_back = self.call_back, colors = self.colors))
+        else:
+            self.layout.add_widget(e5_side_by_side_buttons(text = ['Save','Cancel'],
+                                                            id = ['save','cancel'],
+                                                            call_back = [self.save_record, self.cancel_record],
+                                                            selected = [True, True]))
+
         self.add_widget(self.layout)
 
     def make_empty_frame(self):
@@ -758,7 +766,7 @@ class e5_RecordEditScreen(Screen):
                 for field in self.e5_cfg.fields():
                     for widget in self.layout.walk():
                         if widget.id == field:
-                            widget.text = data_record[field] if field in data_record.keys() else ''
+                            widget.text = '%s' % data_record[field] if field in data_record.keys() else ''
                             widget.bind(text = self.update_db)
                             widget.bind(focus = self.show_menu)
                             break
@@ -769,6 +777,12 @@ class e5_RecordEditScreen(Screen):
             update = {instance.id: value}
             self.data_table.update(update, doc_ids = [self.doc_id])
     
+    def save_record(self, instance):
+        self.parent.current = 'MainScreen'
+
+    def cancel_record(self, instance):
+        self.parent.current = 'MainScreen'
+
     def show_menu(self, instance, ValueError):
         if instance.focus:
             cfg_field = self.e5_cfg.get(instance.id)
