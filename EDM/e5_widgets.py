@@ -961,7 +961,7 @@ class e5_Program(App):
 
 class DataGridMenuList(Popup):
     
-    def __init__(self, title, menu_list, menu_selected = '', call_back = None, **kwargs):
+    def __init__(self, title, menu_list, menu_selected = '', call_back = None, colors = None, **kwargs):
         super(DataGridMenuList, self).__init__(**kwargs)
         
         pop_content = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
@@ -972,7 +972,8 @@ class DataGridMenuList(Popup):
         new_item.add_widget(e5_button('Add', id = 'add_button',
                                              selected = True,
                                              call_back = call_back,
-                                             button_height = .15))
+                                             button_height = .15,
+                                             colors = colors))
         pop_content.add_widget(new_item)
 
         ncols = int(Window.width / 200)
@@ -981,11 +982,15 @@ class DataGridMenuList(Popup):
 
         menu = e5_scrollview_menu(menu_list, menu_selected,
                                                  widget_id = 'menu',
-                                                 call_back = [call_back], ncols = ncols)
+                                                 call_back = [call_back],
+                                                 ncols = ncols,
+                                                 colors = colors)
         pop_content.add_widget(menu)
         menu.make_scroll_menu_item_visible()
         
-        pop_content.add_widget(e5_button('Back', selected = True, call_back = self.dismiss))
+        pop_content.add_widget(e5_button('Back', selected = True,
+                                                 call_back = self.dismiss,
+                                                 colors = colors))
 
         self.content = pop_content
         

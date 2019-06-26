@@ -826,7 +826,84 @@ class VerifyStationScreen(Screen):
         # results section
         # Back button
         pass
-        
+
+class record_button(e5_button):
+    xyz = None
+
+    def __init__(self, station = None, **kwargs):
+        super(record_button, self).__init__(**kwargs)
+        self.station = station
+        self.bind(on_press = self.record_datum)
+
+    def record_datum(self, instance):
+        self.station.take_shot()
+        self.xyz = self.station.xyz()
+        if self.xyz:
+            instance.text = 'X: %s\nY: %s\nZ: %s' % (self.xyz.x,
+                                                        self.xyz.y,
+                                                        self.xyz.z)
+        else:
+            instance.text = 'Recording error.'
+
+class datum_recorder(BoxLayout):
+
+    xyz = None
+    popup = ObjectProperty(None)
+    popup_open = False
+
+    def __init__(self, text = '', ndatums = 1, station = None, colors = None, **kwargs):
+        super(datum_recorder, self).__init__(**kwargs)
+        self.orientation = 'horizontal'
+        self.padding = 10
+        self.colors = colors
+        self.station = station
+        for n in range(ndatums):
+            self.add_widget(record_button(text = 'Record datum %s' % (n+1),
+                                        selected = True,
+                                        id = '%s' % (n+1),
+                                        colors = self.colors,
+                                        station = self.station))
+        self.result = e5_label('', colors = self.colors)
+        self.add_widget(self.result)
+       
+class datum_selector(BoxLayout):
+    
+    datum = None
+    popup = ObjectProperty(None)
+    popup_open = False
+
+    def __init__(self, text = '', data = None, colors = None, **kwargs):
+        super(datum_selector, self).__init__(**kwargs)
+        self.orientation = 'horizontal'
+        self.padding = 10
+        self.colors = colors
+        self.data = data
+        self.add_widget(e5_button(text = text,
+                                    selected = True,
+                                    call_back = self.show_select_datum,
+                                    colors = self.colors))
+        self.result = e5_label('Datum:\nX:\nY:\nZ:', colors = self.colors)
+        self.add_widget(self.result)
+
+    def show_select_datum(self, instance):
+        self.popup = DataGridMenuList(title = "Datum",
+                                        menu_list = self.data.names('datums'),
+                                        menu_selected = '',
+                                        call_back = self.datum_selected,
+                                        colors = self.colors)
+        self.popup.open()
+    
+    def datum_selected(self, instance):
+        self.popup.dismiss()
+        self.datum = self.data.get_datum(instance.text)
+        if self.datum:
+            self.result.text = 'Datum: %s\nX: %s\nY: %s\nZ: %s' % (self.datum.name,
+                                                                    self.datum.x,
+                                                                    self.datum.y,
+                                                                    self.datum.z)
+        else:
+            self.result.text = 'Search error'
+
 class setups(ScrollView):
 
     popup = ObjectProperty(None)
@@ -871,12 +948,10 @@ class setups(ScrollView):
             instructions.text = 'Enter select the datum point under the station and enter the station height.  Note this option assumes the horizontal angle is already correct or will be otherwise set.'
             self.scrollbox.add_widget(instructions)
 
-            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
-            self.directdatum = e5_label('Datum:\nX:\nY:\nZ:', id = 'directdatum')
-            content1.add_widget(e5_button(text = 'Select the datum\nunder the station', selected = True,
-                                            call_back = lambda *args: self.show_select_datum(self.directdatum, *args)))
-            content1.add_widget(self.directdatum)
-            self.scrollbox.add_widget(content1)
+            self.over_datum = datum_selector(text = 'Select the datum\nunder the station',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.over_datum)
 
             content2 = BoxLayout(orientation = 'horizontal', padding = 10)
             content2.add_widget(e5_label('Height over datum'))
@@ -888,65 +963,57 @@ class setups(ScrollView):
             instructions.text = "Select the datum under the station and a datum to be recorded.  EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
-            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content1.add_widget(e5_button(text = 'Select datum\nunder the station', selected = True, call_back = self.show_select_datum))
-            content1.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum1'))
-            self.scrollbox.add_widget(content1)
+            self.datum1 = datum_selector(text = 'Select datum\nunder the station',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.datum1)
 
-            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content2.add_widget(e5_button(text = 'Select datum\nto record', selected = True, call_back = self.show_select_datum))
-            content2.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
-            self.scrollbox.add_widget(content2)
+            self.datum2 = datum_selector(text = 'Select datum\nto record',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.datum2)
             
-            content3 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content3.add_widget(e5_button(text = 'Record datum', selected = True, call_back = self.show_select_datum))
-            content3.add_widget(e5_label('Error X:\nError Y:\nError Z:', id = 'result'))
-            self.scrollbox.add_widget(content3)
+            self.recorder = datum_recorder('Record datum', station = self.station, colors = self.colors)
+            self.scrollbox.add_widget(self.recorder)
 
         elif setup_type == "Record two datums":
             instructions.text = "Select two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
-            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content1.add_widget(e5_button(text = 'Select first datum\nto record', selected = True, call_back = self.show_select_datum))
-            content1.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum1'))
-            self.scrollbox.add_widget(content1)
+            self.datum1 = datum_selector(text = 'Select first datum\nto record',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.datum1)
 
-            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content2.add_widget(e5_button(text = 'Select second datum\nto record', selected = True, call_back = self.show_select_datum))
-            content2.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
-            self.scrollbox.add_widget(content2)
+            self.datum2 = datum_selector(text = 'Select second datum\nto record',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.datum2)
 
-            content3 = BoxLayout(orientation = 'horizontal', padding = 10, spacing = 5)
-            content3.add_widget(e5_button(text = 'Record first\ndatum', selected = True, call_back = self.show_select_datum))
-            content3.add_widget(e5_button(text = 'Record second\ndatum', selected = True, call_back = self.show_select_datum))
-            content3.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result'))
-            self.scrollbox.add_widget(content3)
+            self.recorder = datum_recorder('Record datum', ndatums = 2, station = station, colors = colors)
+            self.scrollbox.add_widget(self.recorder)
 
         elif setup_type == "Three datum shift":
             instructions.text = "This option is designed to let one grid be rotated into another and is best for when a block of sediment is being excavated in a lab.  It requires three datums points."
             self.scrollbox.add_widget(instructions)
 
-            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content1.add_widget(e5_button(text = 'Select datum 1', selected = True, call_back = self.select_datum))
-            content1.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum1'))
-            content1.add_widget(e5_button(text = 'Record datum 1', selected = True, call_back = self.select_datum))
-            content1.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result1'))
-            self.scrollbox.add_widget(content1)
-            
-            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content2.add_widget(e5_button(text = 'Select datum 2', selected = True, call_back = self.select_datum))
-            content2.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
-            content2.add_widget(e5_button(text = 'Record datum 2', selected = True, call_back = self.select_datum))
-            content2.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result2'))
-            self.scrollbox.add_widget(content2)
-            
-            content3 = BoxLayout(orientation = 'horizontal', padding = 10)
-            content3.add_widget(e5_button(text = 'Select datum 3', selected = True, call_back = self.select_datum))
-            content3.add_widget(e5_label('Datum:\nX:\nY:\nZ:', id = 'datum2'))
-            content3.add_widget(e5_button(text = 'Record datum 3', selected = True, call_back = self.select_datum))
-            content3.add_widget(e5_label('Result:\nX:\nY:\nZ:', id = 'result3'))
-            self.scrollbox.add_widget(content3)
+            self.datum1 = datum_selector(text = 'Select datum 1',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.datum1)
+
+            self.datum2 = datum_selector(text = 'Select datum 2',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.datum2)
+
+            self.datum3 = datum_selector(text = 'Select datum 3',
+                                                data = self.data,
+                                                colors = self.colors)
+            self.scrollbox.add_widget(self.datum3)
+
+            self.recorder = datum_recorder('Record datum', ndatums = 3, station = station, colors = colors)
+            self.scrollbox.add_widget(self.recorder)
             
         instructions.bind(texture_size = lambda instance, value: setattr(instance, 'height', value[1]))
         instructions.bind(width = lambda instance, value: setattr(instance, 'text_size', (value * .95, None)))
@@ -957,35 +1024,15 @@ class setups(ScrollView):
 
         def draw_background(widget, prop):
             with widget.canvas.before:
-                Color(0.8, 0.8, 0.8, 1)  # green; colors range from 0-1 instead of 0-255
+                Color(0.8, 0.8, 0.8, 1)
                 Rectangle(size=self.size, pos=self.pos)
 
         self.bind(size = draw_background)
         self.bind(pos = draw_background)
 
-    def show_select_datum(self, datumname, instance):
-        self.popup = DataGridMenuList(title = "Datum",
-                                        menu_list = self.data.names('datums'),
-                                        menu_selected = '',
-                                        call_back = lambda *args: self.datum_selected(datumname, *args))
-        self.popup.open()
-    
-    def datum_selected(self, datumname, instance):
-        self.popup.dismiss()
-        datum_selected = self.data.get_datum(instance.text)
-        if datum_selected:
-            datumname.text = 'Datum: %s\nX: %s\nY: %s\nZ: %s' % (datum_selected.name,
-                                                                    datum_selected.x,
-                                                                    datum_selected.y,
-                                                                    datum_selected.z)
-        else:
-            datumname.text = 'Search error'
-
     def set_hangle(self, instance):
-        self.station.set_horizontal_angle(self.hangle.text)
-        
-    def record_datum(self):
-        pass
+        if self.hangle:
+            self.station.set_horizontal_angle(self.hangle.text)
 
 class InitializeStationScreen(Screen):
 
