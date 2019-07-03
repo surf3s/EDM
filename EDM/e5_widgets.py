@@ -44,6 +44,7 @@ class e5_side_by_side_buttons(GridLayout):
         self.cols = len(id)
         self.spacing = 5
         self.size_hint_y = button_height
+        #self.height = button_height
         for i in range(len(id)):
             self.add_widget(e5_button(text[i], id = id[i], selected = selected[i], call_back = call_back[i],
                             button_height = button_height, colors = colors))
@@ -173,6 +174,7 @@ class e5_scrollview_menu(ScrollView):
 class e5_scrollview_label(ScrollView):
     def __init__(self, text, widget_id = '', popup = False, colors = None, **kwargs):
         super(e5_scrollview_label, self).__init__(**kwargs)
+        self.colors = colors if colors else ColorScheme()
         scrollbox = GridLayout(cols = 1,
                                 size_hint_y = None,
                                 id = widget_id + '_box',
@@ -181,7 +183,7 @@ class e5_scrollview_label(ScrollView):
 
         info = Label(text = text, markup = True,
                     size_hint_y = None,
-                    color = colors.text_color if not popup else colors.popup_text_color,
+                    color = self.colors.text_color if not popup else self.colors.popup_text_color,
                     id = widget_id + '_label',
                     text_size = (self.width, None))
         if colors:
@@ -1002,25 +1004,57 @@ class DataGridMenuList(Popup):
         self.txt.focus = True
         self.txt.select_all()
 
+class DataGridTextInput(TextInput):
+
+    def __init__(self, call_back = None, **kwargs):
+        super(DataGridTextInput, self).__init__(**kwargs)
+        self.call_back = call_back
+
+    def keyboard_on_key_up(self, window, keycode):
+        print(keycode)
+        return super(DataGridTextInput, self).keyboard_on_key_up(window, keycode)
+
+
 class DataGridTextBox(Popup):
-    def __init__(self, title, text = '', multiline = False, call_back = None, **kwargs):
+
+    result = ObjectProperty(None)
+    save_button = ObjectProperty(None)
+
+    def __init__(self, title, label = None, text = '', multiline = False, call_back = None, button_text = ['Back','Save'], colors = None, **kwargs):
         super(DataGridTextBox, self).__init__(**kwargs)
-        content = GridLayout(cols = 1, spacing = 5, padding = 10, size_hint_y = None)
-        self.txt = TextInput(text = text, size_hint_y = .135, multiline = multiline, id = 'new_item')
+        self.colors = colors if colors else ColorScheme()
+        content = GridLayout(cols = 1, spacing = 5, padding = 10)
+        if label:
+            content.add_widget(Label(text = label, text_size = (None, 30)))
+        self.txt = DataGridTextInput(text = text, size_hint_y = None, height = 30 if not multiline else 90,
+                                multiline = multiline, id = 'new_item')
+        self.result = text
+        self.txt.bind(text = self.update)
+        self.txt.bind(on_text_validate = self.accept_value)
         content.add_widget(self.txt)
-        content.add_widget(e5_side_by_side_buttons(['Back','Save'],
-                                                    button_height = .2,
-                                                    id = [title, 'add_button'],
-                                                    selected = [True, True],
-                                                    call_back = [self.dismiss, call_back]))
+        buttons = e5_side_by_side_buttons(button_text,
+                                            button_height = None,
+                                            id = [title, 'add_button'],
+                                            selected = [True, True],
+                                            call_back = [self.dismiss, call_back],
+                                            colors = self.colors)
+        self.save_button = buttons.children[0]                                            
+        content.add_widget(buttons)
         self.title = title
         self.content = content
-        self.size_hint = (.8, .3)
+        self.size_hint = (.8, .35 if label is None else .5)
         self.auto_dismiss = True
     
     def on_open(self):
         self.txt.focus = True
         self.txt.select_all()
+
+    def update(self, instance, value):
+        self.result = value
+
+    def accept_value(self, instance):
+        self.save_button.trigger_action(0)
+        
 
 class DataGridHeaderCell(Button):
     def __init__(self, text, colors, **kwargs):
