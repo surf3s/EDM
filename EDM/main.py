@@ -1,11 +1,17 @@
+# ToDo
+#   On station verify, do the verify math
+#   After XYZ are obtained, check units file, populate and maintain units file after save
+#   Think through making a field link to a database table (unique value is a table record)
 
-# Need a read and write ini to be able to easily resume the program
-# Then start working on the flow for more complex setups
-# Add serial port communications
-# Add bluetooth communications
+# ToDo NewPlot
+#   Read either CSV or JSON file
 
-__version__ = '1.0.3'
-__date__ = 'June, 2019'
+# ToDo More Longterm
+#   Add serial port communications
+#   Add bluetooth communications
+
+__version__ = '1.0.4'
+__date__ = 'July, 2019'
 from constants import __program__ 
 
 #Region Imports
@@ -707,6 +713,11 @@ class totalstation:
     def distance(self, p1, p2):
         return(sqrt( (p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2 ))
 
+
+    # The following functions are needed by the rotation function at the end of this list.
+    # Note too that all of the dependent routines are self written
+    # rather than pulled from existing libraries (like numpy) to avoid dependencies.  Dependencies make porting to
+    # Apple and Android more difficult.
     def dot_product(self, a, b):
         return(a.x * b.x + a.y * b.y + a.z * b.z)
         
@@ -774,8 +785,11 @@ class totalstation:
                         p.z + translation.z))
 
     def rotate_point_2d(self, local_vector, global_vector, p):
-        # source and destination are two vectors that will be made to align with each other
-        # p is a point to be rotated along with this vector alignment
+        # local coodinate system and global coordinate system vectors that will be made to align with each other.
+        # p is a point to be rotated along with this vector alignment.
+        # This is in essence a 2D rotation in the plane formed by the two vectors and around the perpendicular to this plane.
+        # (Two vectors have the origin in common and thus make three points altogether and this is a plane)
+        # (The surface normal is the rotation axis and the angle of rotation is the angle between the two vectors in this plane)
 
         i = self.identity_matrix()
 
@@ -806,6 +820,13 @@ class totalstation:
                         (p.x * r[0][1]) + (p.y * r[1][1]) + (p.z * r[2][1]),
                         (p.x * r[0][2]) + (p.y * r[1][2]) + (p.z * r[2][2])))                        
 
+    # This routine takes two sets of datums (local and global) and converts a newly recorded point
+    # from the local coordinate system (e.g. Microscribe) to the global coordinate system.
+    # It does this by performing a rotation around first one leg and then another of the triangle formed by the datums.
+    # It is written to be readable.  Much efficiency could be gained but as points are only rotated as recorded,
+    # the routine does not need to be fast.  Note too that all of the dependent routines are self written
+    # rather than pulled from existing libraries (like numpy) to avoid dependencies.  Dependencies make porting to
+    # Apple and Android more difficult.
     def rotate_point(self, p = None):
         # p is a point to be rotated
 
@@ -825,9 +846,6 @@ class totalstation:
             rotated_local.append(self.rotate_point_2d(global_vector, local_vector, self.rotate_local[1]))
             rotated_local.append(self.rotate_point_2d(global_vector, local_vector, self.rotate_local[2]))
 
-            print(round(local_vector.x,3), round(local_vector.y,3), round(local_vector.z,3))
-            print(round(global_vector.x,3), round(global_vector.y,3), round(global_vector.z,3))
-
             # Now line up on the other side of the triangle formed by the three datum points
             local_vector = self.normalize_vector(self.vector_subtract(rotated_local[2], rotated_local[0]))
             global_vector = self.normalize_vector(self.vector_subtract(self.rotate_global[2], self.rotate_global[0]))
@@ -838,14 +856,9 @@ class totalstation:
             rotated_local[1] = self.rotate_point_2d(global_vector, local_vector, rotated_local[1])
             rotated_local[2] = self.rotate_point_2d(global_vector, local_vector, rotated_local[2])
 
-            print(round(local_vector.x,3), round(local_vector.y,3), round(local_vector.z,3))
-            print(round(global_vector.x,3), round(global_vector.y,3), round(global_vector.z,3))
-
             # Now align the starting points of each grid systems by shifting the first datum points onto each other
             datum_diff = self.vector_subtract(self.rotate_global[0], rotated_local[0])
             result = self.translate_point(datum_diff, p_out2)
-
-            print(round(datum_diff.x,3), round(datum_diff.y,3), round(datum_diff.z,3))
 
             return(result)
 
@@ -853,7 +866,7 @@ class totalstation:
             return(None)
 
     def rotate_initialize(self, local_datums, global_datums):
-        # source and destination datums are two lists of three corresponding points in the two grid systems
+        # local and global datums are two lists of three corresponding points in the two grid systems
 
         self.rotate_local = local_datums
         self.rotate_global = global_datums
@@ -1061,14 +1074,46 @@ class MainScreen(e5_MainScreen):
 
 class VerifyStationScreen(Screen):
 
-    def __init__(self,**kwargs):
+    def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
         super(VerifyStationScreen, self).__init__(**kwargs)
-        # button to select the datum
-        # button to record the datum
-        # results section
-        # Back button
-        pass
 
+        self.colors = colors if colors else ColorScheme()
+        self.station = station
+        self.data = data
+        self.ini = ini
+
+        self.content = BoxLayout(orientation = 'vertical',
+                                size_hint_y = .9,
+                                size_hint_x = .8,
+                                pos_hint={'center_x': .5},
+                                id = 'content',
+                                padding = 20,
+                                spacing = 20)
+        self.add_widget(self.content)
+
+        self.content.add_widget(e5_label('Select a datum to use as verification and record it.', colors = self.colors))
+
+        self.datum1 = datum_selector(text = 'Select\nverification\ndatum',
+                                            data = self.data,
+                                            colors = self.colors,
+                                            default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'VERIFICATION')))
+        self.content.add_widget(self.datum1)
+
+        self.recorder = datum_recorder('Record\nverification\ndatum', station = self.station, colors = self.colors, setup_type = 'verify')
+        self.content.add_widget(self.recorder)
+
+        self.results = e5_label('', colors = self.colors)
+        self.content.add_widget(self.results)
+
+        self.back_button = e5_button(text = 'Back', size_hint_y = None, size_hint_x = 1, id = 'cancel',
+                        colors = self.colors, selected = True)
+        self.content.add_widget(self.back_button)
+        self.back_button.bind(on_press = self.close_screen)
+
+
+    def close_screen(self, instance):
+        self.parent.current = 'MainScreen'
+        
 class record_button(e5_button):
 
     popup = ObjectProperty(None)
@@ -1137,7 +1182,7 @@ class datum_recorder(GridLayout):
         self.buttons = []
         self.size_hint_y = None
         self.result = record_result('', colors = self.colors)
-        self.button = record_button(text = 'Record datum %s' % (datum_no),
+        self.button = record_button(text = text if text else 'Record datum %s' % (datum_no),
                                     selected = True,
                                     id = 'datum%s' % (datum_no),
                                     colors = self.colors,
@@ -1742,6 +1787,11 @@ class EDMApp(e5_Program):
                                  data = self.data,
                                  station = self.station))
 
+        sm.add_widget(VerifyStationScreen(name = 'VerifyStationScreen', id = 'verify_station',
+                                            data = self.data,
+                                            station = self.station,
+                                            colors = self.colors,
+                                            ini = self.ini))
 
         sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen', id = 'editlastrecord_screen',
                                         data_table = self.data.db.table(self.data.table),
