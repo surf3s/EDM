@@ -707,11 +707,19 @@ class e5_RecordEditScreen(Screen):
 
     can_update_data_table = False
 
-    def __init__(self, data_table = None, doc_id = None, e5_cfg = None, colors = None, one_record_only = False, **kwargs):
+    def __init__(self, data = None,
+                        data_table = None,
+                        doc_id = None,
+                        e5_cfg = None,
+                        colors = None,
+                        one_record_only = False,
+                        on_save = None,
+                        on_cancel = None, **kwargs):
         super(e5_RecordEditScreen, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
         self.e5_cfg = e5_cfg
         self.data_table = data_table
+        self.data = data
         self.doc_id = doc_id
         self.one_record_only = one_record_only
         self.can_update_data_table = False
@@ -749,7 +757,7 @@ class e5_RecordEditScreen(Screen):
 
     def next_record(self, value):
         if self.doc_id and self.data_table:
-            self.doc_id = min(len(self.data_table), self.doc_id + 1)
+            self.doc_id = min(len(self.data.db.table(self.data_table)), self.doc_id + 1)
             self.put_data_in_frame()
 
     def clear_the_frame(self):
@@ -763,7 +771,7 @@ class e5_RecordEditScreen(Screen):
     def put_data_in_frame(self):
         self.clear_the_frame()  
         if self.doc_id and self.data_table and self.e5_cfg:
-            data_record = self.data_table.get(doc_id = self.doc_id)
+            data_record = self.data.db.table(self.data_table).get(doc_id = self.doc_id)
             if data_record:
                 for field in self.e5_cfg.fields():
                     for widget in self.layout.walk():
@@ -777,12 +785,43 @@ class e5_RecordEditScreen(Screen):
     def update_db(self, instance, value):
         if self.data_table and self.can_update_data_table:
             update = {instance.id: value}
-            self.data_table.update(update, doc_ids = [self.doc_id])
+            self.data.db.table(self.data_table).update(update, doc_ids = [self.doc_id])
     
+    def check_required_fields(self):
+        save_errors = []
+        for field_name in self.e5_cfg.fields():
+            field = self.e5_cfg.get(field_name)
+            if field.required:
+                for widget in self.layout.walk():
+                    if widget.id == field_name:
+                        if widget.text == '':
+                            save_errors.append('The field %s is requires a value.' % field_name)
+        return(save_errors)
+
     def save_record(self, instance):
-        self.parent.current = 'MainScreen'
+        save_errors = self.check_required_fields()
+        if hasattr(self.data.db.table(self.data_table), 'on_save') and save_errors == []:
+            save_errors = self.data.db.table(self.data_table).on_save()
+        if save_errors is None:
+            self.update_link_fields()
+            self.parent.current = 'MainScreen'
+        else:
+            # Show a message box with result returned to is_valid
+            pass
+            
+    def update_link_fields(self):
+        for field_name in self.link_fields:
+            cfg_field = self.e5_cfg.get(field_name)
+            for link_field_name in cfg_field.link_fields:
+                for widget in self.layout.walk():
+                    if widget.id == link_field_name:
+                        update = {link_field_name: widget.text}
+                        self.data.db.table(field_name).update(update, doc_ids = [self.doc_id])
+                        # this isn't right - need to find the right record to update
 
     def cancel_record(self, instance):
+        if hasattr(self.data.db.table(self.data_table), 'on_cancel'):
+            self.data_table.on_cancel()
         self.parent.current = 'MainScreen'
 
     def show_menu(self, instance, ValueError):
@@ -791,7 +830,8 @@ class e5_RecordEditScreen(Screen):
             if cfg_field:
                 self.popup_field_widget = instance
                 if cfg_field.inputtype in ['MENU','BOOLEAN']:
-                    self.popup = DataGridMenuList(instance.id, cfg_field.menu, instance.text, self.menu_selection)
+                    self.popup = DataGridMenuList(instance.id, cfg_field.menu,
+                                                    instance.text, self.menu_selection)
                     self.popup.open()
                     self.popup_scrollmenu = self.get_widget_by_id(self.popup, 'menu_scroll')
                     self.popup_textbox = self.get_widget_by_id(self.popup, 'new_item')

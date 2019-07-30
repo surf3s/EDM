@@ -2,6 +2,17 @@
 #   On station verify, do the verify math
 #   After XYZ are obtained, check units file, populate and maintain units file after save
 #   Think through making a field link to a database table (unique value is a table record)
+#   Make sure that each linkfield has a table in the database
+#   Link fields just like unit fields need to be updated after save
+
+# Need to be able to call a function when finished saving or editing a record
+# Maybe need to do this on cancel as well.
+# Probably need to put a hook into the db object 
+# Look up on web how to know if an object has a property without crashing
+# Will need to be sure to clear this value as well after.
+
+# A menu field can be linked to other fields in the same CFG and this will load default values.
+# A text field can be linked to another table. [future feature]
 
 # ToDo NewPlot
 #   Read either CSV or JSON file
@@ -13,6 +24,8 @@
 __version__ = '1.0.4'
 __date__ = 'July, 2019'
 from constants import __program__ 
+
+__DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','UNIT','ID']
 
 #Region Imports
 from kivy.graphics import Color, Rectangle
@@ -217,8 +230,16 @@ class DB(dbs):
         if xyz:
             for a_unit in self.db.table('units'):
                 if 'XMAX' in a_unit.keys() and 'YMAX' in a_unit.keys() and 'XMIN' in a_unit.keys() and 'YMIN' in a_unit.keys():
-                    if xyz.x <= a_unit['XMAX'] and xyz.x >= a_unit['XMIN'] and xyz.y <= a_unit['YMAX'] and xyz.y >= a_unit['YMIN']:
+                    if xyz.x <= float(a_unit['XMAX']) and xyz.x >= float(a_unit['XMIN']) and xyz.y <= float(a_unit['YMAX']) and xyz.y >= float(a_unit['YMIN']):
                         return(a_unit['NAME'])
+        return(None)
+
+    def get_link_fields(self, name = None, value = None):
+        if name is not None and value is not None:
+            try:
+                return(self.db.table(name).search( (where(name) == value) )[0])
+            except:
+                return(None)
         return(None)
 
 class INI(blockdata):
@@ -313,6 +334,7 @@ class CFG(blockdata):
         self.key_field = None   # not implimented yet
         self.description = ''   # not implimented yet
         self.gps = False
+        self.link_fields = []
     
     def open(self, filename = ''):
         if filename:
@@ -335,7 +357,10 @@ class CFG(blockdata):
         f.prompt = self.get_value(field_name, 'PROMPT')
         f.length = self.get_value(field_name, 'LENGTH')
         f.menu = self.get_value(field_name, 'MENU').split(",")
-        f.link_fields = self.get_value(field_name, 'LINKED').split(",")
+        link_fields = self.get_value(field_name, 'LINKED')
+        if link_fields:
+            f.link_fields = link_fields.upper().split(",")
+        f.carry = self.get_value(field_name, 'CARRY')
         return(f)
 
     def put(self, field_name, f):
@@ -450,15 +475,11 @@ class CFG(blockdata):
         # should add hangle, vangle, sloped 
 
     def validate(self):
-        for field_name in self.fields():
-            f = self.get(field_name)
-            if f.prompt == '':
-                f.prompt = field_name
-            f.inputtype = f.inputtype.upper()
-            if field_name in ['UNIT','ID','SUFFIX','X','Y','Z']:
-                f.required = True
-            self.put(field_name, f)
-        
+
+        errors = []
+        field_names = self.fields()
+        self.link_fields = []
+
         # This is a legacy issue.  Linked fields are now listed with each field.
         unit_fields = self.get_value('EDM', 'UNITFIELDS')
         if unit_fields:
@@ -466,6 +487,25 @@ class CFG(blockdata):
             f.link_fields = unit_fields
             self.put('UNIT', f)
             # Delete UNITIFIELDS from the EDM block of teh CFG
+
+        for field_name in field_names:
+            f = self.get(field_name)
+            if f.prompt == '':
+                f.prompt = field_name
+            f.inputtype = f.inputtype.upper()
+            if field_name in ['UNIT','ID','SUFFIX','X','Y','Z']:
+                f.required = True
+            if f.link_fields:
+                self.link_fields.append(field_name)
+                # uppercase the link fields
+                for link_field_name in f.link_fields:
+                    if link_field_name not in field_names:
+                        errors.append(['Warning','The field %s is set to link to %s but the field %s does not exist in the CFG.' % (field_name, link_field_name, link_field_name)])
+                # check that a table exists for this field and insert if not
+                # need access to the db object
+            self.put(field_name, f)
+        
+        return(errors)
 
     def save(self):
         self.write_blocks()
@@ -1026,7 +1066,13 @@ class MainScreen(e5_MainScreen):
             self.popup.dismiss()
             self.add_record()
             #self.station.prism = self.data.prisms.get(value.text).height 
+            self.data.db.table(self.data.table).on_save = self.on_save
             self.parent.current = 'EditPointScreen'
+
+    def on_save(self):
+        # update units fields
+        print('it worked')
+        pass
 
     def close_popup(self, instance):
         self.popup.dismiss()
@@ -1055,22 +1101,86 @@ class MainScreen(e5_MainScreen):
 
     def add_record(self):
         new_record = {}
+        new_record = self.update_unit_fields(new_record)
+        new_record = self.add_defaults(new_record)
+        new_record = self.get_carry_fields(new_record)
+        new_record = self.get_link_fields(new_record)
+        new_record = self.do_increments(new_record)
+
+        self.data.db.table(self.data.table).insert(new_record)
+    
+    def do_increments(self, new_record):
+        fieldnames = self.cfg.fields()
+        for fieldname in fieldnames:
+            if fieldname not in __DEFAULT_FIELDS__:
+                field = self.cfg.get(fieldname)
+                if field.increment:
+                    # need to first check that value is numeric
+                    new_record[fieldname] = float(new_record[fieldname]) + 1
+        return(new_record)
+
+    def get_carry_fields(self, new_record):
+        fieldnames = self.cfg.fields()
+        for fieldname in fieldnames:
+            if fieldname not in __DEFAULT_FIELDS__:
+                field = self.cfg.get(fieldname)
+                if field.carry:
+                    # get the last record of the DB
+                    # carry over the value from this
+                    pass
+        return(new_record)
+
+    def get_link_fields(self, new_record):
+        fieldnames = self.cfg.fields()
+        for fieldname in fieldnames:
+            if fieldname not in __DEFAULT_FIELDS__:
+                field = self.cfg.get(fieldname)
+                if field.link_fields:
+                    linkfields = self.data.get_link_fields(fieldname, new_record[fieldname])
+                    if linkfields:
+                        for link_fieldname in linkfields.keys():
+                            new_record[link_fieldname] = linkfields[link_fieldname]
+        return(new_record)
+
+    def update_unit_fields(self, new_record):
+        fields = self.cfg.fields()
+        unitname = self.data.point_in_unit(self.station.xyz_global)
+        if unitname and "UNIT" in fields:
+            new_record['UNIT'] = unitname
+            unitfields = self.data.get_link_fields('UNIT', unitname)
+            if unitfields:
+                for field in unitfields.keys():
+                    new_record[field] = unitfields[field]
+        return(new_record)
+
+    def add_defaults(self, new_record):
         fields = self.cfg.fields()
         for field in fields:
+            if field == 'SUFFIX':
+                new_record['SUFFIX'] = 1 if self.station.shot_type == 'continue' else 0
             if field == 'X':
-                new_record['X'] = self.station.x
+                new_record['X'] = self.station.xyz_global.x
             elif field == 'Y':
-                new_record['Y'] = self.station.y
+                new_record['Y'] = self.station.xyz_global.y
             elif field == 'Z':
-                new_record['Z'] = self.station.z
+                new_record['Z'] = self.station.xyz_global.z
+            elif field == 'SLOPED':
+                new_record['SLOPED'] = self.station.sloped
+            elif field == 'HANGLE':
+                new_record['HANGLE'] = self.station.hangle
+            elif field == 'VANGLE':
+                new_record['VANGLE'] = self.station.vangle
+            elif field == 'STATIONX':
+                new_record['STATIONX'] = self.station.location.x
+            elif field == 'STATIONY':
+                new_record['STATIONY'] = self.station.location.y
+            elif field == 'STATIONZ':
+                new_record['STATIONZ'] = self.station.location.z
             elif field == 'PRISM':
                 new_record['PRISM'] = self.station.prism
             elif field == 'DATE':
                 new_record['DATE'] = '%s' % datetime.now().replace(microsecond=0)
-        unitname = self.data.point_in_unit(self.station.xyz)
-        if unitname and "UNIT" in fields:
-            new_record['UNIT'] = unitname
-        self.data.db.table(self.data.table).insert(new_record)
+        return(new_record)
 
 class VerifyStationScreen(Screen):
 
@@ -1585,13 +1695,14 @@ class EditPointScreen(e5_RecordEditScreen):
     def on_pre_enter(self):
         if self.data_table is not None and self.e5_cfg is not None:
             try:
-                last = self.data_table.all()[-1]
+                last = self.data.db.table(self.data_table).all()[-1]
                 self.doc_id = last.doc_id
             except:
                 self.doc_id = None
         self.put_data_in_frame()
 
 class EditDatumScreen(Screen):
+
     pass
 
 class EditPointsScreen(e5_DatagridScreen):
@@ -1794,12 +1905,14 @@ class EDMApp(e5_Program):
                                             ini = self.ini))
 
         sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen', id = 'editlastrecord_screen',
-                                        data_table = self.data.db.table(self.data.table),
+                                        data = self.data,
+                                        data_table = self.data.table,
                                         doc_id = None,
                                         e5_cfg = self.cfg))
 
         sm.add_widget(EditPointScreen(name = 'EditPointScreen', id = 'editpoint_screen',
-                                        data_table = self.data.db.table(self.data.table),
+                                        data = self.data,
+                                        data_table = self.data.table,
                                         doc_id = None,
                                         e5_cfg = self.cfg,
                                         one_record_only = True))
