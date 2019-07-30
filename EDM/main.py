@@ -2,14 +2,9 @@
 #   On station verify, do the verify math
 #   After XYZ are obtained, check units file, populate and maintain units file after save
 #   Think through making a field link to a database table (unique value is a table record)
-#   Make sure that each linkfield has a table in the database
 #   Link fields just like unit fields need to be updated after save
 
-# Need to be able to call a function when finished saving or editing a record
-# Maybe need to do this on cancel as well.
-# Probably need to put a hook into the db object 
-# Look up on web how to know if an object has a property without crashing
-# Will need to be sure to clear this value as well after.
+# Need to make prism menu after shot work
 
 # A menu field can be linked to other fields in the same CFG and this will load default values.
 # A text field can be linked to another table. [future feature]
@@ -360,14 +355,15 @@ class CFG(blockdata):
         link_fields = self.get_value(field_name, 'LINKED')
         if link_fields:
             f.link_fields = link_fields.upper().split(",")
-        f.carry = self.get_value(field_name, 'CARRY')
+        f.carry = self.get_value(field_name, 'CARRY').upper() == 'TRUE'
+        f.required = self.get_value(field_name, 'REQUIRED').upper() == 'TRUE'
+        f.increment = self.get_value(field_name, 'INCREMENT').upper() == 'TRUE'
         return(f)
 
     def put(self, field_name, f):
         self.update_value(field_name, 'PROMPT', f.prompt)
         self.update_value(field_name, 'LENGTH', f.length)
         self.update_value(field_name, 'TYPE', f.inputtype)
-        #self.update_value(field_name, 'MENU', f.menu)
 
     def fields(self):
         field_names = self.names()
@@ -376,6 +372,11 @@ class CFG(blockdata):
             if del_field in field_names:
                 field_names.remove(del_field)
         return(field_names)
+
+    def clean_menu(self, menulist):
+        menulist = [item.strip() for item in menulist]
+        menulist = list(filter(('').__ne__, menulist))
+        return(menulist)
 
     def build_prism(self):
         self.update_value('NAME', 'Prompt', 'Name :')
@@ -483,9 +484,10 @@ class CFG(blockdata):
         # This is a legacy issue.  Linked fields are now listed with each field.
         unit_fields = self.get_value('EDM', 'UNITFIELDS')
         if unit_fields:
-            f = self.get('UNIT')
-            f.link_fields = unit_fields
-            self.put('UNIT', f)
+            unit_fields = unit_fields.upper().split(',')
+            unit_fields.remove('UNIT')
+            unit_fields = ','.join(unit_fields)
+            self.update_value('UNIT', 'LINKED', unit_fields)
             # Delete UNITIFIELDS from the EDM block of teh CFG
 
         for field_name in field_names:
@@ -494,17 +496,22 @@ class CFG(blockdata):
                 f.prompt = field_name
             f.inputtype = f.inputtype.upper()
             if field_name in ['UNIT','ID','SUFFIX','X','Y','Z']:
-                f.required = True
+                self.update_value(field_name, 'REQUIRED', 'TRUE')
+            if field_name == 'ID':
+                self.update_value(field_name, 'INCREMENT', 'TRUE')
             if f.link_fields:
                 self.link_fields.append(field_name)
                 # uppercase the link fields
                 for link_field_name in f.link_fields:
                     if link_field_name not in field_names:
                         errors.append(['Warning','The field %s is set to link to %s but the field %s does not exist in the CFG.' % (field_name, link_field_name, link_field_name)])
-                # check that a table exists for this field and insert if not
-                # need access to the db object
             self.put(field_name, f)
-        
+
+            for field_option in ['UNIQUE','CARRY','INCREMENT','REQUIRED','SORTED']:
+                if self.get_value(field_name, field_option):
+                    if self.get_value(field_name, field_option).upper() == 'YES':
+                        self.update_value(field_name, field_option, 'TRUE')
+
         return(errors)
 
     def save(self):
@@ -518,6 +525,11 @@ class CFG(blockdata):
         self.blocks = []
         if os.path.isfile(self.filename):
             self.blocks = self.read_blocks()
+            errors = self.validate()
+            if errors == []:
+                self.save()
+            else:
+                return(errors)
         else:
             self.filename = 'default.cfg'
             self.build_default()
@@ -1033,35 +1045,46 @@ class MainScreen(e5_MainScreen):
 
     def have_shot(self, instance):
         if self.station.shot_type == 'measure':
-            result = self.popup.result
-            self.popup.dismiss()
-            if result:
-                p = self.station.text_to_point(result)
-                if p:
-                    p.x = p.x / 1000
-                    p.y = p.y / 1000
-                    p.z = p.z / 1000
-                    self.station.xyz = p
-                    if len(self.station.rotate_local) == 3 and len(self.station.rotate_global) == 3:
-                        self.station.xyz_global = self.station.rotate_point(p)
-                    else:
-                        self.station.xyz_global = p
+            success = False
+            if self.station.make == 'Microscribe':
+                result = self.popup.result
+                self.popup.dismiss()
+                if result:
+                    p = self.station.text_to_point(result)
+                    if p:
+                        p.x = p.x / 1000
+                        p.y = p.y / 1000
+                        p.z = p.z / 1000
+                        self.station.xyz = p
+                        if len(self.station.rotate_local) == 3 and len(self.station.rotate_global) == 3:
+                            self.station.xyz_global = self.station.rotate_point(p)
+                        else:
+                            self.station.xyz_global = p
 
-                    self.station.xyz_global.x = round(self.station.xyz_global.x, 3)
-                    self.station.xyz_global.y = round(self.station.xyz_global.y, 3)
-                    self.station.xyz_global.z = round(self.station.xyz_global.z, 3)
+                        self.station.xyz_global.x = round(self.station.xyz_global.x, 3)
+                        self.station.xyz_global.y = round(self.station.xyz_global.y, 3)
+                        self.station.xyz_global.z = round(self.station.xyz_global.z, 3)
 
-                    self.station.xyz.x = round(self.station.xyz.x, 3)
-                    self.station.xyz.y = round(self.station.xyz.y, 3)
-                    self.station.xyz.z = round(self.station.xyz.z, 3)
+                        self.station.xyz.x = round(self.station.xyz.x, 3)
+                        self.station.xyz.y = round(self.station.xyz.y, 3)
+                        self.station.xyz.z = round(self.station.xyz.z, 3)
+                        
+                        success = True
+            else:
+                self.popup.dismiss()
+                success = True
 
-                    txt = 'Local coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz.x, self.station.xyz.y, self.station.xyz.z)
-                    txt += '\n\nGlobal coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz_global.x, self.station.xyz_global.y, self.station.xyz_global.z)
-                    self.popup = e5_MessageBox('Measurement', txt,
-                                            response_type = "OK",
-                                            call_back = self.close_popup,
-                                            colors = self.colors)
-                    self.popup.open()
+            if success:
+                txt = 'Local coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz.x, self.station.xyz.y, self.station.xyz.z)
+                txt += '\n\nGlobal coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz_global.x, self.station.xyz_global.y, self.station.xyz_global.z)
+                if self.station.make != 'Microscribe':
+                    txt += '\n\nRaw Data:\n  Horizontal angle: %s\n  Vertical angle: %s\n  Slope distance: %s' % (self.station.hangle, self.station.vangle, self.station.sloped)
+                    txt += '\n\nStation coordinates:\n  X:  %s\n  Y:  %s\n  Z:  %s' % (self.station.location.x, self.station.location.y, self.station.location.z)
+                self.popup = e5_MessageBox('Measurement', txt,
+                                        response_type = "OK",
+                                        call_back = self.close_popup,
+                                        colors = self.colors)
+                self.popup.open()
         else:
             self.popup.dismiss()
             self.add_record()
@@ -1101,22 +1124,39 @@ class MainScreen(e5_MainScreen):
 
     def add_record(self):
         new_record = {}
+        new_record = self.get_button_defaults(new_record)
         new_record = self.update_unit_fields(new_record)
         new_record = self.add_defaults(new_record)
         new_record = self.get_carry_fields(new_record)
         new_record = self.get_link_fields(new_record)
-        new_record = self.do_increments(new_record)
+        if self.station.shot_type is not 'continue':
+            new_record = self.do_increments(new_record)
 
         self.data.db.table(self.data.table).insert(new_record)
     
+    def get_button_defaults(self, new_record):
+        for button_no in range(1,7):
+            button = self.cfg.get_block('BUTTON' + str(button_no))
+            if 'TITLE' in button.keys():
+                if button['TITLE'] == self.station.shot_type:
+                    fieldnames = self.cfg.fields()
+                    for button_default in button:
+                        if button_default in fieldnames:
+                            new_record[button_default] = button[button_default]
+        return(new_record)
+
     def do_increments(self, new_record):
         fieldnames = self.cfg.fields()
         for fieldname in fieldnames:
-            if fieldname not in __DEFAULT_FIELDS__:
-                field = self.cfg.get(fieldname)
-                if field.increment:
-                    # need to first check that value is numeric
-                    new_record[fieldname] = float(new_record[fieldname]) + 1
+            field = self.cfg.get(fieldname)
+            if field.increment:
+                if fieldname in new_record.keys():
+                    try:
+                        new_record[fieldname] = int(new_record[fieldname]) + 1
+                    except:
+                        pass
+                else:
+                    new_record[fieldname] = '1'
         return(new_record)
 
     def get_carry_fields(self, new_record):
@@ -1125,9 +1165,7 @@ class MainScreen(e5_MainScreen):
             if fieldname not in __DEFAULT_FIELDS__:
                 field = self.cfg.get(fieldname)
                 if field.carry:
-                    # get the last record of the DB
-                    # carry over the value from this
-                    pass
+                    new_record[fieldname] = self.get_last_value(fieldname)
         return(new_record)
 
     def get_link_fields(self, new_record):
@@ -1157,7 +1195,13 @@ class MainScreen(e5_MainScreen):
         fields = self.cfg.fields()
         for field in fields:
             if field == 'SUFFIX':
-                new_record['SUFFIX'] = 1 if self.station.shot_type == 'continue' else 0
+                if self.station.shot_type is 'continue':
+                    try:
+                        new_record['SUFFIX'] = int(self.get_last_value('SUFFIX')) + 1
+                    except:
+                        new_record['SUFFIX'] = 0
+                else:
+                    new_record['SUFFIX'] = 0
             if field == 'X':
                 new_record['X'] = self.station.xyz_global.x
             elif field == 'Y':
@@ -1181,6 +1225,13 @@ class MainScreen(e5_MainScreen):
             elif field == 'DATE':
                 new_record['DATE'] = '%s' % datetime.now().replace(microsecond=0)
         return(new_record)
+
+    def get_last_value(self, field_name):
+        last_record = self.data.db.table(self.data.table).all()[-1]
+        if last_record != []:
+            if field_name in last_record.keys():
+                return(last_record[field_name])
+        return(None)
 
 class VerifyStationScreen(Screen):
 

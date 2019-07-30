@@ -27,6 +27,13 @@ class blockdata:
             return(True)
         return(False)
 
+    def get_block(self, blockname):
+        if self.blocks:
+            for block in self.blocks:
+                if block['BLOCKNAME'] == blockname.upper():
+                    return(block)
+        return('')                
+
     def read_blocks(self):
         self.blocks = []
         try:

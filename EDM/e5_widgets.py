@@ -24,6 +24,7 @@ import ntpath
 import os
 from shutil import copyfile
 from datetime import datetime
+from tinydb import where
 
 class e5_label(Label):
     def __init__(self, text, popup = False, colors = None, **kwargs):
@@ -810,14 +811,20 @@ class e5_RecordEditScreen(Screen):
             pass
             
     def update_link_fields(self):
-        for field_name in self.link_fields:
-            cfg_field = self.e5_cfg.get(field_name)
-            for link_field_name in cfg_field.link_fields:
+        if hasattr(self.e5_cfg, 'link_fields'):
+            for field_name in self.e5_cfg.link_fields:
+                cfg_field = self.e5_cfg.get(field_name)
                 for widget in self.layout.walk():
-                    if widget.id == link_field_name:
-                        update = {link_field_name: widget.text}
-                        self.data.db.table(field_name).update(update, doc_ids = [self.doc_id])
-                        # this isn't right - need to find the right record to update
+                    if widget.id == field_name:
+                        db_rec = self.data.db.table(field_name).search(where(field_name) == widget.text)
+                        if db_rec == []:
+                            self.data.db.table(field_name).insert({field_name: widget.text})
+                            db_rec = self.data.db.table(field_name).search(where(field_name) == widget.text)
+                        for link_field_name in cfg_field.link_fields:
+                            for widget in self.layout.walk():
+                                if widget.id == link_field_name:
+                                    update = {link_field_name: widget.text}
+                                    self.data.db.table(field_name).update(update, doc_ids = [db_rec[0].doc_id])
 
     def cancel_record(self, instance):
         if hasattr(self.data.db.table(self.data_table), 'on_cancel'):
