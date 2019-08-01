@@ -60,6 +60,7 @@ import os
 import random
 import datetime
 from math import sqrt
+import re
 
 import logging
 import logging.handlers as handlers
@@ -179,14 +180,22 @@ class DB(dbs):
 
     def get_datum(self, name = ''):
         if name is not '':
-            p = self.db.table('datums').search( (where('NAME') == name) )[0]
-            if p:
+            a_datum = Query()
+            p = self.db.table('datums').search(a_datum.NAME.matches(name, flags = re.IGNORECASE))
+            #p = self.db.table('datums').search( (where('NAME') == name, flags = re.IGNORECASE) )
+            if p != []:
+                p = p[0]
                 return(datum(p['NAME'] if 'NAME' in p.keys() else None,
                             float(p['X']) if 'X' in p.keys() else None,
-                            float(p['Y']) if 'X' in p.keys() else None,
-                            float(p['Z']) if 'X' in p.keys() else None,
+                            float(p['Y']) if 'Y' in p.keys() else None,
+                            float(p['Z']) if 'Z' in p.keys() else None,
                             p['NOTES'] if 'NOTES' in p.keys() else None))
         return(None)
+
+    def delete_datum(self, name = ''):
+        if name is not '':
+            a_datum = Query()
+            self.db.table('datums').remove(a_datum.NAME.matches(name, flags = re.IGNORECASE))
 
     def get_unit(self, name):
         pass
@@ -209,8 +218,11 @@ class DB(dbs):
     def fields(self):
         pass
 
-    def delete_all(self):
-        self.db.purge()
+    def delete_all(self, table_name = None):
+        if table_name is None:
+            self.db.purge()
+        else:
+            self.db.table(table_name).purge()
 
     def export_csv(self):
         pass
@@ -596,11 +608,11 @@ class totalstation:
             if point1 is not None and point2 is not None and point3 is not None:
                 self.rotate_local = [point1, point2, point3]
         if ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_1'):
-            point1 = data.get_datum(ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_1')).as_point()
-            point2 = data.get_datum(ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_2')).as_point()
-            point3 = data.get_datum(ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_3')).as_point()
+            point1 = data.get_datum(ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_1'))
+            point2 = data.get_datum(ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_2'))
+            point3 = data.get_datum(ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_3'))
             if point1 is not None and point2 is not None and point3 is not None:
-                self.rotate_global = [point1, point2, point3]
+                self.rotate_global = [point1.as_point(), point2.as_point(), point3.as_point()]
 
     def text_to_point(self, txt):
         if len(txt.split(',')) == 3:
@@ -688,9 +700,26 @@ class totalstation:
             self.make_global()
     
     def make_global(self):
-        self.xyz_global = point(self.xyz.x + self.location.x,
-                                self.xyz.y + self.location.y,
-                                self.xyz.z + self.location.z,)
+        if self.make == 'Microscribe':
+            if len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
+                self.xyz_global = self.rotate_point(self.xyz)
+            else:
+                self.xyz_global = self.xyz
+            self.round_xyz()
+        else:
+            self.xyz_global = point(self.xyz.x + self.location.x,
+                                    self.xyz.y + self.location.y,
+                                    self.xyz.z + self.location.z,)
+
+    def round_xyz(self):
+        if self.xyz_global:
+            self.xyz_global = self.round_point(self.xyz_global)
+
+        if self.xyz:
+            self.xyz = self.round_point(self.xyz)
+
+    def round_point(self, p):
+        return(point(round(p.x, 3), round(p.y, 3), round(p.z, 3)))
 
     def clear_xyz(self):
         self.xyz = point()
@@ -1056,19 +1085,7 @@ class MainScreen(e5_MainScreen):
                         p.y = p.y / 1000
                         p.z = p.z / 1000
                         self.station.xyz = p
-                        if len(self.station.rotate_local) == 3 and len(self.station.rotate_global) == 3:
-                            self.station.xyz_global = self.station.rotate_point(p)
-                        else:
-                            self.station.xyz_global = p
-
-                        self.station.xyz_global.x = round(self.station.xyz_global.x, 3)
-                        self.station.xyz_global.y = round(self.station.xyz_global.y, 3)
-                        self.station.xyz_global.z = round(self.station.xyz_global.z, 3)
-
-                        self.station.xyz.x = round(self.station.xyz.x, 3)
-                        self.station.xyz.y = round(self.station.xyz.y, 3)
-                        self.station.xyz.z = round(self.station.xyz.z, 3)
-                        
+                        self.station.make_global()
                         success = True
             else:
                 self.popup.dismiss()
@@ -1121,6 +1138,81 @@ class MainScreen(e5_MainScreen):
             self.open_db()
         self.ini.update(self.colors, self.cfg)
         self.build_mainscreen()
+
+    def show_import_csv(self):
+        self.popup = e5_PopUpMenu(title = "Load which kind of data",
+                                        menu_list = ['Datums','Prisms','Units'],
+                                        menu_selected = '',
+                                        call_back = self.select_csv_file,
+                                        colors = self.colors)
+        self.popup.open()
+
+    def select_csv_file(self, instance):
+        self.csv_data_type = instance.text
+        self.popup.dismiss()
+        if self.cfg.filename and self.cfg.path:
+            start_path = self.cfg.path
+        else:
+            start_path = self.ini.get_value('EDM','APP_PATH')
+        content = e5_LoadDialog(load = self.load_csv, 
+                            cancel = self.dismiss_popup,
+                            start_path = start_path,
+                            button_color = self.colors.button_color,
+                            button_background = self.colors.button_background,
+                            filters = ['*.csv','*.CSV'])
+        self.popup = Popup(title = "Select CSV file to import",
+                            content = content,
+                            size_hint = (0.9, 0.9))
+        self.popup.open()
+
+    def load_csv(self, path, filename):
+        csv_file = os.path.join(path, filename[0])
+        errors = ''
+        record_count = 0
+        self.popup.dismiss()
+        try:
+            if os.path.isfile(csv_file):
+                with open(csv_file) as f:
+                    firstline = True
+                    for line in f:
+                        if firstline:
+                            fields = line.upper().split(',')
+                            if self.csv_data_type == 'Datums':
+                                if len(fields) < 4:
+                                    errors = '\nThis CSV file seems to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  The first row in the file should contain these field names separated by commas.  The first line was read as "%s".' % line
+                                if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
+                                    errors = '\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name, X, Y and Z.  The first line was read as "%s".'
+                            if errors:
+                                break
+                            firstline = False
+                        else:
+                            data = line.split(',')
+                            insert_record = {}
+                            for field in range(len(fields)):
+                                insert_record[fields[field]] = data[field]
+                            if self.csv_data_type == 'Datums':
+                                if self.data.get_datum(insert_record['NAME']) is not None:
+                                    self.data.delete_datum(insert_record['NAME'])
+                                self.data.db.table('datums').insert(insert_record)
+                            if self.csv_data_type == 'Units':
+                                self.data.db.table('units').insert(insert_record)
+                            if self.csv_data_type == 'Prisms':
+                                self.data.db.table('prisms').insert(insert_record)
+                            record_count += 1
+
+        except Exception as ex:
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            error = template.format(type(ex).__name__, ex.args)
+            logging.exception(error)
+        if errors:
+            message = errors
+        else:
+            message = '%s %s successfully imported.' % (record_count, self.csv_data_type)
+        self.popup = e5_MessageBox('CSV Import', message,
+                                response_type = "OK",
+                                call_back = self.close_popup,
+                                colors = self.colors)
+        self.popup.open()
 
     def add_record(self):
         new_record = {}
@@ -1260,31 +1352,44 @@ class VerifyStationScreen(Screen):
                                             default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'VERIFICATION')))
         self.content.add_widget(self.datum1)
 
-        self.recorder = datum_recorder('Record\nverification\ndatum', station = self.station, colors = self.colors, setup_type = 'verify')
+        self.recorder = datum_recorder('Record\nverification\ndatum', station = self.station,
+                                        colors = self.colors, setup_type = 'verify',
+                                        on_record = self.compute_error)
         self.content.add_widget(self.recorder)
 
         self.results = e5_label('', colors = self.colors)
         self.content.add_widget(self.results)
 
-        self.back_button = e5_button(text = 'Back', size_hint_y = None, size_hint_x = 1, id = 'cancel',
-                        colors = self.colors, selected = True)
+        self.back_button = e5_button(text = 'Back', size_hint_y = None,
+                                    size_hint_x = 1, id = 'cancel',
+                                    colors = self.colors, selected = True)
         self.content.add_widget(self.back_button)
         self.back_button.bind(on_press = self.close_screen)
 
+    def compute_error(self):
+        if self.datum1.datum:
+            error = self.station.round_point(self.station.vector_subtract(self.datum1.datum, self.recorder.result.xyz_global))
+            self.results.text = '\n  X error: %s\n  Y error: %s\n  Z error: %s' % (error.x, error.y, error.z)
+        else:
+            self.results.text = "Select the name of the verification datum before recording the datum."
 
     def close_screen(self, instance):
+        if self.datum1.datum:
+            self.ini.update_value('SETUPS', 'VERIFICATION',self.datum1.datum.name)
+            self.ini.save()
         self.parent.current = 'MainScreen'
         
 class record_button(e5_button):
 
     popup = ObjectProperty(None)
 
-    def __init__(self, station = None, result_label = None, setup_type = None, **kwargs):
+    def __init__(self, station = None, result_label = None, setup_type = None, on_record = None, **kwargs):
         super(record_button, self).__init__(**kwargs)
         self.station = station
         self.bind(on_press = self.record_datum)
         self.result_label = result_label
         self.setup_type = setup_type
+        self.on_record = on_record
 
     def record_datum(self, instance):
         if self.id == 'datum1' and self.setup_type in ['Over a datum + Record a datum','Record two datums']:
@@ -1312,6 +1417,7 @@ class record_button(e5_button):
                     y = round(float(y) / 1000, 3) 
                     z = round(float(z) / 1000, 3)
                     self.station.xyz = point(x, y, z)
+                    self.station.make_global()
                     self.have_shot()
             except:
                 self.popup = e5_MessageBox(title = 'Error', message = '\nError.  Data not formatted correctly.  EDM expects three floating point numbers separated by commas.')
@@ -1319,20 +1425,32 @@ class record_button(e5_button):
 
     def have_shot(self):
         if self.station.xyz:
-            self.result_label.text = 'X: %s\nY: %s\nZ: %s' % (self.station.xyz.x,
-                                                        self.station.xyz.y,
-                                                        self.station.xyz.z)
+            if self.setup_type == 'verify':
+                self.result_label.text = 'X: %s\nY: %s\nZ: %s' % (self.station.xyz_global.x,
+                                                                    self.station.xyz_global.y,
+                                                                    self.station.xyz_global.z)
+            else:
+                self.result_label.text = 'X: %s\nY: %s\nZ: %s' % (self.station.xyz.x,
+                                                                    self.station.xyz.y,
+                                                                    self.station.xyz.z)
+
             self.result_label.xyz = self.station.xyz
+            self.result_label.xyz_global = self.station.xyz_global
         else:
             self.result_label.text = 'Recording error.'
             self.result_label.xyz = None
+            self.result_label.xyz_global = None
+        if self.on_record is not None:
+            self.on_record()
 
 class record_result(e5_label):
     xyz = None
 
 class datum_recorder(GridLayout):
 
-    def __init__(self, text = '', datum_no = 1, station = None, colors = None, setup_type = None, **kwargs):
+    def __init__(self, text = '', datum_no = 1, station = None,
+                        colors = None, setup_type = None,
+                        on_record = None, **kwargs):
         super(datum_recorder, self).__init__(**kwargs)
         self.padding = 10
         self.spacing = 10
@@ -1349,7 +1467,8 @@ class datum_recorder(GridLayout):
                                     colors = self.colors,
                                     station = self.station,
                                     result_label = self.result,
-                                    setup_type = setup_type)
+                                    setup_type = setup_type,
+                                    on_record = on_record)
         self.add_widget(self.button)
         self.add_widget(self.result)
        

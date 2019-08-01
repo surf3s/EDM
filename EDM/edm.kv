@@ -69,6 +69,18 @@
                         text: 'All points'
                         color: SUBMENU_COLOR
                         on_press: app.root.current = root.show_delete_all_records()
+                    ActionButton:
+                        text: 'All datums'
+                        color: SUBMENU_COLOR
+                        on_press: app.root.current = root.show_delete_all_records('datums')
+                    ActionButton:
+                        text: 'All units'
+                        color: SUBMENU_COLOR
+                        on_press: app.root.current = root.show_delete_all_records('units')
+                    ActionButton:
+                        text: 'All prisms'
+                        color: SUBMENU_COLOR
+                        on_press: app.root.current = root.show_delete_all_records('prisms')
                 ActionGroup:
                     text: 'Edit'
                     color: root.text_color
@@ -128,6 +140,10 @@
                         color: SUBMENU_COLOR
                         minimum_width: '140sp'
                     ActionButton:
+                        text: 'Import CSVs'
+                        on_release: root.show_import_csv()
+                        color: SUBMENU_COLOR
+                    ActionButton:
                         text: 'Export CSVs'
                         on_release: root.show_save_csvs()
                         color: SUBMENU_COLOR
@@ -148,7 +164,7 @@
         orientation: "vertical"
         FileChooserListView:
             id: filechooser
-            filters: ['*.cfg','*.CFG']
+            filters: root.filters
             path: root.start_path
         BoxLayout:
             size_hint_y: None

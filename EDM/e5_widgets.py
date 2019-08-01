@@ -26,6 +26,35 @@ from shutil import copyfile
 from datetime import datetime
 from tinydb import where
 
+class e5_PopUpMenu(Popup):
+    
+    def __init__(self, title, menu_list, menu_selected = '', call_back = None, colors = None, **kwargs):
+        super(e5_PopUpMenu, self).__init__(**kwargs)
+        
+        pop_content = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
+
+        ncols = int(Window.width / 200)
+        if ncols < 1:
+            ncols = 1
+
+        menu = e5_scrollview_menu(menu_list, menu_selected,
+                                                 widget_id = 'menu',
+                                                 call_back = [call_back],
+                                                 ncols = ncols,
+                                                 colors = colors)
+        pop_content.add_widget(menu)
+        menu.make_scroll_menu_item_visible()
+        
+        pop_content.add_widget(e5_button('Back', selected = True,
+                                                 call_back = self.dismiss,
+                                                 colors = colors))
+
+        self.content = pop_content
+        
+        self.title = title
+        self.size_hint = (.9, .9)
+        self.auto_dismiss = True
+
 class e5_label(Label):
     def __init__(self, text, popup = False, colors = None, **kwargs):
         super(e5_label, self).__init__(**kwargs)
@@ -362,17 +391,22 @@ class e5_MainScreen(Screen):
         self.data.delete(last_record.doc_id)
         self.close_popup(value)
 
-    def show_delete_all_records(self):
-        message_text = '\nYou are asking to delete all of the records in the current database table. Are you sure you want to do this?'
+    def show_delete_all_records(self, table_name = None):
+        if not table_name:
+            message_text = '\nYou are asking to delete all of the records in the current database table. Are you sure you want to do this?'
+            self.delete_table = self.data.table                
+        else:
+            message_text = '\nYou are asking to delete all of the records in the %s table. Are you sure you want to do this?' % table_name
+            self.delete_table = table_name
         self.popup = e5_MessageBox('Delete All Records', message_text, response_type = "YESNO",
-                                    call_back = [self.delete_all_records1, self.close_popup],
-                                    colors = self.colors)
+                                call_back = [self.delete_all_records1, self.close_popup],
+                                colors = self.colors)
         self.popup.open()
         self.popup_open = True
 
     def delete_all_records1(self, value):
         self.close_popup(value)
-        message_text = '\nThis is your last chance.  All records will be deleted when you press Yes.'
+        message_text = '\nThis is your last chance.  All records in the %s table will be deleted when you press Yes.' % self.delete_table
         self.popup = e5_MessageBox('Delete All Records', message_text, response_type = "YESNO",
                                     call_back = [self.delete_all_records2, self.close_popup],
                                     colors = self.colors)
@@ -380,7 +414,7 @@ class e5_MainScreen(Screen):
         self.popup_open = True
         
     def delete_all_records2(self, value):
-        self.data.delete_all()
+        self.data.delete_all(self.delete_table)
         self.close_popup(value)
 
     def show_save_csvs(self):
@@ -646,6 +680,7 @@ class e5_LoadDialog(FloatLayout):
     cancel = ObjectProperty(None)
     button_color = ObjectProperty(None)
     button_background = ObjectProperty(None)
+    filters = ObjectProperty(['*.cfg','*.CFG'])
 
 class e5_SaveDialog(BoxLayout):
     save = ObjectProperty(None)
@@ -913,10 +948,9 @@ class e5_DatagridScreen(Screen):
         if ascii_code == 8:
             return False
         if ascii_code == 27 and (self.datagrid.popup_scrollmenu or self.datagrid.popup_textbox):
-            self.datagrid.popup_scrollmenu= None
+            self.datagrid.popup_scrollmenu = None
             self.datagrid.popup_textbox = None
             self.datagrid.popup.dismiss()
-
         ### On key down, see if there is a current record,
         # get the next record in the db,
         # and then try to fire the highlight record stuff
@@ -1061,7 +1095,6 @@ class DataGridTextInput(TextInput):
         print(keycode)
         return super(DataGridTextInput, self).keyboard_on_key_up(window, keycode)
 
-
 class DataGridTextBox(Popup):
 
     result = ObjectProperty(None)
@@ -1102,7 +1135,6 @@ class DataGridTextBox(Popup):
     def accept_value(self, instance):
         self.save_button.trigger_action(0)
         
-
 class DataGridHeaderCell(Button):
     def __init__(self, text, colors, **kwargs):
         super(DataGridHeaderCell, self).__init__(**kwargs)
@@ -1312,7 +1344,7 @@ class DataGridLabelAndField(BoxLayout):
         if colors:
             if colors.text_font_size:
                 txt.font_size = colors.text_font_size 
-        txt.bind(minimum_height=txt.setter('height'))
+        txt.bind(minimum_height = txt.setter('height'))
         self.add_widget(label)
         self.add_widget(txt)
 
@@ -1439,7 +1471,11 @@ class DataGridWidget(TabbedPanel):
                                         colors = self.colors)
 
     def open_panel4(self):
-        pass
+        cfg_fields = self.fields.fields()
+        for widget in self.ids.edit_panel.children[0].walk():
+            if widget.id in cfg_fields:
+                widget.text = ''
+        self.textboxes_will_update_db = False
 
     def show_menu(self, instance, value):
         if instance.focus:
