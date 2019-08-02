@@ -1325,6 +1325,79 @@ class MainScreen(e5_MainScreen):
                 return(last_record[field_name])
         return(None)
 
+class RecordDatumsScreen(Screen):
+
+    def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
+        super(RecordDatumsScreen, self).__init__(**kwargs)
+
+        self.colors = colors if colors else ColorScheme()
+        self.station = station
+        self.data = data
+        self.ini = ini
+
+        self.content = BoxLayout(orientation = 'vertical',
+                                size_hint_y = .9,
+                                size_hint_x = .8,
+                                pos_hint={'center_x': .5},
+                                id = 'content',
+                                padding = 20,
+                                spacing = 20)
+        self.add_widget(self.content)
+
+        self.content.add_widget(e5_label('Provide a name and optinal notes, record and save.', colors = self.colors))
+
+        self.datum_name = DataGridLabelAndField('Name', colors = self.colors)
+        self.content.add_widget(self.datum_name)
+        self.datum_notes = DataGridLabelAndField('Notes', colors = self.colors)
+        self.content.add_widget(self.datum_notes)
+        
+        self.recorder = datum_recorder('Record datum', station = self.station,
+                                        colors = self.colors, setup_type = 'record_new')
+        self.content.add_widget(self.recorder)
+
+        self.results = e5_label('', colors = self.colors)
+        self.content.add_widget(self.results)
+
+        self.content.add_widget(e5_side_by_side_buttons(text = ['Save','Back'],
+                                                id = ['save','cancel'],
+                                                call_back = [self.check_for_duplicate, self.cancel],
+                                                selected = [True, True],
+                                                colors = self.colors))
+    def check_for_duplicate(self, instance):
+        if self.data.get_datum(self.datum_name.txt.text) is not None:
+            message = '\nOverwrite existing datum %s?' % self.datum_name.txt.text
+            self.popup = e5_MessageBox('Overwrite?', message,
+                                        response_type = "YESNO",
+                                        call_back = [self.delete_and_save, self.close_popup],
+                                        colors = self.colors)
+        else:
+            self.save_datum()
+
+    def delete_and_save(self, instance):
+        self.popup.dismiss()
+        self.data.delete_datum(self.datum_name.txt.text)
+        self.save_datum()
+
+    def save_datum(self):
+        insert_record = {}
+        insert_record['NAME'] = self.datum_name.txt.text
+        insert_record['NOTES'] = self.datum_notes.txt.text
+        insert_record['X'] = str(self.recorder.result.xyz_global.x)
+        insert_record['Y'] = str(self.recorder.result.xyz_global.y)
+        insert_record['Z'] = str(self.recorder.result.xyz_global.z)
+        self.data.db.table('datums').insert(insert_record)
+        self.datum_name.txt.text = ''
+        self.datum_notes.txt.text = ''
+        self.recorder.result.text = ''
+        self.recorder.result.xyz = None
+        self.recorder.result.xyz_global = None
+
+    def close_popup(self, instance):
+        self.popup.dismiss()
+
+    def cancel(self, instance):
+        self.parent.current = 'MainScreen'
+
 class VerifyStationScreen(Screen):
 
     def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
@@ -1425,7 +1498,7 @@ class record_button(e5_button):
 
     def have_shot(self):
         if self.station.xyz:
-            if self.setup_type == 'verify':
+            if self.setup_type == 'verify' or self.setup_type == 'record_new':
                 self.result_label.text = 'X: %s\nY: %s\nZ: %s' % (self.station.xyz_global.x,
                                                                     self.station.xyz_global.y,
                                                                     self.station.xyz_global.z)
@@ -1625,19 +1698,19 @@ class setups(ScrollView):
             self.datum1 = datum_selector(text = 'Select datum 1',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_DATUM_1')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1')))
             self.scrollbox.add_widget(self.datum1)
 
             self.datum2 = datum_selector(text = 'Select datum 2',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_DATUM_2')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2')))
             self.scrollbox.add_widget(self.datum2)
 
             self.datum3 = datum_selector(text = 'Select datum 3',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_DATUM_1')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3')))
             self.scrollbox.add_widget(self.datum3)
 
             for n in range(3):
@@ -2069,6 +2142,12 @@ class EDMApp(e5_Program):
                                  station = self.station))
 
         sm.add_widget(VerifyStationScreen(name = 'VerifyStationScreen', id = 'verify_station',
+                                            data = self.data,
+                                            station = self.station,
+                                            colors = self.colors,
+                                            ini = self.ini))
+
+        sm.add_widget(RecordDatumsScreen(name = 'RecordDatumsScreen', id = 'record_datums',
                                             data = self.data,
                                             station = self.station,
                                             colors = self.colors,

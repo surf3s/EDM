@@ -1310,7 +1310,7 @@ class DataGridGridPanel(BoxLayout):
             reformatted_row = {}
             reformatted_row['doc_id'] = str(tb_row.doc_id)
             for field in self.tb_fields.fields():
-                reformatted_row[field] = tb_row[field] if field in tb_row else ''
+                reformatted_row[field] = str(tb_row[field]) if field in tb_row else ''
             data.append(reformatted_row)
         data = sorted(data, key=lambda k: int(k['doc_id']), reverse = True) 
         self.add_widget(DataGridTable(list_dicts = data, column_names = self.column_names,
@@ -1338,15 +1338,15 @@ class DataGridLabelAndField(BoxLayout):
         self.size_hint = (0.9, None)
         self.spacing = 10
         label = e5_label(text = col, id = '__label')
-        txt = TextInput(multiline = False,
+        self.txt = TextInput(multiline = False,
                         size_hint = (0.75, None),
                         id = col)
         if colors:
             if colors.text_font_size:
-                txt.font_size = colors.text_font_size 
-        txt.bind(minimum_height = txt.setter('height'))
+                self.txt.font_size = colors.text_font_size 
+        self.txt.bind(minimum_height = self.txt.setter('height'))
         self.add_widget(label)
-        self.add_widget(txt)
+        self.add_widget(self.txt)
 
 class DataGridDeletePanel(GridLayout):
 
@@ -1447,7 +1447,7 @@ class DataGridWidget(TabbedPanel):
                 data_record = self.data.get(doc_id = int(datatable.datagrid_doc_id))
                 for widget in self.ids.edit_panel.children[0].walk():
                     if widget.id in self.fields.fields():
-                        widget.text = data_record[widget.id] if widget.id in data_record else ''
+                        widget.text = str(data_record[widget.id]) if widget.id in data_record else ''
                         widget.bind(text = self.update_db)
                         widget.bind(focus = self.show_menu)
                 self.textboxes_will_update_db = True
