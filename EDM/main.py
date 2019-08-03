@@ -963,7 +963,6 @@ class totalstation:
             local.append(point(0,0,0))
             local.append(self.vector_subtract(self.rotate_local[1], self.rotate_local[0]))
             local.append(self.vector_subtract(self.rotate_local[2], self.rotate_local[0]))
-
           
             # First line up one side of the triangle formed by the three datum points
             local_vector = self.normalize_vector(local[1])
@@ -978,9 +977,10 @@ class totalstation:
 
             # Now line up on the other side of the triangle formed by the three datum points
             # by computing the surface normal of each and rotating on the first already rotated side
-            local_datums_normal = self.cross_product(rotated_local[1], rotated_local[2])
-            global_datums_normal = self.cross_product(self.normalize_vector(self.vector_subtract(self.rotate_global[1], self.rotate_global[0])),
-                                                        self.normalize_vector(self.vector_subtract(self.rotate_global[2], self.rotate_global[0])))
+            local_datums_normal = self.normalize_vector(self.cross_product(self.normalize_vector(rotated_local[1]),
+                                                    self.normalize_vector(rotated_local[2])))
+            global_datums_normal = self.normalize_vector(self.cross_product(self.normalize_vector(self.vector_subtract(self.rotate_global[1], self.rotate_global[0])),
+                                                        self.normalize_vector(self.vector_subtract(self.rotate_global[2], self.rotate_global[0]))))
             p_out2 = self.rotate_point_2d(global_datums_normal, local_datums_normal, p_out)
 
             # Finish the rotation for the local datums as well (not strictly needed for points 2 and 3)
