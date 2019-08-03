@@ -1374,6 +1374,12 @@ class MainScreen(e5_MainScreen):
                 new_record['STATIONY'] = self.station.location.y
             elif field == 'STATIONZ':
                 new_record['STATIONZ'] = self.station.location.z
+            elif field == 'LOCALX':
+                new_record['LOCALX'] = self.station.xyz.x
+            elif field == 'LOCALY':
+                new_record['LOCALY'] = self.station.xyz.y
+            elif field == 'LOCALZ':
+                new_record['LOCALZ'] = self.station.xyz.z
             elif field == 'PRISM':
                 new_record['PRISM'] = self.station.prism
             elif field == 'DATE':
