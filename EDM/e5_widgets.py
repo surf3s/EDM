@@ -751,8 +751,7 @@ class e5_RecordEditScreen(Screen):
                         e5_cfg = None,
                         colors = None,
                         one_record_only = False,
-                        on_save = None,
-                        on_cancel = None, **kwargs):
+                        **kwargs):
         super(e5_RecordEditScreen, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
         self.e5_cfg = e5_cfg
@@ -884,12 +883,20 @@ class e5_RecordEditScreen(Screen):
                         for link_field_name in cfg_field.link_fields:
                             for widget in self.layout.walk():
                                 if widget.id == link_field_name:
-                                    update = {link_field_name: widget.text}
-                                    self.data.db.table(field_name).update(update, doc_ids = [db_rec[0].doc_id])
+                                    if (widget.id == 'ID' and self.is_numeric(widget.text)) or widget.id != 'ID':
+                                        update = {link_field_name: widget.text}
+                                        self.data.db.table(field_name).update(update, doc_ids = [db_rec[0].doc_id])
+
+    def is_numeric(self, value):
+        try:
+            a = float(value)
+            return(True)
+        except:
+            return(False)
 
     def cancel_record(self, instance):
         if hasattr(self.data.db.table(self.data_table), 'on_cancel'):
-            self.data_table.on_cancel()
+            self.data.db.table(self.data_table).on_cancel()
         self.parent.current = 'MainScreen'
 
     def show_menu(self, instance, ValueError):

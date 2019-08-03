@@ -22,7 +22,7 @@ __version__ = '1.0.4'
 __date__ = 'July, 2019'
 from constants import __program__ 
 
-__DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','UNIT','ID']
+__DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','ID']
 
 #Region Imports
 from kivy.graphics import Color, Rectangle
@@ -1157,10 +1157,16 @@ class MainScreen(e5_MainScreen):
                 self.add_record()
                 ### self.station.prism = self.data.prisms.get(value.text).height 
                 self.data.db.table(self.data.table).on_save = self.on_save
+                self.data.db.table(self.data.table).on_cancel = self.on_cancel
                 self.parent.current = 'EditPointScreen'
 
     def on_save(self):
         pass
+
+    def on_cancel(self):
+        last_record = self.data.db.table(self.data.table).all()[-1]
+        if last_record != []:
+            self.data.db.table(self.data.table).remove(doc_ids = [last_record.doc_id])
 
     def close_popup(self, instance):
         self.popup.dismiss()
@@ -1266,16 +1272,26 @@ class MainScreen(e5_MainScreen):
         new_record = {}
         new_record = self.fill_default_fields(new_record)
         if self.station.shot_type is not 'continue':
-            new_record = self.fill_button_defaults(new_record)
             new_record = self.find_unit_and_fill_fields(new_record)
             new_record = self.fill_carry_fields(new_record)
             new_record = self.fill_link_fields(new_record)
             new_record = self.do_increments(new_record)
+            new_record['SUFFIX'] = 0
+            new_record = self.fill_button_defaults(new_record)
         else:
             new_record = self.fill_empty_with_last(new_record)
+            new_record['SUFFIX'] = int(self.get_last_value('SUFFIX')) + 1
             
         self.data.db.table(self.data.table).insert(new_record)
     
+    def fill_empty_with_last(self, new_record):
+        for field in self.cfg.fields():
+            if field not in new_record.keys():
+                new_record[field] = self.get_last_value(field)
+            elif new_record[field] == '':
+                new_record[field] = self.get_last_value(field)
+        return(new_record)
+
     def fill_button_defaults(self, new_record):
         for button_no in range(1,7):
             button = self.cfg.get_block('BUTTON' + str(button_no))
@@ -1340,14 +1356,6 @@ class MainScreen(e5_MainScreen):
     def fill_default_fields(self, new_record):
         fields = self.cfg.fields()
         for field in fields:
-            if field == 'SUFFIX':
-                if self.station.shot_type is 'continue':
-                    try:
-                        new_record['SUFFIX'] = int(self.get_last_value('SUFFIX')) + 1
-                    except:
-                        new_record['SUFFIX'] = 0
-                else:
-                    new_record['SUFFIX'] = 0
             if field == 'X':
                 new_record['X'] = self.station.xyz_global.x
             elif field == 'Y':
