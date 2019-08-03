@@ -25,6 +25,8 @@ import os
 from shutil import copyfile
 from datetime import datetime
 from tinydb import where
+from tinydb import Query
+import re
 
 class e5_PopUpMenu(Popup):
     
@@ -822,7 +824,23 @@ class e5_RecordEditScreen(Screen):
         if self.data_table and self.can_update_data_table:
             update = {instance.id: value}
             self.data.db.table(self.data_table).update(update, doc_ids = [self.doc_id])
-    
+            self.refresh_linked_fields(instance.id, value)
+
+    def refresh_linked_fields(self, fieldname, value):
+        field = self.e5_cfg.get(fieldname)
+        if field.link_fields:
+            linkfields = self.data.get_link_fields(fieldname, value)
+            if linkfields:
+                for widget in self.layout.walk():
+                    if widget.id in linkfields.keys() and widget.id != fieldname:
+                        widget.text = linkfields[widget.id]
+                        widget_field = self.e5_cfg.get(widget.id)
+                        if widget_field.increment:
+                            try:
+                                widget.text = str(int(widget.text) + 1)
+                            except:
+                                pass
+
     def check_required_fields(self):
         save_errors = []
         for field_name in self.e5_cfg.fields():
@@ -831,7 +849,7 @@ class e5_RecordEditScreen(Screen):
                 for widget in self.layout.walk():
                     if widget.id == field_name:
                         if widget.text == '':
-                            save_errors.append('The field %s is requires a value.' % field_name)
+                            save_errors.append('The field %s requires a value.' % field_name)
         return(save_errors)
 
     def save_record(self, instance):
@@ -842,16 +860,24 @@ class e5_RecordEditScreen(Screen):
             self.update_link_fields()
             self.parent.current = 'MainScreen'
         else:
-            # Show a message box with result returned to is_valid
-            pass
-            
+            self.popup = e5_MessageBox('Save errors',
+                                    '\nCorrect the following errors:\n  ' + '\n  '.join(save_errors),
+                                    response_type = "OK",
+                                    call_back = self.close_popup,
+                                    colors = self.colors)
+            self.popup.open()
+    
+    def close_popup(self, instance):
+        self.popup.dismiss()
+
     def update_link_fields(self):
         if hasattr(self.e5_cfg, 'link_fields'):
             for field_name in self.e5_cfg.link_fields:
                 cfg_field = self.e5_cfg.get(field_name)
                 for widget in self.layout.walk():
                     if widget.id == field_name:
-                        db_rec = self.data.db.table(field_name).search(where(field_name) == widget.text)
+                        q = Query()
+                        db_rec = self.data.db.table(field_name).search(q[field_name].matches(widget.text, re.IGNORECASE))
                         if db_rec == []:
                             self.data.db.table(field_name).insert({field_name: widget.text})
                             db_rec = self.data.db.table(field_name).search(where(field_name) == widget.text)

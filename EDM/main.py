@@ -1,13 +1,15 @@
 # ToDo
-#   On station verify, do the verify math
 #   After XYZ are obtained, check units file, populate and maintain units file after save
-#   Think through making a field link to a database table (unique value is a table record)
 #   Link fields just like unit fields need to be updated after save
+#   Item added to menu doesn't actually add to cfg
+
+# If it is a linked field - make it a menu field?
 
 # Need to make prism menu after shot work
 
 # A menu field can be linked to other fields in the same CFG and this will load default values.
 # A text field can be linked to another table. [future feature]
+#   Think through making a field link to a database table (unique value is a table record)
 
 # ToDo NewPlot
 #   Read either CSV or JSON file
@@ -61,6 +63,7 @@ import random
 import datetime
 from math import sqrt
 import re
+import string
 
 import logging
 import logging.handlers as handlers
@@ -244,7 +247,8 @@ class DB(dbs):
     def get_link_fields(self, name = None, value = None):
         if name is not None and value is not None:
             try:
-                return(self.db.table(name).search( (where(name) == value) )[0])
+                q = Query()
+                return(self.db.table(name).search(q[name].matches(value, re.IGNORECASE))[0])
             except:
                 return(None)
         return(None)
@@ -666,10 +670,10 @@ class totalstation:
 
         return([angle, minutes, seconds])
 
-    def hash(self, hashlen):
+    def hash(self, hashlen = 5):
         hash = ""
         for a in range(0, hashlen):
-            hash = hash + random.choice(string.ascii_uppercase)
+            hash += random.choice(string.ascii_uppercase)
         return(hash)
 
     def take_shot(self):
@@ -1125,25 +1129,20 @@ class MainScreen(e5_MainScreen):
         self.popup.open()
 
     def have_shot(self, instance):
-        if self.station.shot_type == 'measure':
-            success = False
-            if self.station.make == 'Microscribe':
-                result = self.popup.result
-                self.popup.dismiss()
-                if result:
-                    p = self.station.text_to_point(result)
-                    if p:
-                        p.x = p.x / 1000
-                        p.y = p.y / 1000
-                        p.z = p.z / 1000
-                        self.station.xyz = p
-                        self.station.make_global()
-                        success = True
-            else:
-                self.popup.dismiss()
-                success = True
+        if self.station.make == 'Microscribe':
+            result = self.popup.result
+            if result:
+                p = self.station.text_to_point(result)
+                if p:
+                    p.x = p.x / 1000
+                    p.y = p.y / 1000
+                    p.z = p.z / 1000
+                    self.station.xyz = p
+                    self.station.make_global()
+        self.popup.dismiss()
 
-            if success:
+        if self.station.xyz.x is not None:
+            if self.station.shot_type == 'measure':
                 txt = 'Local coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz.x, self.station.xyz.y, self.station.xyz.z)
                 txt += '\n\nGlobal coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz_global.x, self.station.xyz_global.y, self.station.xyz_global.z)
                 if self.station.make != 'Microscribe':
@@ -1154,16 +1153,13 @@ class MainScreen(e5_MainScreen):
                                         call_back = self.close_popup,
                                         colors = self.colors)
                 self.popup.open()
-        else:
-            self.popup.dismiss()
-            self.add_record()
-            #self.station.prism = self.data.prisms.get(value.text).height 
-            self.data.db.table(self.data.table).on_save = self.on_save
-            self.parent.current = 'EditPointScreen'
+            else:
+                self.add_record()
+                ### self.station.prism = self.data.prisms.get(value.text).height 
+                self.data.db.table(self.data.table).on_save = self.on_save
+                self.parent.current = 'EditPointScreen'
 
     def on_save(self):
-        # update units fields
-        print('it worked')
         pass
 
     def close_popup(self, instance):
@@ -1268,17 +1264,19 @@ class MainScreen(e5_MainScreen):
 
     def add_record(self):
         new_record = {}
-        new_record = self.get_button_defaults(new_record)
-        new_record = self.update_unit_fields(new_record)
-        new_record = self.add_defaults(new_record)
-        new_record = self.get_carry_fields(new_record)
-        new_record = self.get_link_fields(new_record)
+        new_record = self.fill_default_fields(new_record)
         if self.station.shot_type is not 'continue':
+            new_record = self.fill_button_defaults(new_record)
+            new_record = self.find_unit_and_fill_fields(new_record)
+            new_record = self.fill_carry_fields(new_record)
+            new_record = self.fill_link_fields(new_record)
             new_record = self.do_increments(new_record)
-
+        else:
+            new_record = self.fill_empty_with_last(new_record)
+            
         self.data.db.table(self.data.table).insert(new_record)
     
-    def get_button_defaults(self, new_record):
+    def fill_button_defaults(self, new_record):
         for button_no in range(1,7):
             button = self.cfg.get_block('BUTTON' + str(button_no))
             if 'TITLE' in button.keys():
@@ -1286,7 +1284,11 @@ class MainScreen(e5_MainScreen):
                     fieldnames = self.cfg.fields()
                     for button_default in button:
                         if button_default in fieldnames:
-                            new_record[button_default] = button[button_default]
+                            if button[button_default].upper() == 'ALPHA':
+                                ### Should be calibrated to the length of this field
+                                new_record[button_default] = self.station.hash()
+                            else:
+                                new_record[button_default] = button[button_default]
         return(new_record)
 
     def do_increments(self, new_record):
@@ -1303,7 +1305,7 @@ class MainScreen(e5_MainScreen):
                     new_record[fieldname] = '1'
         return(new_record)
 
-    def get_carry_fields(self, new_record):
+    def fill_carry_fields(self, new_record):
         fieldnames = self.cfg.fields()
         for fieldname in fieldnames:
             if fieldname not in __DEFAULT_FIELDS__:
@@ -1312,7 +1314,7 @@ class MainScreen(e5_MainScreen):
                     new_record[fieldname] = self.get_last_value(fieldname)
         return(new_record)
 
-    def get_link_fields(self, new_record):
+    def fill_link_fields(self, new_record):
         fieldnames = self.cfg.fields()
         for fieldname in fieldnames:
             if fieldname not in __DEFAULT_FIELDS__:
@@ -1324,7 +1326,7 @@ class MainScreen(e5_MainScreen):
                             new_record[link_fieldname] = linkfields[link_fieldname]
         return(new_record)
 
-    def update_unit_fields(self, new_record):
+    def find_unit_and_fill_fields(self, new_record):
         fields = self.cfg.fields()
         unitname = self.data.point_in_unit(self.station.xyz_global)
         if unitname and "UNIT" in fields:
@@ -1335,7 +1337,7 @@ class MainScreen(e5_MainScreen):
                     new_record[field] = unitfields[field]
         return(new_record)
 
-    def add_defaults(self, new_record):
+    def fill_default_fields(self, new_record):
         fields = self.cfg.fields()
         for field in fields:
             if field == 'SUFFIX':
