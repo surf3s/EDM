@@ -272,6 +272,7 @@ class e5_MainScreen(Screen):
         self.cfg.update_value(__program__,'DATABASE', self.data.filename)
         self.cfg.update_value(__program__,'TABLE', self.data.table)
         self.cfg.save()
+        self.data.new_data = True
 
     def show_popup_message(self, dt):
         self.event.cancel()
@@ -419,12 +420,16 @@ class e5_MainScreen(Screen):
         self.data.delete_all(self.delete_table)
         self.close_popup(value)
 
-    def show_save_csvs(self):
-        if self.e5_cfg.filename and self.e5_data.filename:
-            filename = ntpath.split(self.e5_cfg.filename)[1].split(".")[0]
-            filename = filename + "_" + self.e5_data.table + '.csv' 
+    def show_save_csvs(self, *args):
+        if self.cfg.filename and self.data.filename:
+            if len(args) > 0:
+                self.csv_data_type = args[0].id.lower()
+            else:
+                self.csv_data_type = self.data.table
+            filename = ntpath.split(self.cfg.filename)[1].split(".")[0]
+            filename = filename + "_" + self.csv_data_type + '.csv' 
             content = e5_SaveDialog(filename = filename,
-                                start_path = self.e5_cfg.path,
+                                start_path = self.cfg.path,
                                 save = self.save_csvs, 
                                 cancel = self.dismiss_popup)
             self.popup = Popup(title = "Export CSV file",
@@ -446,38 +451,47 @@ class e5_MainScreen(Screen):
 
         filename = os.path.join(path, filename)
 
-        table = self.e5_data.db.table(self.e5_data.table)
-
-        errors = self.e5_cfg.write_csvs(filename, table)
+        if __program__ == 'EDM' and self.csv_data_type != 'points':
+            table = self.data.db.table(self.csv_data_type)
+            if self.csv_data_type == 'datums':
+                errors = self.cfg_datums.write_csvs(filename, table)
+            if self.csv_data_type == 'units':
+                errors = self.cfg_units.write_csvs(filename, table)
+            if self.csv_data_type == 'prisms':
+                errors = self.cfg_prisms.write_csvs(filename, table)
+        else:
+            table = self.data.db.table(self.csv_data_type)
+            errors = self.cfg.write_csvs(filename, table)
+        
         title = 'CSV Export'
         if errors:
             self.popup = e5_MessageBox(title, errors, call_back = self.close_popup, colors = self.colors)
         else:
-            self.popup = e5_MessageBox(title, '\nThe table %s was successfully written as the file %s.' % (self.e5_data.table, filename),
+            self.popup = e5_MessageBox(title, '\nThe table %s was successfully written as the file %s.' % (self.csv_data_type, filename),
                 call_back = self.close_popup, colors = self.colors)
         self.popup.open()
         self.popup_open = True
 
     def show_save_geojson(self):
-        if self.e5_cfg.filename and self.e5_data.filename:
+        if self.cfg.filename and self.data.filename:
             geojson_compatible = 0
-            for fieldname in self.e5_cfg.fields():
+            for fieldname in self.cfg.fields():
                 if fieldname in ['X','Y','Z']:
                     geojson_compatible += 1
                 elif fieldname in ['LATITUDE','LONGITUDE','ELEVATION']:
                     geojson_compatible += 1
                 else:
-                    field = self.e5_cfg.get(fieldname)
+                    field = self.cfg.get(fieldname)
                     if field.inputtype in ['GPS']:
                         geojson_compatible = 2
                 if geojson_compatible > 1:
                         break
             if geojson_compatible:
-                filename = ntpath.split(self.e5_cfg.filename)[1].split(".")[0]
-                filename = filename + '_' + self.e5_data.table + '.geojson' 
+                filename = ntpath.split(self.cfg.filename)[1].split(".")[0]
+                filename = filename + '_' + self.data.table + '.geojson' 
 
                 content = e5_SaveDialog(filename = filename,
-                                    start_path = self.e5_cfg.path,
+                                    start_path = self.cfg.path,
                                     save = self.save_geojson, 
                                     cancel = self.dismiss_popup)
                 self.popup = Popup(title = "Export geoJSON file",
@@ -502,14 +516,14 @@ class e5_MainScreen(Screen):
 
         filename = os.path.join(path, filename)
 
-        table = self.e5_data.db.table(self.e5_data.table)
+        table = self.data.db.table(self.data.table)
 
-        errors = self.e5_cfg.write_geojson(filename, table)
+        errors = self.cfg.write_geojson(filename, table)
         title = 'geoJSON Export'
         if errors:
             self.popup = e5_MessageBox(title, errors, call_back = self.close_popup, colors = self.colors)
         else:
-            self.popup = e5_MessageBox(title, '\nThe table %s was successfully written as geoJSON to the file %s.' % (self.e5_data.table, filename),
+            self.popup = e5_MessageBox(title, '\nThe table %s was successfully written as geoJSON to the file %s.' % (self.data.table, filename),
                 call_back = self.close_popup, colors = self.colors)
         self.popup.open()
         self.popup_open = True
@@ -857,6 +871,7 @@ class e5_RecordEditScreen(Screen):
             save_errors = self.data.db.table(self.data_table).on_save()
         if save_errors is None:
             self.update_link_fields()
+            self.data.new_data = True
             self.parent.current = 'MainScreen'
         else:
             self.popup = e5_MessageBox('Save errors',
@@ -944,18 +959,19 @@ class e5_DatagridScreen(Screen):
         self.e5_cfg = main_cfg
         self.tablename = main_tablename
 
-        self.datagrid = DataGridWidget(data = main_data.db.table(main_tablename) if main_tablename else None,
+        self.datagrid = DataGridWidget(data = main_data.db.table(main_tablename) if self.e5_data.db is not None and main_tablename else None,
                                         fields = self.e5_cfg,
                                         colors = self.colors,
                                         addnew = addnew)
         self.add_widget(self.datagrid)
-        if main_data:
+        if main_data.db is not None:
             if main_data.db.tables:
                 self.datagrid.data = main_data.db.table(main_tablename)
                 self.datagrid.fields = main_cfg
 
     def on_pre_enter(self):
         if self.e5_data:
+            ### This new_data variable should be done on a table by table basis
             if self.e5_data.new_data:
                 self.datagrid.data = self.e5_data.db.table(self.e5_data.table)
                 self.datagrid.fields = self.e5_cfg
@@ -1133,7 +1149,8 @@ class DataGridTextBox(Popup):
     result = ObjectProperty(None)
     save_button = ObjectProperty(None)
 
-    def __init__(self, title, label = None, text = '', multiline = False, call_back = None, button_text = ['Back','Save'], colors = None, **kwargs):
+    def __init__(self, title, label = None, text = '', multiline = False, call_back = None,
+                        button_text = ['Back','Save'], colors = None, **kwargs):
         super(DataGridTextBox, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
         content = GridLayout(cols = 1, spacing = 5, padding = 10)

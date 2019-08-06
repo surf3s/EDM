@@ -554,6 +554,37 @@ class CFG(blockdata):
         txt = 'CFG file is %s\n' % self.filename
         return(txt)
 
+    def write_csvs(self, filename, table):
+        try:
+            cfg_fields = self.fields()
+            f = open(filename, 'w')
+            csv_row = ''
+            for fieldname in cfg_fields:
+                csv_row += ',"%s"' % fieldname if csv_row else '"%s"' % fieldname 
+            f.write(csv_row + '\n')
+            for row in table:
+                csv_row = ''
+                for fieldname in cfg_fields:
+                    if fieldname in row.keys():
+                        if self.get(fieldname).inputtype in ['NUMERIC','INSTRUMENT']:
+                            csv_row += ',%s' % row[fieldname] if csv_row else "%s" % row[fieldname]   
+                        else:
+                            csv_row += ',"%s"' % row[fieldname] if csv_row else '"%s"' % row[fieldname]
+                    else:
+                        if self.get(fieldname).inputtype in ['NUMERIC','INSTRUMENT']:
+                            if csv_row:
+                                csv_row = csv_row + ','     # Not sure this works if there is an entirely empty row of numeric values
+                        else:
+                            if csv_row:
+                                csv_row = csv_row + ',""'
+                            else: 
+                                csv_row = '""'
+                f.write(csv_row + '\n')
+            f.close()
+            return(None)
+        except:
+            return('\nCould not write data to %s.' % (filename))
+
 class totalstation:
 
     popup = ObjectProperty(None)
@@ -1026,6 +1057,11 @@ class MainScreen(e5_MainScreen):
         self.cfg = cfg 
         self.station = station if station else totalstation()
 
+        self.cfg_datums = CFG()
+        self.cfg_datums.build_datum()
+        self.cfg_prisms = CFG().build_prism()
+        self.cfg_units = CFG().build_unit()
+
         self.layout = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
                                 size_hint_x = .8,
@@ -1122,10 +1158,16 @@ class MainScreen(e5_MainScreen):
                                             call_back = self.have_shot)
         else:
             self.station.take_shot()
-            self.popup = DataGridMenuList(title = "Prism Height",
-                                            menu_list = self.data.names('prisms'),
-                                            menu_selected = '',
-                                            call_back = self.have_shot)
+            prism_names = self.data.names('prisms')
+            if len(prism_names) > 0 :
+                self.popup = DataGridMenuList(title = "Prism Height",
+                                                menu_list = prism_names,
+                                                menu_selected = '',
+                                                call_back = self.have_shot)
+            else:
+                self.popup = DataGridTextBox(title = 'Prism Height',
+                                            call_back = self.have_shot,
+                                            button_text = ['Back','Next'])
         self.popup.open()
 
     def have_shot(self, instance):
@@ -1198,6 +1240,14 @@ class MainScreen(e5_MainScreen):
                                         menu_list = ['Datums','Prisms','Units'],
                                         menu_selected = '',
                                         call_back = self.select_csv_file,
+                                        colors = self.colors)
+        self.popup.open()
+
+    def show_csv_datatype(self):
+        self.popup = e5_PopUpMenu(title = "Export which kind of data",
+                                        menu_list = ['Points','Datums','Prisms','Units'],
+                                        menu_selected = '',
+                                        call_back = self.show_save_csvs,
                                         colors = self.colors)
         self.popup.open()
 
@@ -1336,10 +1386,11 @@ class MainScreen(e5_MainScreen):
             if fieldname not in __DEFAULT_FIELDS__:
                 field = self.cfg.get(fieldname)
                 if field.link_fields:
-                    linkfields = self.data.get_link_fields(fieldname, new_record[fieldname])
-                    if linkfields:
-                        for link_fieldname in linkfields.keys():
-                            new_record[link_fieldname] = linkfields[link_fieldname]
+                    if fieldname in new_record.keys():
+                        linkfields = self.data.get_link_fields(fieldname, new_record[fieldname])
+                        if linkfields:
+                            for link_fieldname in linkfields.keys():
+                                new_record[link_fieldname] = linkfields[link_fieldname]
         return(new_record)
 
     def find_unit_and_fill_fields(self, new_record):
@@ -1459,6 +1510,7 @@ class RecordDatumsScreen(Screen):
         self.recorder.result.text = ''
         self.recorder.result.xyz = None
         self.recorder.result.xyz_global = None
+        self.data.new_data = True
 
     def close_popup(self, instance):
         self.popup.dismiss()
