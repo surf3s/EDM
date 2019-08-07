@@ -1174,7 +1174,13 @@ class DataGridTextBox(Popup):
         self.content = content
         self.size_hint = (.8, .35 if label is None else .5)
         self.auto_dismiss = True
+
+        self.event = Clock.schedule_once(self.set_focus, .2)
     
+    def set_focus(self, instance):
+        self.txt.focus = True
+        self.txt.select_all()
+
     def on_open(self):
         self.txt.focus = True
         self.txt.select_all()

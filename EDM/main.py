@@ -18,8 +18,8 @@
 #   Add serial port communications
 #   Add bluetooth communications
 
-__version__ = '1.0.4'
-__date__ = 'July, 2019'
+__version__ = '1.0.5'
+__date__ = 'August, 2019'
 from constants import __program__ 
 
 __DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','ID']
@@ -29,7 +29,6 @@ from kivy.graphics import Color, Rectangle
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.factory import Factory
-from kivy.properties import ObjectProperty
 from kivy.uix.popup import Popup
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
@@ -1047,6 +1046,7 @@ class MainScreen(e5_MainScreen):
     popup = ObjectProperty(None)
     popup_open = False
     text_color = (0, 0, 0, 1)
+    title = __program__
 
     def __init__(self, data = None, cfg = None, ini = None, colors = None, station = None, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
@@ -1056,7 +1056,8 @@ class MainScreen(e5_MainScreen):
         self.data = data if data else DB()
         self.cfg = cfg 
         self.station = station if station else totalstation()
-
+        if self.cfg is not None:
+            self.children[0].children[0].children[0].action_previous.title = filename_only(cfg.filename)
         self.cfg_datums = CFG()
         self.cfg_datums.build_datum()
         self.cfg_prisms = CFG().build_prism()
@@ -1152,8 +1153,8 @@ class MainScreen(e5_MainScreen):
         
         self.station.shot_type = instance.id
         if self.station.make == 'Microscribe':
-            self.popup = DataGridTextBox(title = 'EDM',
-                                            label = 'Waiting on Microscribe...',
+            self.popup = DataGridTextBox(title = 'EDM', text = '<Microscribe>',
+                                            label = 'Waiting on...',
                                             button_text = ['Cancel', 'Next'],
                                             call_back = self.have_shot)
         else:
@@ -1203,7 +1204,13 @@ class MainScreen(e5_MainScreen):
                 self.parent.current = 'EditPointScreen'
 
     def on_save(self):
-        pass
+        unit = self.get_last_value('UNIT')
+        idno = self.get_last_value('ID')
+        suffix = self.get_last_value('SUFFIX')
+        if unit is not None and idno is not None and suffix is not None:
+            self.info.text = '%s-%s(%s)' % (unit, idno, suffix)
+        else:
+            self.info = 'EDM'
 
     def on_cancel(self):
         last_record = self.data.db.table(self.data.table).all()[-1]
@@ -1438,10 +1445,11 @@ class MainScreen(e5_MainScreen):
         return(new_record)
 
     def get_last_value(self, field_name):
-        last_record = self.data.db.table(self.data.table).all()[-1]
-        if last_record != []:
-            if field_name in last_record.keys():
-                return(last_record[field_name])
+        if len(self.data.db.table(self.data.table)) > 0 :
+            last_record = self.data.db.table(self.data.table).all()[-1]
+            if last_record != []:
+                if field_name in last_record.keys():
+                    return(last_record[field_name])
         return(None)
 
 class RecordDatumsScreen(Screen):
@@ -2050,7 +2058,7 @@ class EditLastRecordScreen(e5_RecordEditScreen):
     def on_pre_enter(self):
         if self.data_table is not None and self.e5_cfg is not None:
             try:
-                last = self.data_table.all()[-1]
+                last = self.data.db.table(self.data.table).all()[-1]
                 self.doc_id = last.doc_id
             except:
                 self.doc_id = None

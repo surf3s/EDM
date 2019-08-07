@@ -15,6 +15,13 @@ def locate_file(filename, cfg_path = None):
             return(path.join(cfg_path, f))
     return('')
 
+def filename_only(filename = None):
+    if filename:
+        p, f = path.split(filename)
+        return(f)
+    else:
+        return('')
+        
 def platform_name():
     return(['Windows','Linux','Android','MacOSX','IOS','Unknown'][['win', 'linux', 'android', 'macosx', 'ios', 'unknown'].index(platform)])
 
