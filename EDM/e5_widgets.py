@@ -930,6 +930,12 @@ class e5_RecordEditScreen(Screen):
     def menu_selection(self, instance):
         self.popup.dismiss()
         self.popup_field_widget.text = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
+        if instance.id == 'add_button':
+            field = self.e5_cfg.get(self.popup_field_widget.id)
+            if self.popup_field_widget.text not in field.menu:
+                field.menu.append(self.popup_field_widget.text)
+                self.e5_cfg.update_value(self.popup_field_widget.id, 'MENU', ','.join(field.menu))
+                self.e5_cfg.save()
         self.popup_field_widget = None
         self.popup_scrollmenu = None
 
@@ -1521,7 +1527,7 @@ class DataGridWidget(TabbedPanel):
                 data_record = self.data.get(doc_id = int(datatable.datagrid_doc_id))
                 serialize_record = '\nDelete this record?\n\n'
                 for field in data_record:
-                    serialize_record += field + " : " + data_record[field] + '\n'
+                    serialize_record += field + " : %s\n" % data_record[field]
                 self.panel3.populate(message = serialize_record,
                                         call_back = self.delete_record1, 
                                         colors = self.colors)
