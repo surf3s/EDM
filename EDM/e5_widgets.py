@@ -460,7 +460,7 @@ class e5_MainScreen(Screen):
             if self.csv_data_type == 'prisms':
                 errors = self.cfg_prisms.write_csvs(filename, table)
         else:
-            table = self.data.db.table(self.csv_data_type)
+            table = self.data.db.table(self.data.table)
             errors = self.cfg.write_csvs(filename, table)
         
         title = 'CSV Export'
@@ -1314,7 +1314,9 @@ class DataGridTableData(RecycleView):
             self.popup = DataGridMenuList(field, cfg_field.menu, editcell_widget.text, self.menu_selection)
             self.popup.open()
         if cfg_field.inputtype in ['TEXT','NUMERIC','NOTE']:
-            self.popup = DataGridTextBox(field, editcell_widget.text, cfg_field.inputtype == 'NOTE', self.menu_selection)
+            self.popup = DataGridTextBox(title = field, text = editcell_widget.text,
+                                            multiline = cfg_field.inputtype == 'NOTE',
+                                            call_back = self.menu_selection)
             self.popup.open()
         self.datatable_widget.popup_scrollmenu = self.datatable_widget.get_widget_by_id(self.popup, 'menu_scroll')
         self.datatable_widget.popup_textbox = self.datatable_widget.get_widget_by_id(self.popup, 'new_item')

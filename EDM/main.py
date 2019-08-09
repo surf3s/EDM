@@ -565,10 +565,20 @@ class CFG(blockdata):
                 csv_row = ''
                 for fieldname in cfg_fields:
                     if fieldname in row.keys():
-                        if self.get(fieldname).inputtype in ['NUMERIC','INSTRUMENT']:
-                            csv_row += ',%s' % row[fieldname] if csv_row else "%s" % row[fieldname]   
+                        if row[fieldname] is not None:
+                            if self.get(fieldname).inputtype in ['NUMERIC','INSTRUMENT']:
+                                csv_row += ',%s' % row[fieldname] if csv_row else "%s" % row[fieldname]   
+                            else:
+                                csv_row += ',"%s"' % row[fieldname] if csv_row else '"%s"' % row[fieldname]
                         else:
-                            csv_row += ',"%s"' % row[fieldname] if csv_row else '"%s"' % row[fieldname]
+                            if self.get(fieldname).inputtype in ['NUMERIC','INSTRUMENT']:
+                                if csv_row:
+                                    csv_row = csv_row + ','     # Not sure this works if there is an entirely empty row of numeric values
+                            else:
+                                if csv_row:
+                                    csv_row = csv_row + ',""'
+                                else: 
+                                    csv_row = '""'
                     else:
                         if self.get(fieldname).inputtype in ['NUMERIC','INSTRUMENT']:
                             if csv_row:
