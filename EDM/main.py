@@ -550,7 +550,7 @@ class CFG(blockdata):
             self.build_default()
     
     def status(self):
-        txt = 'CFG file is %s\n' % self.filename
+        txt = '\nCFG file is %s\n' % self.filename
         return(txt)
 
     def write_csvs(self, filename, table):
@@ -661,7 +661,10 @@ class totalstation:
     def text_to_point(self, txt):
         if len(txt.split(',')) == 3:
             x, y, z = txt.split(',')
-            return(point(float(x), float(y), float(z)))
+            try:
+                return(point(float(x), float(y), float(z)))
+            except:
+                return(None)
         else:
             return(None)
 
@@ -1163,6 +1166,7 @@ class MainScreen(e5_MainScreen):
         
         self.station.shot_type = instance.id
         if self.station.make == 'Microscribe':
+            self.station.clear_xyz()
             self.popup = DataGridTextBox(title = 'EDM', text = '<Microscribe>',
                                             label = 'Waiting on...',
                                             button_text = ['Cancel', 'Next'],
@@ -1221,6 +1225,7 @@ class MainScreen(e5_MainScreen):
             self.info.text = '%s-%s(%s)' % (unit, idno, suffix)
         else:
             self.info = 'EDM'
+        self.make_backup()
 
     def on_cancel(self):
         last_record = self.data.db.table(self.data.table).all()[-1]

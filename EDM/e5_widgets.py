@@ -340,17 +340,17 @@ class e5_MainScreen(Screen):
     def make_backup(self):
         if self.ini.backup_interval > 0:
             try:
-                record_counter = int(self.cfg.get_value('E5','RECORDS UNTIL BACKUP')) if self.cfg.get_value('E5','RECORDS UNTIL BACKUP') else self.ini.backup_interval
+                record_counter = int(self.cfg.get_value(__program__,'RECORDS UNTIL BACKUP')) if self.cfg.get_value(__program__,'RECORDS UNTIL BACKUP') else self.ini.backup_interval
                 record_counter -= 1
                 if record_counter <= 0:
                     backup_path, backup_file = os.path.split(self.data.filename)
                     backup_file, backup_file_ext = backup_file.split('.')
                     backup_file += self.time_stamp() if self.ini.incremental_backups else '_backup'
-                    backup_file += backup_file_ext
+                    backup_file += "." + backup_file_ext
                     backup_file = os.path.join(backup_path, backup_file)
-                    copyfile(self.ini.filename, backup_file)
+                    copyfile(self.data.filename, backup_file)
                     record_counter = self.ini.backup_interval
-                self.cfg.update_value('E5','RECORDS UNTIL BACKUP',str(record_counter))
+                self.cfg.update_value(__program__,'RECORDS UNTIL BACKUP',str(record_counter))
             except:
                 self.popup = e5_MessageBox('Backup Error', "\nAn error occurred while attempting to make a backup.  Check the backup settings and that the disk has enough space for a backup.",
                                             call_back = self.close_popup, colors = self.colors)
