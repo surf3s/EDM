@@ -1713,7 +1713,9 @@ class datum_selector(GridLayout):
     popup = ObjectProperty(None)
     popup_open = False
 
-    def __init__(self, text = '', data = None, colors = None, default_datum = None, **kwargs):
+    def __init__(self, text = '',
+                        data = None, colors = None, default_datum = None, 
+                        call_back = None, id = None, **kwargs):
         super(datum_selector, self).__init__(**kwargs)
         #self.orientation = 'horizontal'
         self.padding = 10
@@ -1722,6 +1724,7 @@ class datum_selector(GridLayout):
         self.colors = colors
         self.data = data
         self.datum = default_datum
+        self.call_back = call_back
         self.size_hint_y = None
         self.add_widget(e5_button(text = text,
                                     selected = True,
@@ -1752,6 +1755,8 @@ class datum_selector(GridLayout):
                                                                     self.datum.x,
                                                                     self.datum.y,
                                                                     self.datum.z)
+            if self.call_back:
+                self.call_back(self)
         else:
             self.result.text = 'Search error'
 
@@ -1827,11 +1832,12 @@ class setups(ScrollView):
             self.datum2 = datum_selector(text = 'Select datum\nto record',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM')),
+                                                call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum2)
             
-            self.recorder = datum_recorder('Record datum', station = self.station, colors = self.colors, setup_type = setup_type)
-            self.scrollbox.add_widget(self.recorder)
+            self.recorder.append(datum_recorder('Record datum', station = self.station, colors = self.colors, setup_type = setup_type))
+            self.scrollbox.add_widget(self.recorder[0])
 
         elif setup_type == "Record two datums":
             instructions.text = "Select two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
@@ -1840,13 +1846,15 @@ class setups(ScrollView):
             self.datum1 = datum_selector(text = 'Select first datum\nto record',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_1')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_1')),
+                                                call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum1)
 
             self.datum2 = datum_selector(text = 'Select second datum\nto record',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_2')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_2')),
+                                                call_back = self.datum2_selected)
             self.scrollbox.add_widget(self.datum2)
 
             for n in range(2):
@@ -1860,19 +1868,22 @@ class setups(ScrollView):
             self.datum1 = datum_selector(text = 'Select datum 1',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1')),
+                                                call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum1)
 
             self.datum2 = datum_selector(text = 'Select datum 2',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2')),
+                                                call_back = self.datum2_selected)
             self.scrollbox.add_widget(self.datum2)
 
             self.datum3 = datum_selector(text = 'Select datum 3',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3')),
+                                                call_back = self.datum3_selected)
             self.scrollbox.add_widget(self.datum3)
 
             for n in range(3):
@@ -1894,6 +1905,15 @@ class setups(ScrollView):
 
         self.bind(size = draw_background)
         self.bind(pos = draw_background)
+
+    def datum1_selected(self, instance):
+        self.recorder[0].children[1].text = 'Record ' + instance.datum.name
+
+    def datum2_selected(self, instance):
+        self.recorder[1].children[1].text = 'Record ' + instance.datum.name
+
+    def datum3_selected(self, instance):
+        self.recorder[2].children[1].text = 'Record ' + instance.datum.name
 
     def set_hangle(self, instance):
         if self.hangle:
