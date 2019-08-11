@@ -74,6 +74,12 @@ class blockdata:
                         return('')
         return('')                
 
+    def delete_key(self, blockname, key):
+        for block in self.blocks:
+            if block['BLOCKNAME'] == blockname.upper():
+                block.pop(key)
+                return
+        
     def rename_block(self, oldname, newname):
         for block in self.blocks:
             if block['BLOCKNAME'] == oldname.upper():

@@ -1,3 +1,5 @@
+# same data coming across each time
+
 # ToDo
 #   After XYZ are obtained, check units file, populate and maintain units file after save
 #   Link fields just like unit fields need to be updated after save
@@ -18,7 +20,7 @@
 #   Add serial port communications
 #   Add bluetooth communications
 
-__version__ = '1.0.5'
+__version__ = '1.0.6'
 __date__ = 'August, 2019'
 from constants import __program__ 
 
@@ -183,7 +185,7 @@ class DB(dbs):
     def get_datum(self, name = ''):
         if name is not '':
             a_datum = Query()
-            p = self.db.table('datums').search(a_datum.NAME.matches(name, flags = re.IGNORECASE))
+            p = self.db.table('datums').search(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
             #p = self.db.table('datums').search( (where('NAME') == name, flags = re.IGNORECASE) )
             if p != []:
                 p = p[0]
@@ -197,7 +199,7 @@ class DB(dbs):
     def delete_datum(self, name = ''):
         if name is not '':
             a_datum = Query()
-            self.db.table('datums').remove(a_datum.NAME.matches(name, flags = re.IGNORECASE))
+            self.db.table('datums').remove(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
 
     def get_unit(self, name):
         pass
@@ -247,7 +249,11 @@ class DB(dbs):
         if name is not None and value is not None:
             try:
                 q = Query()
-                return(self.db.table(name).search(q[name].matches(value, re.IGNORECASE))[0])
+                r = self.db.table(name).search(q[name].matches('^' + value + '$', re.IGNORECASE))
+                if r is not []:
+                    return(r[0])
+                else:
+                    return(None)
             except:
                 return(None)
         return(None)
@@ -503,8 +509,8 @@ class CFG(blockdata):
             unit_fields.remove('UNIT')
             unit_fields = ','.join(unit_fields)
             self.update_value('UNIT', 'LINKED', unit_fields)
-            # Delete UNITIFIELDS from the EDM block of teh CFG
-
+            self.delete_key('EDM', 'UNITFIELDS')
+            
         for field_name in field_names:
             f = self.get(field_name)
             if f.prompt == '':
@@ -1069,8 +1075,6 @@ class MainScreen(e5_MainScreen):
         self.data = data if data else DB()
         self.cfg = cfg 
         self.station = station if station else totalstation()
-        if self.cfg is not None:
-            self.children[0].children[0].children[0].action_previous.title = filename_only(cfg.filename)
         self.cfg_datums = CFG()
         self.cfg_datums.build_datum()
         self.cfg_prisms = CFG().build_prism()
@@ -1161,6 +1165,14 @@ class MainScreen(e5_MainScreen):
                         colors = self.colors, call_back = self.take_shot, selected = True))
 
         self.layout.add_widget(shot_buttons)
+
+        self.update_title()
+
+    def update_title(self):
+        self.children[-1].children[0].children[0].action_previous.title = 'EDM'
+        if self.cfg is not None:
+            if self.cfg.filename is not "":
+                self.children[-1].children[0].children[0].action_previous.title = filename_only(self.cfg.filename)
 
     def take_shot(self, instance):
         
@@ -1307,7 +1319,7 @@ class MainScreen(e5_MainScreen):
                                 if len(fields) < 4:
                                     errors = '\nThis CSV file seems to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  The first row in the file should contain these field names separated by commas.  The first line was read as "%s".' % line
                                 if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
-                                    errors = '\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name, X, Y and Z.  The first line was read as "%s".'
+                                    errors = '\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name, X, Y and Z.  The first line was read as "%s".' % line
                             if errors:
                                 break
                             firstline = False
@@ -1399,7 +1411,9 @@ class MainScreen(e5_MainScreen):
             if fieldname not in __DEFAULT_FIELDS__:
                 field = self.cfg.get(fieldname)
                 if field.carry:
-                    new_record[fieldname] = self.get_last_value(fieldname)
+                    carry_value = self.get_last_value(fieldname)
+                    if carry_value:
+                        new_record[fieldname] = carry_value
         return(new_record)
 
     def fill_link_fields(self, new_record):
@@ -1505,6 +1519,7 @@ class RecordDatumsScreen(Screen):
                                                 call_back = [self.check_for_duplicate, self.cancel],
                                                 selected = [True, True],
                                                 colors = self.colors))
+
     def check_for_duplicate(self, instance):
         if self.data.get_datum(self.datum_name.txt.text) is not None:
             message = '\nOverwrite existing datum %s?' % self.datum_name.txt.text
@@ -1617,7 +1632,8 @@ class record_button(e5_button):
         if self.station.make == 'Microscribe':
             #self.popup = DataGridTextBox(title = self.text + '.  Waiting on Microscribe...', button_text = ['Cancel', 'Next'], call_back = self.microscribe)
             self.popup = DataGridTextBox(title = 'EDM',
-                                            label = self.text + '.  Waiting on Microscribe...',
+                                            label = self.text + '.  Waiting on...',
+                                            text = '<Microscribe>',
                                             button_text = ['Cancel', 'Next'],
                                             call_back = self.microscribe)
             self.popup.open()

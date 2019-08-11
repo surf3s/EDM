@@ -24,6 +24,7 @@ import ntpath
 import os
 from shutil import copyfile
 from datetime import datetime
+from datetime import date
 from tinydb import where
 from tinydb import Query
 import re
@@ -345,7 +346,7 @@ class e5_MainScreen(Screen):
                 if record_counter <= 0:
                     backup_path, backup_file = os.path.split(self.data.filename)
                     backup_file, backup_file_ext = backup_file.split('.')
-                    backup_file += self.time_stamp() if self.ini.incremental_backups else '_backup'
+                    backup_file += self.datetime_stamp() if self.ini.incremental_backups else '_backup'
                     backup_file += "." + backup_file_ext
                     backup_file = os.path.join(backup_path, backup_file)
                     copyfile(self.data.filename, backup_file)
@@ -357,11 +358,17 @@ class e5_MainScreen(Screen):
                 self.popup.open()
                 self.popup_open = True
 
-    def time_stamp(self):
+    def date_stamp(self):
+        date_stamp = '%s' % datetime.now().replace(microsecond=0)
+        date_stamp = date_stamp.split(' ')[0]
+        date_stamp = date_stamp.replace('-', '_') 
+        return('_' + date_stamp)
+
+    def datetime_stamp(self):
         time_stamp = '%s' % datetime.now().replace(microsecond=0)
-        time_stamp = time_stamp.replace('-','_')
-        time_stamp = time_stamp.replace(' ','_')
-        time_stamp = time_stamp.replace(':','_')
+        time_stamp = time_stamp.replace('-', '_')
+        time_stamp = time_stamp.replace(' ', '_')
+        time_stamp = time_stamp.replace(':', '_')
         return('_' + time_stamp)
 
     def close_popup(self, value):
@@ -427,7 +434,7 @@ class e5_MainScreen(Screen):
             else:
                 self.csv_data_type = self.data.table
             filename = ntpath.split(self.cfg.filename)[1].split(".")[0]
-            filename = filename + "_" + self.csv_data_type + '.csv' 
+            filename = filename + "_" + self.csv_data_type + self.date_stamp() + '.csv' 
             content = e5_SaveDialog(filename = filename,
                                 start_path = self.cfg.path,
                                 save = self.save_csvs, 
@@ -891,7 +898,7 @@ class e5_RecordEditScreen(Screen):
                 for widget in self.layout.walk():
                     if widget.id == field_name:
                         q = Query()
-                        db_rec = self.data.db.table(field_name).search(q[field_name].matches(widget.text, re.IGNORECASE))
+                        db_rec = self.data.db.table(field_name).search(q[field_name].matches('^' + widget.text + '$', re.IGNORECASE))
                         if db_rec == []:
                             self.data.db.table(field_name).insert({field_name: widget.text})
                             db_rec = self.data.db.table(field_name).search(where(field_name) == widget.text)
