@@ -1773,8 +1773,9 @@ class setups(ScrollView):
         self.data = data
         self.station = station
         self.ini = ini
+        self.recorder = []
 
-        y_sizes = {"Horizontal Angle Only" : 1.2,
+        y_sizes = {"Horizontal Angle Only" : 3.0,
                     "Over a datum": 1.1,
                     "Over a datum + Record a datum" : 1.6,
                     "Record two datums" : 2.6,
@@ -1792,13 +1793,13 @@ class setups(ScrollView):
             instructions.text = 'Enter the angle to be uploaded to the station.'
             self.scrollbox.add_widget(instructions)
 
-            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content1 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
             content1.add_widget(e5_label('Horizontal angle to the point\n(use ddd.mmss)'))
-            self.hangle = TextInput(text = '', multiline = False, id = 'h_angle')
+            self.hangle = TextInput(text = '', multiline = False, id = 'h_angle', size_hint_max_y = 30)
             content1.add_widget(self.hangle)
             self.scrollbox.add_widget(content1)
 
-            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2 = GridLayout(cols = 1, padding = 10, size_hint_y = None)
             content2.add_widget(e5_button(text = 'Upload angle', selected = True, call_back = self.set_hangle))
             self.scrollbox.add_widget(content2)
 
@@ -1812,10 +1813,10 @@ class setups(ScrollView):
                                                 default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
             self.scrollbox.add_widget(self.over_datum)
 
-            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
             content2.add_widget(e5_label('Height over datum'))
             self.station_height = TextInput(text = '', multiline = False,
-                                            id = 'station_height')
+                                            id = 'station_height', size_hint_max_y = 30)
             content2.add_widget(self.station_height)
             self.scrollbox.add_widget(content2)
 
@@ -1903,8 +1904,8 @@ class setups(ScrollView):
                 Color(0.8, 0.8, 0.8, 1)
                 Rectangle(size=self.size, pos=self.pos)
 
-        self.bind(size = draw_background)
-        self.bind(pos = draw_background)
+        #self.bind(size = draw_background)
+        #self.bind(pos = draw_background)
 
     def datum1_selected(self, instance):
         self.recorder[0].children[1].text = 'Record ' + instance.datum.name
@@ -1935,13 +1936,14 @@ class InitializeStationScreen(Screen):
         self.content = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
                                 size_hint_x = .8,
-                                pos_hint = {'center_x': .5},
+                                pos_hint = {'center_x': .5, 'center_y': .5},
                                 id = 'content',
                                 padding = 0,
                                 spacing = 0)
         self.add_widget(self.content)
 
-        setup_type_box = GridLayout(cols = 2, size_hint = (1, .2))
+        setup_type_box = GridLayout(cols = 2, size_hint = (.9, .2),
+                            pos_hint = {'center_x': .5, 'center_y': .5})
         setup_type_box.add_widget(e5_label('Setup type', colors = self.colors))
         self.setup_type = Spinner(text = self.setup,
                                     values=["Horizontal Angle Only",
