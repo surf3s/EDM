@@ -1228,6 +1228,9 @@ class MainScreen(e5_MainScreen):
                 self.data.db.table(self.data.table).on_save = self.on_save
                 self.data.db.table(self.data.table).on_cancel = self.on_cancel
                 self.parent.current = 'EditPointScreen'
+        else:
+            self.popup = e5_MessageBox(title = 'Error', message = '\nPointed not recorded.')
+            self.popup.open()
 
     def on_save(self):
         unit = self.get_last_value('UNIT')
@@ -1644,6 +1647,7 @@ class record_button(e5_button):
         result = self.popup.result
         self.popup.dismiss()
         if result:
+            error = True
             try:
                 if len(result.split(',')) == 3:
                     x, y, z = result.split(',')
@@ -1656,8 +1660,11 @@ class record_button(e5_button):
                     else:
                         self.station.round_xyz()
                     self.have_shot()
+                    error = False
             except:
-                self.popup = e5_MessageBox(title = 'Error', message = '\nError.  Data not formatted correctly.  EDM expects three floating point numbers separated by commas.')
+                pass
+            if error:
+                self.popup = e5_MessageBox(title = 'Error', message = '\nData not formatted correctly.  EDM expects three floating point numbers separated by commas.')
                 self.popup.open()
 
     def have_shot(self):
