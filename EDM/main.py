@@ -1370,10 +1370,12 @@ class MainScreen(e5_MainScreen):
     
     def fill_empty_with_last(self, new_record):
         for field in self.cfg.fields():
-            if field not in new_record.keys():
-                new_record[field] = self.get_last_value(field)
-            elif new_record[field] == '':
-                new_record[field] = self.get_last_value(field)
+            field_data = self.get_last_value(field)
+            if field_data is not None:
+                if field not in new_record.keys():
+                    new_record[field] = self.get_last_value(field)
+                elif new_record[field] == '':
+                    new_record[field] = self.get_last_value(field)
         return(new_record)
 
     def fill_button_defaults(self, new_record):
