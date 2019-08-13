@@ -1715,7 +1715,9 @@ class datum_selector(GridLayout):
     popup = ObjectProperty(None)
     popup_open = False
 
-    def __init__(self, text = '', data = None, colors = None, default_datum = None, **kwargs):
+    def __init__(self, text = '',
+                        data = None, colors = None, default_datum = None, 
+                        call_back = None, id = None, **kwargs):
         super(datum_selector, self).__init__(**kwargs)
         #self.orientation = 'horizontal'
         self.padding = 10
@@ -1724,6 +1726,7 @@ class datum_selector(GridLayout):
         self.colors = colors
         self.data = data
         self.datum = default_datum
+        self.call_back = call_back
         self.size_hint_y = None
         self.add_widget(e5_button(text = text,
                                     selected = True,
@@ -1754,6 +1757,8 @@ class datum_selector(GridLayout):
                                                                     self.datum.x,
                                                                     self.datum.y,
                                                                     self.datum.z)
+            if self.call_back:
+                self.call_back(self)
         else:
             self.result.text = 'Search error'
 
@@ -1770,8 +1775,9 @@ class setups(ScrollView):
         self.data = data
         self.station = station
         self.ini = ini
+        self.recorder = []
 
-        y_sizes = {"Horizontal Angle Only" : 1.2,
+        y_sizes = {"Horizontal Angle Only" : 3.0,
                     "Over a datum": 1.1,
                     "Over a datum + Record a datum" : 1.6,
                     "Record two datums" : 2.6,
@@ -1789,13 +1795,13 @@ class setups(ScrollView):
             instructions.text = 'Enter the angle to be uploaded to the station.'
             self.scrollbox.add_widget(instructions)
 
-            content1 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content1 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
             content1.add_widget(e5_label('Horizontal angle to the point\n(use ddd.mmss)'))
-            self.hangle = TextInput(text = '', multiline = False, id = 'h_angle')
+            self.hangle = TextInput(text = '', multiline = False, id = 'h_angle', size_hint_max_y = 30)
             content1.add_widget(self.hangle)
             self.scrollbox.add_widget(content1)
 
-            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2 = GridLayout(cols = 1, padding = 10, size_hint_y = None)
             content2.add_widget(e5_button(text = 'Upload angle', selected = True, call_back = self.set_hangle))
             self.scrollbox.add_widget(content2)
 
@@ -1809,10 +1815,10 @@ class setups(ScrollView):
                                                 default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
             self.scrollbox.add_widget(self.over_datum)
 
-            content2 = BoxLayout(orientation = 'horizontal', padding = 10)
+            content2 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
             content2.add_widget(e5_label('Height over datum'))
             self.station_height = TextInput(text = '', multiline = False,
-                                            id = 'station_height')
+                                            id = 'station_height', size_hint_max_y = 30)
             content2.add_widget(self.station_height)
             self.scrollbox.add_widget(content2)
 
@@ -1829,11 +1835,12 @@ class setups(ScrollView):
             self.datum2 = datum_selector(text = 'Select datum\nto record',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM')),
+                                                call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum2)
             
-            self.recorder = datum_recorder('Record datum', station = self.station, colors = self.colors, setup_type = setup_type)
-            self.scrollbox.add_widget(self.recorder)
+            self.recorder.append(datum_recorder('Record datum', station = self.station, colors = self.colors, setup_type = setup_type))
+            self.scrollbox.add_widget(self.recorder[0])
 
         elif setup_type == "Record two datums":
             instructions.text = "Select two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
@@ -1842,13 +1849,15 @@ class setups(ScrollView):
             self.datum1 = datum_selector(text = 'Select first datum\nto record',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_1')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_1')),
+                                                call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum1)
 
             self.datum2 = datum_selector(text = 'Select second datum\nto record',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_2')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_2')),
+                                                call_back = self.datum2_selected)
             self.scrollbox.add_widget(self.datum2)
 
             for n in range(2):
@@ -1862,19 +1871,22 @@ class setups(ScrollView):
             self.datum1 = datum_selector(text = 'Select datum 1',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1')),
+                                                call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum1)
 
             self.datum2 = datum_selector(text = 'Select datum 2',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2')),
+                                                call_back = self.datum2_selected)
             self.scrollbox.add_widget(self.datum2)
 
             self.datum3 = datum_selector(text = 'Select datum 3',
                                                 data = self.data,
                                                 colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3')))
+                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3')),
+                                                call_back = self.datum3_selected)
             self.scrollbox.add_widget(self.datum3)
 
             for n in range(3):
@@ -1894,8 +1906,17 @@ class setups(ScrollView):
                 Color(0.8, 0.8, 0.8, 1)
                 Rectangle(size=self.size, pos=self.pos)
 
-        self.bind(size = draw_background)
-        self.bind(pos = draw_background)
+        #self.bind(size = draw_background)
+        #self.bind(pos = draw_background)
+
+    def datum1_selected(self, instance):
+        self.recorder[0].children[1].text = 'Record ' + instance.datum.name
+
+    def datum2_selected(self, instance):
+        self.recorder[1].children[1].text = 'Record ' + instance.datum.name
+
+    def datum3_selected(self, instance):
+        self.recorder[2].children[1].text = 'Record ' + instance.datum.name
 
     def set_hangle(self, instance):
         if self.hangle:
@@ -1917,13 +1938,14 @@ class InitializeStationScreen(Screen):
         self.content = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
                                 size_hint_x = .8,
-                                pos_hint={'center_x': .5},
+                                pos_hint = {'center_x': .5, 'center_y': .5},
                                 id = 'content',
-                                padding = 20,
-                                spacing = 20)
+                                padding = 0,
+                                spacing = 0)
         self.add_widget(self.content)
 
-        setup_type_box = GridLayout(cols = 2, size_hint = (1, .2))
+        setup_type_box = GridLayout(cols = 2, size_hint = (.9, .2),
+                            pos_hint = {'center_x': .5, 'center_y': .5})
         setup_type_box.add_widget(e5_label('Setup type', colors = self.colors))
         self.setup_type = Spinner(text = self.setup,
                                     values=["Horizontal Angle Only",
@@ -2404,6 +2426,7 @@ class EDMApp(e5_Program):
     def build(self):
         self.add_screens()
         restore_window_size_position(__program__, self.ini)
+        Window.borderless = True
         self.title = __program__ + " " + __version__
         logger.info(__program__ + ' started, logger initialized, and application built.')
         sm.screens[0].build_mainscreen()
