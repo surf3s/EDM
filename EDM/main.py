@@ -1935,10 +1935,10 @@ class InitializeStationScreen(Screen):
         self.content = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
                                 size_hint_x = .8,
-                                pos_hint={'center_x': .5},
+                                pos_hint = {'center_x': .5},
                                 id = 'content',
-                                padding = 20,
-                                spacing = 20)
+                                padding = 0,
+                                spacing = 0)
         self.add_widget(self.content)
 
         setup_type_box = GridLayout(cols = 2, size_hint = (1, .2))
@@ -2422,6 +2422,7 @@ class EDMApp(e5_Program):
     def build(self):
         self.add_screens()
         restore_window_size_position(__program__, self.ini)
+        Window.borderless = True
         self.title = __program__ + " " + __version__
         logger.info(__program__ + ' started, logger initialized, and application built.')
         sm.screens[0].build_mainscreen()
