@@ -2120,7 +2120,7 @@ class EditLastRecordScreen(e5_RecordEditScreen):
     def on_pre_enter(self):
         if self.data_table is not None and self.e5_cfg is not None:
             try:
-                last = self.data.db.table(self.data.table).all()[-1]
+                last = self.data.db.table(self.data_table).all()[-1]
                 self.doc_id = last.doc_id
             except:
                 self.doc_id = None

@@ -17,7 +17,7 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.switch import Switch
 from kivy.uix.slider import Slider
 
-from constants import BLACK, WHITE, SCROLLBAR_WIDTH, GOOGLE_COLORS, __program__
+from constants import BLACK, WHITE, SCROLLBAR_WIDTH, GOOGLE_COLORS, SPLASH_HELP, __program__
 from colorscheme import ColorScheme, make_rgb
 from misc import platform_name, locate_file
 import ntpath
@@ -279,12 +279,12 @@ class e5_MainScreen(Screen):
         self.event.cancel()
         if self.cfg.has_errors or self.cfg.has_warnings:
             if self.cfg.has_errors:
-                message_text = 'The following errors in the configuration file %s must be fixed before data entry can begin.\n\n' % self.cfg.filename
+                message_text = '\nThe following errors were found in the configuration file %s and must be corrected before data entry can begin.\n\n' % self.cfg.filename
                 self.cfg.filename = ''
                 title = 'CFG File Errors'                
             elif self.cfg.has_warnings:
                 self.cfg.has_warnings = False
-                message_text = '\nThough data entry can start, there are the following warnings in the configuration file %s.\n\n' % self.cfg.filename
+                message_text = '\nThough data collection can start, there are the following warnings in the configuration file %s.\n\n' % self.cfg.filename
                 title = 'Warnings'
             message_text = message_text + '\n\n'.join(self.cfg.errors)
         else:
@@ -810,12 +810,12 @@ class e5_RecordEditScreen(Screen):
 
     def previous_record(self, value):
         if self.doc_id:
-            self.doc_id = max(1, self.doc_id - 1)
+            self.doc_id = max(self.data.db.table(self.data_table).all()[0].doc_id, self.doc_id - 1)
             self.put_data_in_frame()
 
     def next_record(self, value):
         if self.doc_id and self.data_table:
-            self.doc_id = min(len(self.data.db.table(self.data_table)), self.doc_id + 1)
+            self.doc_id = min(self.data.db.table(self.data_table).all()[-1].doc_id, self.doc_id + 1)
             self.put_data_in_frame()
 
     def clear_the_frame(self):
