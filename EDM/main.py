@@ -1,9 +1,9 @@
-# same data coming across each time
-
 # ToDo
 #   After XYZ are obtained, check units file, populate and maintain units file after save
 #   Link fields just like unit fields need to be updated after save
 #   Item added to menu doesn't actually add to cfg
+#   same data coming across each time
+#   Table names can not have special characters in them
 
 # If it is a linked field - make it a menu field?
 
@@ -20,7 +20,7 @@
 #   Add serial port communications
 #   Add bluetooth communications
 
-__version__ = '1.0.6'
+__version__ = '1.0.7'
 __date__ = 'August, 2019'
 from constants import __program__ 
 
