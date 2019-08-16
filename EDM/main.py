@@ -1,20 +1,14 @@
 # ToDo
 #   After XYZ are obtained, check units file, populate and maintain units file after save
-#   Link fields just like unit fields need to be updated after save
-#   Item added to menu doesn't actually add to cfg
 #   same data coming across each time
 #   Table names can not have special characters in them
+#   Need to make prism menu after shot work
 
-# If it is a linked field - make it a menu field?
-
-# Need to make prism menu after shot work
-
-# A menu field can be linked to other fields in the same CFG and this will load default values.
 # A text field can be linked to another table. [future feature]
 #   Think through making a field link to a database table (unique value is a table record)
 
 # ToDo NewPlot
-#   Read either CSV or JSON file
+#   Read JSON file
 
 # ToDo More Longterm
 #   Add serial port communications
@@ -351,11 +345,12 @@ class CFG(blockdata):
         self.description = ''   # not implimented yet
         self.gps = False
         self.link_fields = []
-    
+        self.errors = []
+
     def open(self, filename = ''):
         if filename:
             self.filename = filename
-        self.load()
+        return(self.load())
 
     def valid_datarecord(self, data_record):
         for field in data_record:
@@ -498,7 +493,9 @@ class CFG(blockdata):
 
     def validate(self):
 
-        errors = []
+        self.errors = []
+        self.has_errors = False
+        self.has_warnings = False
         field_names = self.fields()
         self.link_fields = []
 
@@ -510,8 +507,17 @@ class CFG(blockdata):
             unit_fields = ','.join(unit_fields)
             self.update_value('UNIT', 'LINKED', unit_fields)
             self.delete_key('EDM', 'UNITFIELDS')
-            
+
+        table_name = self.get_value('EDM','TABLE')
+        if table_name:
+            if any((c in set(r' !@#$%^&*()?/\{}<.,.|+=~`-')) for c in table_name):
+                self.errors.append("Error: The table name '%s' has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '%s' characters.  Change the name before collecting data." % (table_name, r' !@#$%^&*()?/\{}<.,.|+=~`-'))
+                self.has_errors = True
+    
         for field_name in field_names:
+            if any((c in set(r' !@#$%^&*()?/\{}<.,.|+=~`-')) for c in field_name):
+                self.errors.append("Error: The field name '%s' has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '%s' characters.  Change the name before collecting data." % (table_name, r' !@#$%^&*()?/\{}<.,.|+=~`-'))
+                self.has_errors = True
             f = self.get(field_name)
             if f.prompt == '':
                 f.prompt = field_name
@@ -525,7 +531,7 @@ class CFG(blockdata):
                 # uppercase the link fields
                 for link_field_name in f.link_fields:
                     if link_field_name not in field_names:
-                        errors.append(['Warning','The field %s is set to link to %s but the field %s does not exist in the CFG.' % (field_name, link_field_name, link_field_name)])
+                        self.errors.append("Warning: The field %s is set to link to %s but the field %s does not exist in the CFG." % (field_name, link_field_name, link_field_name))
             self.put(field_name, f)
 
             for field_option in ['UNIQUE','CARRY','INCREMENT','REQUIRED','SORTED']:
@@ -533,7 +539,7 @@ class CFG(blockdata):
                     if self.get_value(field_name, field_option).upper() == 'YES':
                         self.update_value(field_name, field_option, 'TRUE')
 
-        return(errors)
+        return(self.has_errors)
 
     def save(self):
         self.write_blocks()
@@ -1168,6 +1174,10 @@ class MainScreen(e5_MainScreen):
 
         self.update_title()
 
+        if self.cfg.filename:
+            if self.cfg.has_warnings or self.cfg.has_errors:
+                self.event = Clock.schedule_once(self.show_popup_message, 1)
+
     def update_title(self):
         self.children[-1].children[0].children[0].action_previous.title = 'EDM'
         if self.cfg is not None:
@@ -1233,6 +1243,16 @@ class MainScreen(e5_MainScreen):
             self.popup.open()
 
     def on_save(self):
+        self.update_info_label()
+        self.make_backup()
+        self.check_for_duplicate_xyz()
+
+    def on_cancel(self):
+        last_record = self.data.db.table(self.data.table).all()[-1]
+        if last_record != []:
+            self.data.db.table(self.data.table).remove(doc_ids = [last_record.doc_id])
+
+    def update_info_label(self):
         unit = self.get_last_value('UNIT')
         idno = self.get_last_value('ID')
         suffix = self.get_last_value('SUFFIX')
@@ -1240,12 +1260,16 @@ class MainScreen(e5_MainScreen):
             self.info.text = '%s-%s(%s)' % (unit, idno, suffix)
         else:
             self.info = 'EDM'
-        self.make_backup()
 
-    def on_cancel(self):
-        last_record = self.data.db.table(self.data.table).all()[-1]
-        if last_record != []:
-            self.data.db.table(self.data.table).remove(doc_ids = [last_record.doc_id])
+    def check_for_duplicate_xyz(self):
+        if self.station.make == 'Microscribe':
+            if len(self.data.db.table(self.data.table)) > 1:
+                last_record = self.data.db.table(self.data.table).all()[-1]
+                next_to_last_record = self.data.db.table(self.data.table).all()[-2]
+                if 'X' in last_record.keys() and 'Y' in last_record.keys() and 'Z' in last_record.keys():
+                    if last_record['X'] == next_to_last_record['X'] and last_record['Y'] == next_to_last_record['Y'] and last_record['Z'] == next_to_last_record['Z']:
+                        self.popup = e5_MessageBox(title = 'Warning', message = '\nThe last two recorded points have the exact same XYZ coordinates (%s, %s, %s).  Verify that the Microscribe is still properly recording points (green light is on).  If the red light is on, you need to re-initialize (Setup - Initialize Station) and re-shoot the last two points.' % (last_record['X'], last_record['Y'], last_record['Z']))
+                        self.popup.open()
 
     def close_popup(self, instance):
         self.popup.dismiss()
@@ -2292,11 +2316,13 @@ class StatusScreen(e5_InfoScreen):
         txt += self.station.status() if self.station else 'Total station information is not available.\n\n'
         txt += '\nThe default user path is %s.\n' % self.ini.get_value(__program__,"APP_PATH")
         txt += '\nThe operating system is %s.\n' % platform_name()
+        txt += '\nPython buid is %s.\n' % (python_version())
+        txt += '\nLibraries installed include Kivy %s, TinyDB %s and Plyer %s.\n' % (__kivy_version__, __tinydb_version__, __plyer_version__)
+        txt += '\nEDM was tested and distributed on Python 3.6, Kivy 1.10.1, TinyDB 3.11.1 and Plyer 1.4.0.\n'
         self.content.text = txt
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
         self.back_button.color = self.colors.button_color
-
 
 #endregion
 
