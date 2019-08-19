@@ -85,6 +85,7 @@ class e5_button(Button):
     def __init__(self, text, id = '', selected = False, call_back = None,
                  button_height = None, colors = None, **kwargs):
         super(e5_button, self).__init__(**kwargs)
+        self.colors = colors
         self.text = text
         self.size_hint_y = button_height
         self.id = id
@@ -168,7 +169,6 @@ class e5_scrollview_menu(ScrollView):
             index_no = 0
 
         if index_no >= 0:
-            print (self.children[0].cols)
             new_index = -1
             if ascii_code == 279:
                 new_index = len(menu_list) - 1
@@ -814,7 +814,7 @@ class e5_RecordEditScreen(Screen):
                         one_record_only = False,
                         **kwargs):
         super(e5_RecordEditScreen, self).__init__(**kwargs)
-        self.colors = colors if colors else ColorScheme()
+        self.colors = colors if colors is not None else ColorScheme()
         self.e5_cfg = e5_cfg
         self.data_table = data_table
         self.data = data
@@ -831,7 +831,8 @@ class e5_RecordEditScreen(Screen):
             self.layout.add_widget(e5_side_by_side_buttons(text = ['Previous record','Next record'],
                                                             id = ['previous','next'],
                                                             call_back = [self.previous_record, self.next_record],
-                                                            selected = [True, True]))
+                                                            selected = [True, True],
+                                                            colors = self.colors))
             self.layout.add_widget(e5_button('Back', id = 'back', selected = True,
                                         call_back = self.call_back, colors = self.colors))
         else:
@@ -969,7 +970,7 @@ class e5_RecordEditScreen(Screen):
                 self.popup_field_widget = instance
                 if cfg_field.inputtype in ['MENU','BOOLEAN']:
                     self.popup = DataGridMenuList(instance.id, cfg_field.menu,
-                                                    instance.text, self.menu_selection)
+                                                    instance.text, self.menu_selection, colors = self.colors)
                     self.popup.open()
                     self.popup_scrollmenu = self.get_widget_by_id(self.popup, 'menu_scroll')
                     self.popup_textbox = self.get_widget_by_id(self.popup, 'new_item')
@@ -1229,7 +1230,7 @@ class DataGridTextBox(Popup):
         self.size_hint = (.8, .35 if label is None else .5)
         self.auto_dismiss = True
 
-        self.event = Clock.schedule_once(self.set_focus, .5)
+        self.event = Clock.schedule_once(self.set_focus, .35)
     
     def set_focus(self, instance):
         self.txt.focus = True
@@ -1359,12 +1360,13 @@ class DataGridTableData(RecycleView):
         cfg_field = self.e5_cfg.get(field)
         self.inputtype = cfg_field.inputtype
         if cfg_field.inputtype in ['MENU','BOOLEAN']:
-            self.popup = DataGridMenuList(field, cfg_field.menu, editcell_widget.text, self.menu_selection)
+            self.popup = DataGridMenuList(field, cfg_field.menu, editcell_widget.text, self.menu_selection, self.colors)
             self.popup.open()
         if cfg_field.inputtype in ['TEXT','NUMERIC','NOTE']:
             self.popup = DataGridTextBox(title = field, text = editcell_widget.text,
                                             multiline = cfg_field.inputtype == 'NOTE',
-                                            call_back = self.menu_selection)
+                                            call_back = self.menu_selection,
+                                            colors = self.colors)
             self.popup.open()
         self.datatable_widget.popup_scrollmenu = self.datatable_widget.get_widget_by_id(self.popup, 'menu_scroll')
         self.datatable_widget.popup_textbox = self.datatable_widget.get_widget_by_id(self.popup, 'new_item')
@@ -1595,7 +1597,8 @@ class DataGridWidget(TabbedPanel):
             if cfg_field:
                 self.popup_field_widget = instance
                 if cfg_field.inputtype in ['MENU','BOOLEAN']:
-                    self.popup = DataGridMenuList(instance.id, cfg_field.menu, instance.text, self.menu_selection)
+                    self.popup = DataGridMenuList(instance.id, cfg_field.menu,
+                                                    instance.text, self.menu_selection, colors = self.colors)
                     self.popup.open()
                     self.popup_scrollmenu = self.get_widget_by_id(self.popup, 'menu_scroll')
                     self.popup_textbox = self.get_widget_by_id(self.popup, 'new_item')

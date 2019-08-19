@@ -1,10 +1,14 @@
+### EDM by Shannon McPherron
+#
+#   This is an alpha release.  I am still working on bugs and I am still implementing some features.
+#   It should be backwards compatible with EDM-Mobile and EDMWin (but there are still some issues).
+
 # ToDo
 #   After XYZ are obtained, check units file, populate and maintain units file after save
-#   same data coming across each time
-#   Table names can not have special characters in them
 #   Need to make prism menu after shot work
+#   Make copy and paste work
 
-# A text field can be linked to another table. [future feature]
+#   A text field can be linked to another table. [future feature]
 #   Think through making a field link to a database table (unique value is a table record)
 
 # ToDo NewPlot
@@ -44,6 +48,7 @@ from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.tabbedpanel import TabbedPanel
 from kivy.core.window import Window
+from kivy import __version__ as __kivy_version__
 
 # The explicit mention of this package here
 # triggers its inclusions in the pyinstaller spec file.
@@ -59,9 +64,12 @@ import datetime
 from math import sqrt
 import re
 import string
+from platform import python_version
 
 import logging
 import logging.handlers as handlers
+
+import serial
 
 # My libraries for this project
 from blockdata import blockdata
@@ -73,8 +81,14 @@ from misc import *
 
 # The database - pure Python
 from tinydb import TinyDB, Query, where
+from tinydb import __version__ as __tinydb_version__
+
+from plyer import gps
+from plyer import __version__ as __plyer_version__
 
 from collections import OrderedDict
+
+from plyer import __version__ as __plyer_version__
 
 #endregion
 
@@ -177,7 +191,7 @@ class DB(dbs):
             return(None)
 
     def get_datum(self, name = ''):
-        if name is not '':
+        if name is not '' and self.db is not None:
             a_datum = Query()
             p = self.db.table('datums').search(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
             #p = self.db.table('datums').search( (where('NAME') == name, flags = re.IGNORECASE) )
@@ -1645,12 +1659,13 @@ class record_button(e5_button):
 
     def __init__(self, station = None, result_label = None, setup_type = None, on_record = None, **kwargs):
         super(record_button, self).__init__(**kwargs)
+        #self.colors = colors if colors is not None else ColorScheme()
         self.station = station
         self.bind(on_press = self.record_datum)
         self.result_label = result_label
         self.setup_type = setup_type
         self.on_record = on_record
-
+        
     def record_datum(self, instance):
         if self.id == 'datum1' and self.setup_type in ['Over a datum + Record a datum','Record two datums']:
             self.station.set_horizontal_angle(0)
@@ -1664,7 +1679,8 @@ class record_button(e5_button):
                                             label = self.text + '.  Waiting on...',
                                             text = '<Microscribe>',
                                             button_text = ['Cancel', 'Next'],
-                                            call_back = self.microscribe)
+                                            call_back = self.microscribe,
+                                            colors = self.colors)
             self.popup.open()
 
     def microscribe(self, instance):
@@ -1688,7 +1704,8 @@ class record_button(e5_button):
             except:
                 pass
             if error:
-                self.popup = e5_MessageBox(title = 'Error', message = '\nData not formatted correctly.  EDM expects three floating point numbers separated by commas.')
+                self.popup = e5_MessageBox(title = 'Error', message = '\nData not formatted correctly.  EDM expects three floating point numbers separated by commas.',
+                                            colors = self.colors)
                 self.popup.open()
 
     def have_shot(self):
@@ -1722,7 +1739,7 @@ class datum_recorder(GridLayout):
         super(datum_recorder, self).__init__(**kwargs)
         self.padding = 10
         self.spacing = 10
-        self.colors = colors
+        self.colors = colors if colors is not None else ColorScheme()
         self.station = station
         self.cols = 2
         self.results = []
@@ -1802,7 +1819,7 @@ class setups(ScrollView):
     def __init__(self, setup_type, data = None, ini = None, station = None, colors = None, **kwargs):
         super(setups, self).__init__(**kwargs)
 
-        self.colors = colors if colors else ColorScheme()
+        self.colors = colors if colors is not None else ColorScheme()
         self.data = data
         self.station = station
         self.ini = ini
@@ -1921,7 +1938,13 @@ class setups(ScrollView):
             self.scrollbox.add_widget(self.datum3)
 
             for n in range(3):
-                self.recorder.append(datum_recorder('Record datum', datum_no = n + 1, station = station, colors = colors, setup_type = setup_type))
+                datum_name = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_%s' % (n + 1)))
+                if datum_name is None:
+                    datum_name = 'Record datum %s' % (n + 1)
+                else:
+                    datum_name = 'Record %s' % datum_name.name
+                self.recorder.append(datum_recorder(datum_name, datum_no = n + 1, station = station,
+                                                                colors = self.colors, setup_type = setup_type))
                 self.scrollbox.add_widget(self.recorder[n])
             
         instructions.bind(texture_size = lambda instance, value: setattr(instance, 'height', value[1]))
@@ -2006,7 +2029,8 @@ class InitializeStationScreen(Screen):
         self.content.add_widget(e5_side_by_side_buttons(text = ['Back','Accept Setup'],
                                                         id = ['back','accept'],
                                                         call_back = [self.go_back, self.accept_setup],
-                                                        selected = [True, True]))
+                                                        selected = [True, True],
+                                                        colors = self.colors))
 
     def rebuild(self, instance, value):
         self.setup = value
@@ -2317,8 +2341,8 @@ class StatusScreen(e5_InfoScreen):
         txt += '\nThe default user path is %s.\n' % self.ini.get_value(__program__,"APP_PATH")
         txt += '\nThe operating system is %s.\n' % platform_name()
         txt += '\nPython buid is %s.\n' % (python_version())
-        txt += '\nLibraries installed include Kivy %s, TinyDB %s and Plyer %s.\n' % (__kivy_version__, __tinydb_version__, __plyer_version__)
-        txt += '\nEDM was tested and distributed on Python 3.6, Kivy 1.10.1, TinyDB 3.11.1 and Plyer 1.4.0.\n'
+        txt += '\nLibraries installed include Kivy %s and TinyDB %s.\n' % (__kivy_version__, __tinydb_version__)
+        txt += '\nEDM was tested and distributed on Python 3.6, Kivy 1.10.1 and TinyDB 3.11.1.\n'
         self.content.text = txt
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
@@ -2373,6 +2397,7 @@ class EDMApp(e5_Program):
                                             ini = self.ini))
 
         sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen', id = 'editlastrecord_screen',
+                                        colors = self.colors,
                                         data = self.data,
                                         data_table = self.data.table,
                                         doc_id = None,
