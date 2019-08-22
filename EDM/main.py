@@ -23,6 +23,7 @@ __date__ = 'August, 2019'
 from constants import __program__ 
 
 __DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','ID']
+__BUTTONS__ = 13
 
 #Region Imports
 from kivy.graphics import Color, Rectangle
@@ -69,7 +70,7 @@ from platform import python_version
 import logging
 import logging.handlers as handlers
 
-import serial
+#import serial
 
 # My libraries for this project
 from blockdata import blockdata
@@ -83,12 +84,13 @@ from misc import *
 from tinydb import TinyDB, Query, where
 from tinydb import __version__ as __tinydb_version__
 
-from plyer import gps
-from plyer import __version__ as __plyer_version__
+#from plyer import gps
+#from plyer import __version__ as __plyer_version__
 
 from collections import OrderedDict
 
-from plyer import __version__ as __plyer_version__
+#from plyer import __version__ as __plyer_version__
+__plyer_version__ = 'None'
 
 #endregion
 
@@ -312,6 +314,8 @@ class INI(blockdata):
     def update(self, colors, cfg):
         self.update_value(__program__,'CFG', cfg.filename)
         self.update_value(__program__,'ColorScheme', colors.color_scheme)
+        self.update_value(__program__,'ButtonFontSize', colors.button_font_size)
+        self.update_value(__program__,'TextFontSize', colors.text_font_size)
         self.update_value(__program__,'DarkMode', 'TRUE' if colors.darkmode else 'FALSE')
         self.update_value(__program__,'IncrementalBackups', self.incremental_backups)
         self.update_value(__program__,'BackupInterval', self.backup_interval)
@@ -397,7 +401,9 @@ class CFG(blockdata):
 
     def fields(self):
         field_names = self.names()
-        del_fields = ['BUTTON1','BUTTON2','BUTTON3','BUTTON4','BUTTON5','BUTTON6','EDM','TIME']
+        del_fields = ['EDM','TIME']
+        for n in range(1, __BUTTONS__):
+            del_fields.append('BUTTON%s' % n)
         for del_field in del_fields:
             if del_field in field_names:
                 field_names.remove(del_field)
@@ -1145,7 +1151,7 @@ class MainScreen(e5_MainScreen):
         button_count = 0
         button_text = []
         button_selected = []
-        for button_no in range(1,7):
+        for button_no in range(1, __BUTTONS__):
             if self.cfg.get_value('BUTTON' + str(button_no), 'TITLE'):
                 button_text.append(self.cfg.get_value('BUTTON' + str(button_no), 'TITLE'))
                 button_selected.append(False)
@@ -1420,18 +1426,19 @@ class MainScreen(e5_MainScreen):
         return(new_record)
 
     def fill_button_defaults(self, new_record):
-        for button_no in range(1,7):
+        for button_no in range(1, __BUTTONS__):
             button = self.cfg.get_block('BUTTON' + str(button_no))
-            if 'TITLE' in button.keys():
-                if button['TITLE'] == self.station.shot_type:
-                    fieldnames = self.cfg.fields()
-                    for button_default in button:
-                        if button_default in fieldnames:
-                            if button[button_default].upper() == 'ALPHA':
-                                ### Should be calibrated to the length of this field
-                                new_record[button_default] = self.station.hash()
-                            else:
-                                new_record[button_default] = button[button_default]
+            if button:
+                if 'TITLE' in button.keys():
+                    if button['TITLE'] == self.station.shot_type:
+                        fieldnames = self.cfg.fields()
+                        for button_default in button:
+                            if button_default in fieldnames:
+                                if button[button_default].upper() == 'ALPHA':
+                                    ### Should be calibrated to the length of this field
+                                    new_record[button_default] = self.station.hash()
+                                else:
+                                    new_record[button_default] = button[button_default]
         return(new_record)
 
     def do_increments(self, new_record):
