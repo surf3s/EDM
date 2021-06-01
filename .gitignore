@@ -1,3 +1,8 @@
 
 *.xlsx
 EDM/.vscode/.ropeproject/objectdb
+build/
+.vscode/
+bin/
+manuals/
+Backups/

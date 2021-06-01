@@ -1052,7 +1052,6 @@ class totalstation:
             rotated_local.append(self.rotate_point_2d(global_vector, local_vector, local[0]))
             rotated_local.append(self.rotate_point_2d(global_vector, local_vector, local[1]))
             rotated_local.append(self.rotate_point_2d(global_vector, local_vector, local[2]))
-            #rotated_local.append(self.rotate_point_2d(global_vector, local_vector, self.vector_subtract(self.rotate_local[2], self.rotate_local[0])))
 
             # Now line up on the other side of the triangle formed by the three datum points
             # by computing the surface normal of each and rotating on the first already rotated side
@@ -1068,8 +1067,6 @@ class totalstation:
             rotated_local[2] = self.rotate_point_2d(global_vector, local_vector, rotated_local[2])
 
             # Now align the starting points of each grid systems by shifting the first datum points onto each other
-            #datum_diff = self.vector_subtract(self.rotate_global[0], rotated_local[0])
-            #result = self.translate_point(datum_diff, p_out2)
             result = self.translate_point(self.rotate_global[0], p_out2)
 
             return(result)
