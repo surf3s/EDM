@@ -18,12 +18,16 @@
 #   Add serial port communications
 #   Add bluetooth communications
 
-__version__ = '1.0.7'
-__date__ = 'August, 2019'
+# ToDo Serial Communications with TS
+#   put getting comports into a pre_enter function rather than on startup to save time
+
+__version__ = '1.0.8'
+__date__ = 'June, 2021'
 from constants import __program__ 
 
 __DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','ID']
 __BUTTONS__ = 13
+__LASTCOMPORT__ = 16
 
 #Region Imports
 from kivy.graphics import Color, Rectangle
@@ -98,6 +102,7 @@ __plyer_version__ = 'None'
 # or get angles.py library (looks maybe better)
 
 # use pySerial for serial communications
+import serial
 
 #Region Data Classes
 class point:
@@ -175,11 +180,12 @@ class DB(dbs):
             self.db = TinyDB(self.filename)
 
     def open(self, filename):
-        self.db = TinyDB(filename)
-        self.filename = filename
-        self.prisms = self.db.table('prisms')
-        self.units = self.db.table('units')
-        self.datums = self.db.table('datums')
+        if os.path.exists(filename):
+            self.db = TinyDB(filename)
+            self.filename = filename
+            self.prisms = self.db.table('prisms')
+            self.units = self.db.table('units')
+            self.datums = self.db.table('datums')
 
     def create_defaults(self):
         pass
@@ -658,6 +664,7 @@ class totalstation:
         self.rotate_local = []
         self.rotate_global = []
         self.last_setup_type = ''
+
 
     def setup(self, ini, data):
         if ini.get_value(__program__,'STATION'):
@@ -2235,6 +2242,20 @@ class StationConfigurationScreen(Screen):
 
         self.build_screen()
 
+
+    def comportIsUsable(self, portName):
+        try:
+            ser = serial.Serial(port = portName)
+            ser.close()
+            return portName
+        except:
+            return None
+
+
+    def comports(self):
+        return list(filter(None.__ne__, [self.comportIsUsable("COM%s" % comno) for comno in range(1, __LASTCOMPORT__ + 1)]))
+
+
     def build_screen(self):
         self.layout.clear_widgets()
         self.layout.add_widget(station_setting(label_text = 'Station type',
@@ -2250,13 +2271,13 @@ class StationConfigurationScreen(Screen):
                                             colors = self.colors,
                                             default = self.ini.get_value(__program__, 'COMMUNICATIONS')))
         self.layout.add_widget(station_setting(label_text = 'Port Number',
-                                            spinner_values = ("COM1", "COM2","COM3","COM4","COM5","COM6"),
+                                            spinner_values = self.comports(),
                                             call_back = self.update_ini,
                                             id = 'comport',
                                             colors = self.colors,
                                             default = self.ini.get_value(__program__, 'COMPORT')))
         self.layout.add_widget(station_setting(label_text = 'Baud rate',
-                                            spinner_values = ("1200", "2400","4800","9600"),
+                                            spinner_values = ("1200", "2400", "4800", "9600", "14400", "19200"),
                                             call_back = self.update_ini,
                                             id = 'baudrate',
                                             colors = self.colors,
@@ -2354,7 +2375,8 @@ class StatusScreen(e5_InfoScreen):
 
 #endregion
 
-sm = ScreenManager(id = 'screen_manager')
+#sm = ScreenManager(id = 'screen_manager')
+sm = ScreenManager()
 
 class EDMApp(e5_Program):
 
