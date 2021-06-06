@@ -58,6 +58,7 @@ class e5_PopUpMenu(Popup):
         self.auto_dismiss = True
 
 class e5_label(Label):
+    id = ObjectProperty('')
     def __init__(self, text, popup = False, colors = None, **kwargs):
         super(e5_label, self).__init__(**kwargs)
         self.text = text
@@ -70,20 +71,26 @@ class e5_label(Label):
                 self.font_size = colors.text_font_size 
 
 class e5_side_by_side_buttons(GridLayout):
-    def __init__(self, text, id = ['',''], selected = [False, False],
-                     call_back = [None, None], button_height = None, colors = None, **kwargs):
+    def __init__(self, text,
+                    id = ['',''], selected = [False, False],
+                    call_back = [None, None], button_height = None, colors = None, **kwargs):
         super(e5_side_by_side_buttons, self).__init__(**kwargs)
         self.cols = len(id)
         self.spacing = 5
         self.size_hint_y = button_height
         #self.height = button_height
         for i in range(len(id)):
-            self.add_widget(e5_button(text[i], id = id[i], selected = selected[i], call_back = call_back[i],
+            self.add_widget(e5_button(text[i],
+                            id = id[i],
+                            selected = selected[i], call_back = call_back[i],
                             button_height = button_height, colors = colors))
 
 class e5_button(Button):
-    def __init__(self, text, id = '', selected = False, call_back = None,
-                 button_height = None, colors = None, **kwargs):
+    id = ObjectProperty('')
+    def __init__(self, text,
+                id = '',
+                selected = False, call_back = None,
+                button_height = None, colors = None, **kwargs):
         super(e5_button, self).__init__(**kwargs)
         self.colors = colors
         self.text = text
@@ -102,16 +109,15 @@ class e5_button(Button):
         self.background_normal = ''
 
 class e5_scrollview_menu(ScrollView):
-
+    id = ObjectProperty(None)
     scrollbox = ObjectProperty(None)
     menu_selected_widget = None
-
     def __init__(self, menu_list, menu_selected, widget_id = '', call_back = [None], ncols = 1, colors = None, **kwargs):
         super(e5_scrollview_menu, self).__init__(**kwargs)
         self.colors = colors
         self.scrollbox = GridLayout(cols = ncols,
                                 size_hint_y = None,
-                                id = widget_id + '_box',
+                                #id = widget_id + '_box',
                                 spacing = 5)
         self.scrollbox.bind(minimum_height = self.scrollbox.setter('height'))
         
@@ -204,16 +210,17 @@ class e5_scrollview_menu(ScrollView):
                     # need new logic to auto select when only one case is available
 
 class e5_scrollview_label(ScrollView):
+    id = ObjectProperty(None)
     def __init__(self, text, widget_id = '', popup = False, colors = None, **kwargs):
         super(e5_scrollview_label, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
         scrollbox = GridLayout(cols = 1,
                                 size_hint_y = None,
-                                id = widget_id + '_box',
+#                                id = widget_id + '_box',
                                 spacing = 5)
         scrollbox.bind(minimum_height = scrollbox.setter('height'))
 
-        info = Label(text = text, markup = True,
+        info = e5_label(text = text, markup = True,
                     size_hint_y = None,
                     color = self.colors.text_color if not popup else self.colors.popup_text_color,
                     id = widget_id + '_label',
@@ -575,6 +582,11 @@ class e5_MainScreen(Screen):
         self.popup.open()
         self.popup_open = True
 
+class e5_gridlayout(GridLayout):
+    id = ObjectProperty(None)
+    def __init__(self, **kwargs):
+        super(e5_gridlayout, self).__init__(**kwargs)
+
 class e5_SettingsScreen(Screen):
     def __init__(self, cfg = None, ini = None, colors = None, **kwargs):
         super(e5_SettingsScreen, self).__init__(**kwargs)
@@ -587,10 +599,7 @@ class e5_SettingsScreen(Screen):
 
     def build_screen(self):
         self.clear_widgets()
-        layout = GridLayout(cols = 1,
-                                size_hint_y = 1,
-                                id = 'settings_box',
-                                spacing = 5, padding = 5)
+        layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
         layout.bind(minimum_height = layout.setter('height'))
 
         darkmode = GridLayout(cols = 2, size_hint_y = .1, spacing = 5, padding = 5)
@@ -607,19 +616,21 @@ class e5_SettingsScreen(Screen):
                                                   call_back = [self.color_scheme_selected]))
         temp = ColorScheme()
         for widget in colorscheme.walk():
-            if widget.id in self.colors.color_names():
-                temp.set_to(widget.text)
-                widget.background_color = temp.button_background
+            if hasattr(widget, 'id'):
+                if widget.id in self.colors.color_names():
+                    temp.set_to(widget.text)
+                    widget.background_color = temp.button_background
         layout.add_widget(colorscheme)
         
         backups = GridLayout(cols = 2, size_hint_y = .3, spacing = 5, padding = 5)
-        backups.add_widget(e5_label('Auto-backup after\nevery %s\nrecords entered.' % self.ini.backup_interval,
-                                    id = 'label_backup_interval',
-                                    colors = self.colors))
+        self.backup_label = e5_label('Auto-backup after\nevery %s\nrecords entered.' % self.ini.backup_interval,
+                                    colors = self.colors)
+        backups.add_widget(self.backup_label)
         slide = Slider(min = 0, max = 200, step = 5,
                         value = self.ini.backup_interval,
-                        orientation = 'horizontal', id = 'backup_interval',
-                        value_track = True, value_track_color = self.colors.button_background)
+                        orientation = 'horizontal', 
+                        value_track = True,
+                        value_track_color = self.colors.button_background)
         backups.add_widget(slide)
         slide.bind(value = self.update_backup_interval)
         backups.add_widget(e5_label('Use incremental backups?', colors = self.colors))
@@ -638,7 +649,7 @@ class e5_SettingsScreen(Screen):
                                     colors = self.colors)
         text_font_size.add_widget(self.text_font_size_label)
         text_font_slide = Slider(min = 12, max = 26, step = 1, value = text_font_size_value,
-                        orientation = 'horizontal', id = 'font_size',
+                        orientation = 'horizontal',
                         value_track = True, value_track_color = self.colors.button_background)
         text_font_size.add_widget(text_font_slide)
         text_font_slide.bind(value = self.update_text_font_size)
@@ -654,7 +665,7 @@ class e5_SettingsScreen(Screen):
                                     colors = self.colors)
         button_font_size.add_widget(self.button_font_size_label)
         button_font_slide = Slider(min = 12, max = 26, step = 1, value = button_font_size_value,
-                        orientation = 'horizontal', id = 'font_size',
+                        orientation = 'horizontal',
                         value_track = True, value_track_color = self.colors.button_background)
         button_font_size.add_widget(button_font_slide)
         button_font_slide.bind(value = self.update_button_font_size)
@@ -684,10 +695,7 @@ class e5_SettingsScreen(Screen):
 
     def update_backup_interval(self, instance, value):
         self.ini.backup_interval = int(value)
-        for widget in self.walk():
-            if widget.id == 'label_backup_interval':
-                widget.text = 'Auto-backup after\nevery %s\nrecords entered.' % self.ini.backup_interval
-                break
+        self.backup_label.text = 'Auto-backup after\nevery %s\nrecords entered.' % self.ini.backup_interval
 
     def incremental_backups(self, instance, value):
         self.ini.incremental_backups = value
@@ -707,24 +715,24 @@ class e5_SettingsScreen(Screen):
         self.parent.current = 'MainScreen'
 
 class e5_InfoScreen(Screen):
-
     content = ObjectProperty(None)
     back_button = ObjectProperty(None)
-
     def __init__(self, colors = None, **kwargs):
         super(e5_InfoScreen, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
         layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
         layout.add_widget(e5_scrollview_label(text = '', widget_id = 'content', colors = self.colors))
-        layout.add_widget(e5_button('Back', id = 'back_button', 
+        layout.add_widget(e5_button('Back',
+                                    id = 'back_button', 
                                     selected = True, call_back = self.go_back,
                                     colors = self.colors))
         self.add_widget(layout)
         for widget in self.walk():
-            if widget.id == 'content_label':
-                self.content = widget
-            if widget.id == 'back_button':
-                self.back_button = widget
+            if hasattr(widget, 'id'):
+                if widget.id == 'content_label':
+                    self.content = widget
+                if widget.id == 'back_button':
+                    self.back_button = widget
 
     def go_back(self, *args):
         self.parent.current = 'MainScreen'
@@ -805,8 +813,8 @@ class e5_SaveDialog(BoxLayout):
 
         self.txt = TextInput(text = self.filename, 
                         multiline = False,
-                        size_hint = (1, .1),
-                        id = 'filename')
+                        size_hint = (1, .1))
+#                        id = 'filename')
         self.txt.bind(text = self.update_filename)
         content.add_widget(self.txt)
 
@@ -875,7 +883,9 @@ class e5_RecordEditScreen(Screen):
                                                             call_back = [self.previous_record, self.next_record],
                                                             selected = [True, True],
                                                             colors = self.colors))
-            self.layout.add_widget(e5_button('Back', id = 'back', selected = True,
+            self.layout.add_widget(e5_button('Back',
+                                        id = 'back',
+                                        selected = True,
                                         call_back = self.call_back, colors = self.colors))
         else:
             self.layout.add_widget(e5_side_by_side_buttons(text = ['Save','Cancel'],
@@ -909,8 +919,9 @@ class e5_RecordEditScreen(Screen):
         if self.e5_cfg:
             fields = self.e5_cfg.fields()
             for widget in self.layout.walk():
-                if widget.id in fields:
-                    widget.text = ''
+                if hasattr(widget, 'id'):
+                    if widget.id in fields:
+                        widget.text = ''
 
     def put_data_in_frame(self):
         self.clear_the_frame()  
@@ -1037,8 +1048,9 @@ class e5_RecordEditScreen(Screen):
         if not start:
             start = self
         for widget in start.walk():
-            if widget.id == id:
-                return(widget)
+            if hasattr(widget, 'id'):
+                if widget.id == id:
+                    return(widget)
         return(None)
 
     def call_back(self, value):
@@ -1206,11 +1218,12 @@ class DataGridMenuList(Popup):
         new_item = GridLayout(cols = 2, spacing = 5, size_hint_y = .15)
         self.txt = TextInput(id = 'new_item', size_hint_y = .15)
         new_item.add_widget(self.txt)
-        new_item.add_widget(e5_button('Add', id = 'add_button',
-                                             selected = True,
-                                             call_back = call_back,
-                                             button_height = .15,
-                                             colors = colors))
+        new_item.add_widget(e5_button('Add',
+                                            id = 'add_button',
+                                            selected = True,
+                                            call_back = call_back,
+                                            button_height = .15,
+                                            colors = colors))
         pop_content.add_widget(new_item)
 
         ncols = int(Window.width / 200)
@@ -1389,16 +1402,18 @@ class DataGridTableData(RecycleView):
     def get_editcell_row(self, key):
         row_widgets = []
         for widget in self.walk():
-            if widget.id == 'datacell':
-                if widget.key == key:
-                    row_widgets.append(widget)
+            if hasattr(widget, 'id'):
+                if widget.id == 'datacell':
+                    if widget.key == key:
+                        row_widgets.append(widget)
         return(row_widgets)
 
     def get_editcell(self, key, field):
         for widget in self.walk():
-            if widget.id == 'datacell':
-                if widget.field == field and widget.key == key:
-                    return(widget)
+            if hasattr(widget, 'id'):
+                if widget.id == 'datacell':
+                    if widget.field == field and widget.key == key:
+                        return(widget)
         return(None)
 
     def editcell(self, key, field, db):
@@ -1434,9 +1449,10 @@ class DataGridTableData(RecycleView):
             new_data = {self.field: self.datatable_widget.popup_textbox.text}
         self.tb.update(new_data, doc_ids = [int(self.datagrid_doc_id)])
         for widget in self.walk():
-            if widget.id=='datacell':
-                if widget.key == self.datagrid_doc_id and widget.field == self.field:
-                    widget.text = new_data[self.field]
+            if hasattr(widget, 'id'):
+                if widget.id=='datacell':
+                    if widget.key == self.datagrid_doc_id and widget.field == self.field:
+                        widget.text = new_data[self.field]
         self.popup.dismiss()
         self.datatable_widget.popup_scrollmenu = None
         self.datatable_widget.popup_textbox = None
@@ -1508,7 +1524,7 @@ class DataGridLabelAndField(BoxLayout):
         label = e5_label(text = col, id = '__label')
         self.txt = TextInput(multiline = note_field,
                         size_hint = (0.75, None),
-                        id = col,
+#                        id = col,
                         size_hint_y = .95)
         if colors:
             if colors.text_font_size:
@@ -1526,7 +1542,9 @@ class DataGridDeletePanel(GridLayout):
         self.spacing = 5
         if message:
             self.add_widget(e5_scrollview_label(message, popup = False, colors = self.colors))
-            self.add_widget(e5_button('Delete', id = 'delete', selected = True,
+            self.add_widget(e5_button('Delete',
+                                        id = 'delete',
+                                        selected = True,
                                         call_back = call_back, colors = self.colors))
         else:
             self.add_widget(e5_scrollview_label('\nSelect a record in the grid view first, and then delete that record here.',
@@ -1541,7 +1559,9 @@ class DataGridAddNewPanel(BoxLayout):
             self.addnew_list.clear_widgets()
             for col in fields.fields():
                 self.addnew_list.add_widget(DataGridLabelAndField(col = col, colors = self.colors))
-            self.add_widget(e5_button('Add record', id = 'addnew', selected = True,
+            self.add_widget(e5_button('Add record',
+                                        id = 'addnew',
+                                        selected = True,
                                         call_back = call_back, colors = self.colors))
 
 class DataGridWidget(TabbedPanel):
@@ -1615,16 +1635,18 @@ class DataGridWidget(TabbedPanel):
             if datatable.datagrid_doc_id is not None:
                 data_record = self.data.get(doc_id = int(datatable.datagrid_doc_id))
                 for widget in self.ids.edit_panel.children[0].walk():
-                    if widget.id in self.fields.fields():
-                        widget.text = str(data_record[widget.id]) if widget.id in data_record else ''
-                        widget.bind(text = self.update_db)
-                        widget.bind(focus = self.show_menu)
+                    if hasattr(widget, 'id'):
+                        if widget.id in self.fields.fields():
+                            widget.text = str(data_record[widget.id]) if widget.id in data_record else ''
+                            widget.bind(text = self.update_db)
+                            widget.bind(focus = self.show_menu)
                 self.textboxes_will_update_db = True
             else:
                 cfg_fields = self.fields.fields()
                 for widget in self.ids.edit_panel.children[0].walk():
-                    if widget.id in cfg_fields:
-                        widget.text = ''
+                    if hasattr(widget, 'id'):
+                        if widget.id in cfg_fields:
+                            widget.text = ''
                 self.textboxes_will_update_db = False
 
     def open_panel3(self):
@@ -1642,8 +1664,9 @@ class DataGridWidget(TabbedPanel):
     def open_panel4(self):
         cfg_fields = self.fields.fields()
         for widget in self.ids.edit_panel.children[0].walk():
-            if widget.id in cfg_fields:
-                widget.text = ''
+            if hasattr(widget, 'id'):
+                if widget.id in cfg_fields:
+                    widget.text = ''
         self.textboxes_will_update_db = False
 
     def show_menu(self, instance, value):
@@ -1669,10 +1692,11 @@ class DataGridWidget(TabbedPanel):
         new_record = {}
         cfg_fields = self.fields.fields()
         for widget in self.ids.addnew_panel.children[1].walk():
-            if widget.id in cfg_fields:
-                if widget.text:
-                    new_record[widget.id] = widget.text
-                    widget.text = ''
+            if hasattr(widget, 'id'):
+                if widget.id in cfg_fields:
+                    if widget.text:
+                        new_record[widget.id] = widget.text
+                        widget.text = ''
         self.data.insert(new_record)
         self.data.new_data = True  #Needs to reference parent
         self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
@@ -1715,8 +1739,9 @@ class DataGridWidget(TabbedPanel):
         if not start:
             start = self
         for widget in start.walk():
-            if widget.id == id:
-                return(widget)
+            if hasattr(widget, 'id'):
+                if widget.id == id:
+                    return(widget)
         return(None)
 
     def get_tab_by_name(self, text = ''):

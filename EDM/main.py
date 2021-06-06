@@ -1114,7 +1114,7 @@ class MainScreen(e5_MainScreen):
                                 size_hint_y = .9,
                                 size_hint_x = .8,
                                 pos_hint={'center_x': .5},
-                                id = 'mainscreen',
+#                                id = 'mainscreen',
                                 padding = 20,
                                 spacing = 20)
         self.build_mainscreen()
@@ -1136,7 +1136,7 @@ class MainScreen(e5_MainScreen):
         self.info = Label(text = 'EDM',
                     size_hint = (1, size_hints['info']),
                     color = self.colors.text_color,
-                    id = 'lastshot',
+#                    id = 'lastshot',
                     halign = 'center')
         if self.colors:
             if self.colors.text_font_size:
@@ -1148,7 +1148,7 @@ class MainScreen(e5_MainScreen):
         #grid = GridLayout(cols = 3, spacing = 10)
         scroll_content = BoxLayout(orientation = 'horizontal',
                                     size_hint = (1, size_hints['option_buttons']),
-                                    id = 'option_buttons',
+#                                    id = 'option_buttons',
                                     spacing = 20)
         self.layout.add_widget(scroll_content)
 
@@ -1185,13 +1185,16 @@ class MainScreen(e5_MainScreen):
 
         shot_buttons = GridLayout(cols = 3, size_hint = (1, size_hints['shot_buttons']), spacing = 20)
         
-        shot_buttons.add_widget(e5_button(text = 'Record', id = 'record',
+        shot_buttons.add_widget(e5_button(text = 'Record',
+#                        id = 'record',
                         colors = self.colors, call_back = self.take_shot, selected = True))
 
-        shot_buttons.add_widget(e5_button(text = 'Continue', id = 'continue',
+        shot_buttons.add_widget(e5_button(text = 'Continue',
+#                        id = 'continue',
                         colors = self.colors, call_back = self.take_shot, selected = True))
 
-        shot_buttons.add_widget(e5_button(text = 'Measure', id = 'measure',
+        shot_buttons.add_widget(e5_button(text = 'Measure',
+#                        id = 'measure',
                         colors = self.colors, call_back = self.take_shot, selected = True))
 
         self.layout.add_widget(shot_buttons)
@@ -1549,7 +1552,7 @@ class RecordDatumsScreen(Screen):
                                 size_hint_y = .9,
                                 size_hint_x = .8,
                                 pos_hint={'center_x': .5},
-                                id = 'content',
+#                                id = 'content',
                                 padding = 20,
                                 spacing = 20)
         self.add_widget(self.content)
@@ -1611,7 +1614,7 @@ class RecordDatumsScreen(Screen):
         self.parent.current = 'MainScreen'
 
 class VerifyStationScreen(Screen):
-
+    id = ObjectProperty(None)
     def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
         super(VerifyStationScreen, self).__init__(**kwargs)
 
@@ -1624,7 +1627,7 @@ class VerifyStationScreen(Screen):
                                 size_hint_y = .9,
                                 size_hint_x = .8,
                                 pos_hint={'center_x': .5},
-                                id = 'content',
+#                                id = 'content',
                                 padding = 20,
                                 spacing = 20)
         self.add_widget(self.content)
@@ -1646,7 +1649,8 @@ class VerifyStationScreen(Screen):
         self.content.add_widget(self.results)
 
         self.back_button = e5_button(text = 'Back', size_hint_y = None,
-                                    size_hint_x = 1, id = 'cancel',
+                                    size_hint_x = 1,
+                                    id = 'cancel',
                                     colors = self.colors, selected = True)
         self.content.add_widget(self.back_button)
         self.back_button.bind(on_press = self.close_screen)
@@ -1776,7 +1780,9 @@ class datum_selector(GridLayout):
 
     def __init__(self, text = '',
                         data = None, colors = None, default_datum = None, 
-                        call_back = None, id = None, **kwargs):
+                        call_back = None,
+                        id = None,
+                        **kwargs):
         super(datum_selector, self).__init__(**kwargs)
         #self.orientation = 'horizontal'
         self.padding = 10
@@ -1823,6 +1829,7 @@ class datum_selector(GridLayout):
 
 class setups(ScrollView):
 
+    id = ObjectProperty(None)
     popup = ObjectProperty(None)
     popup_open = False
     recorder = []
@@ -1844,7 +1851,7 @@ class setups(ScrollView):
         
         self.scrollbox = GridLayout(cols = 1,
                                 size_hint_y = None,
-                                id = 'setups_box',
+#                                id = 'setups_box',
                                 spacing = 5)
         self.scrollbox.bind(minimum_height = self.scrollbox.setter('height'))
 
@@ -1856,7 +1863,9 @@ class setups(ScrollView):
 
             content1 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
             content1.add_widget(e5_label('Horizontal angle to the point\n(use ddd.mmss)'))
-            self.hangle = TextInput(text = '', multiline = False, id = 'h_angle', size_hint_max_y = 30)
+            self.hangle = TextInput(text = '', multiline = False,
+#                                    id = 'h_angle',
+                                    size_hint_max_y = 30)
             content1.add_widget(self.hangle)
             self.scrollbox.add_widget(content1)
 
@@ -1877,7 +1886,8 @@ class setups(ScrollView):
             content2 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
             content2.add_widget(e5_label('Height over datum'))
             self.station_height = TextInput(text = '', multiline = False,
-                                            id = 'station_height', size_hint_max_y = 30)
+#                                            id = 'station_height',
+                                            size_hint_max_y = 30)
             content2.add_widget(self.station_height)
             self.scrollbox.add_widget(content2)
 
@@ -2004,7 +2014,7 @@ class InitializeStationScreen(Screen):
                                 size_hint_y = .9,
                                 size_hint_x = .8,
                                 pos_hint = {'center_x': .5, 'center_y': .5},
-                                id = 'content',
+#                                id = 'content',
                                 padding = 0,
                                 spacing = 0)
         self.add_widget(self.content)
@@ -2018,7 +2028,7 @@ class InitializeStationScreen(Screen):
                                             "Over a datum + Record a datum",
                                             "Record two datums",
                                             "Three datum shift"],
-                                    id = 'setup_type',
+#                                    id = 'setup_type',
                                     size_hint = (.7, None)
                                     #pos_hint = {'center_x': .5, 'center_y': .5},
                                     )
@@ -2223,8 +2233,8 @@ class station_setting(GridLayout):
         label = e5_label(text = label_text, colors = colors)
         self.add_widget(label)
         
-        spinner = Spinner(text = default if default is not None else '', values = spinner_values,
-                                    id = id)
+        spinner = Spinner(text = default if default is not None else '', values = spinner_values)
+#                                    id = id)
         self.add_widget(spinner)
         spinner.bind(text = call_back)
 
@@ -2271,7 +2281,8 @@ class StationConfigurationScreen(Screen):
                                             colors = self.colors,
                                             default = self.ini.get_value(__program__, 'COMMUNICATIONS')))
         self.layout.add_widget(station_setting(label_text = 'Port Number',
-                                            spinner_values = self.comports(),
+#                                            spinner_values = self.comports(),
+                                            spinner_values = [],
                                             call_back = self.update_ini,
                                             id = 'comport',
                                             colors = self.colors,
@@ -2301,7 +2312,8 @@ class StationConfigurationScreen(Screen):
                                             colors = self.colors,
                                             default = self.ini.get_value(__program__, 'STOPBITS')))
 
-        button2 = e5_button(text = 'Back', size_hint_y = None, size_hint_x = 1, id = 'cancel',
+        button2 = e5_button(text = 'Back', size_hint_y = None, size_hint_x = 1,
+#                        id = 'cancel',
                         colors = self.colors, selected = True)
         self.layout.add_widget(button2)
         button2.bind(on_press = self.close_screen)
@@ -2403,40 +2415,45 @@ class EDMApp(e5_Program):
         logger.addHandler(fh)
 
     def add_screens(self):
-        sm.add_widget(MainScreen(name = 'MainScreen', id = 'main_screen',
+        sm.add_widget(MainScreen(name = 'MainScreen', 
                                  colors = self.colors,
                                  ini = self.ini,
                                  cfg = self.cfg,
                                  data = self.data,
                                  station = self.station))
 
-        sm.add_widget(VerifyStationScreen(name = 'VerifyStationScreen', id = 'verify_station',
+        sm.add_widget(VerifyStationScreen(name = 'VerifyStationScreen',
+                                            id = 'verify_station',
                                             data = self.data,
                                             station = self.station,
                                             colors = self.colors,
                                             ini = self.ini))
 
-        sm.add_widget(RecordDatumsScreen(name = 'RecordDatumsScreen', id = 'record_datums',
+        sm.add_widget(RecordDatumsScreen(name = 'RecordDatumsScreen',
+#                                            id = 'record_datums',
                                             data = self.data,
                                             station = self.station,
                                             colors = self.colors,
                                             ini = self.ini))
 
-        sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen', id = 'editlastrecord_screen',
+        sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen',
+#                                        id = 'editlastrecord_screen',
                                         colors = self.colors,
                                         data = self.data,
                                         data_table = self.data.table,
                                         doc_id = None,
                                         e5_cfg = self.cfg))
 
-        sm.add_widget(EditPointScreen(name = 'EditPointScreen', id = 'editpoint_screen',
+        sm.add_widget(EditPointScreen(name = 'EditPointScreen',
+#                                        id = 'editpoint_screen',
                                         data = self.data,
                                         data_table = self.data.table,
                                         doc_id = None,
                                         e5_cfg = self.cfg,
                                         one_record_only = True))
 
-        sm.add_widget(EditPointsScreen(name = 'EditPointsScreen', id = 'editpoints_screen',
+        sm.add_widget(EditPointsScreen(name = 'EditPointsScreen',
+#                                        id = 'editpoints_screen',
                                         colors = self.colors,
                                         main_data = self.data,
                                         main_tablename = self.data.table,
@@ -2444,7 +2461,8 @@ class EDMApp(e5_Program):
 
         datum_cfg = CFG()
         datum_cfg.build_datum()
-        sm.add_widget(EditPointsScreen(name = 'EditDatumsScreen', id = 'editdatums_screen',
+        sm.add_widget(EditPointsScreen(name = 'EditDatumsScreen',
+#                                        id = 'editdatums_screen',
                                         colors = self.colors,
                                         main_data = self.data,
                                         main_tablename = 'datums',
@@ -2453,7 +2471,8 @@ class EDMApp(e5_Program):
 
         prism_cfg = CFG()
         prism_cfg.build_prism()
-        sm.add_widget(EditPointsScreen(name = 'EditPrismsScreen', id = 'editprisms_screen',
+        sm.add_widget(EditPointsScreen(name = 'EditPrismsScreen',
+#                                        id = 'editprisms_screen',
                                         colors = self.colors,
                                         main_data = self.data,
                                         main_tablename = 'prisms',
@@ -2462,47 +2481,56 @@ class EDMApp(e5_Program):
 
         units_cfg = CFG()
         units_cfg.build_unit()
-        sm.add_widget(EditPointsScreen(name = 'EditUnitsScreen', id = 'editunits_screen',
+        sm.add_widget(EditPointsScreen(name = 'EditUnitsScreen',
+#                                        id = 'editunits_screen',
                                         colors = self.colors,
                                         main_data = self.data,
                                         main_tablename = 'units',
                                         main_cfg = units_cfg,
                                         addnew = True))
 
-        sm.add_widget(StatusScreen(name = 'StatusScreen', id = 'status_screen',
+        sm.add_widget(StatusScreen(name = 'StatusScreen',
+#                                    id = 'status_screen',
                                     colors = self.colors,
                                     cfg = self.cfg,
                                     ini = self.ini,
                                     data = self.data,
                                     station = self.station))
 
-        sm.add_widget(e5_LogScreen(name = 'LogScreen', id = 'log_screen',
+        sm.add_widget(e5_LogScreen(name = 'LogScreen',
+#                                id = 'log_screen',
                                 colors = self.colors,
                                 logger = logger))
 
-        sm.add_widget(e5_CFGScreen(name = 'CFGScreen', id = 'cfg_screen',
+        sm.add_widget(e5_CFGScreen(name = 'CFGScreen',
+#                                id = 'cfg_screen',
                                 colors = self.colors,
                                 cfg = self.cfg))
 
-        sm.add_widget(e5_INIScreen(name = 'INIScreen', id = 'ini_screen',
+        sm.add_widget(e5_INIScreen(name = 'INIScreen',
+#                                id = 'ini_screen',
                                 colors = self.colors,
                                 ini = self.ini))
 
-        sm.add_widget(AboutScreen(name = 'AboutScreen', id = 'about_screen',
+        sm.add_widget(AboutScreen(name = 'AboutScreen',
+#                                    id = 'about_screen',
                                     colors = self.colors))
 
-        sm.add_widget(StationConfigurationScreen(name = 'StationConfigurationScreen', id = 'station_configuration_screen',
+        sm.add_widget(StationConfigurationScreen(name = 'StationConfigurationScreen',
+#                                    id = 'station_configuration_screen',
                                     station = self.station,
                                     ini = self.ini,
                                     colors = self.colors))
 
-        sm.add_widget(InitializeStationScreen(name = 'InitializeStationScreen', id = 'initialize_station_screen',
+        sm.add_widget(InitializeStationScreen(name = 'InitializeStationScreen',
+#                                                id = 'initialize_station_screen',
                                                 data = self.data,
                                                 station = self.station,
                                                 ini = self.ini,
                                                 colors = self.colors))
 
-        sm.add_widget(e5_SettingsScreen(name = 'EDMSettingsScreen', id = 'edmsettings_screen',
+        sm.add_widget(e5_SettingsScreen(name = 'EDMSettingsScreen',
+#                                        id = 'edmsettings_screen',
                                         colors = self.colors,
                                         ini = self.ini,
                                         cfg = self.cfg))
