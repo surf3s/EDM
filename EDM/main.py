@@ -180,12 +180,15 @@ class DB(dbs):
             self.db = TinyDB(self.filename)
 
     def open(self, filename):
-        if os.path.exists(filename):
+        try:
             self.db = TinyDB(filename)
             self.filename = filename
             self.prisms = self.db.table('prisms')
             self.units = self.db.table('units')
             self.datums = self.db.table('datums')
+            return(True)
+        except:
+            return(False)
 
     def create_defaults(self):
         pass
@@ -2223,6 +2226,8 @@ class EditDatumsScreen(e5_DatagridScreen):
     pass
 
 class station_setting(GridLayout):
+    label = ObjectProperty(None)
+    spinner = ObjectProperty(None)
     def __init__(self, label_text = '', spinner_values = (), default = '',
                         id = None, call_back = None, colors = None, **kwargs):
         super(station_setting, self).__init__(**kwargs)
@@ -2230,16 +2235,17 @@ class station_setting(GridLayout):
         self.cols = 2
         self.size_hint_max_x = 300
 
-        label = e5_label(text = label_text, colors = colors)
-        self.add_widget(label)
+        self.label = e5_label(text = label_text, colors = colors)
+        self.add_widget(self.label)
         
-        spinner = Spinner(text = default if default is not None else '', values = spinner_values)
-#                                    id = id)
-        self.add_widget(spinner)
-        spinner.bind(text = call_back)
+        self.spinner = Spinner(text = default if default is not None else '', values = spinner_values)
+        self.add_widget(self.spinner)
+        self.spinner.bind(text = call_back)
 
 class StationConfigurationScreen(Screen):
-
+    comport_widgit = ObjectProperty(None)
+    comport_to_test = None
+    valid_comports = []
     def __init__(self, station = None, ini = None, colors = None, **kwargs):
         super(StationConfigurationScreen, self).__init__(**kwargs)
 
@@ -2253,6 +2259,27 @@ class StationConfigurationScreen(Screen):
         self.build_screen()
 
 
+    def on_enter(self):
+        self.event1 = Clock.schedule_once(self.show_popup_message, .2)
+        self.event2 = Clock.schedule_interval(self.check_comports, .2)
+
+
+    def show_popup_message(self, dt):
+        self.popup = e5_MessageBox('COM Ports','Looking for valid COM ports...This can take several seconds...And the Cancel button might appear non-responsive...',
+                                    response_type = "CANCEL",
+                                    call_back = self.close_popup,
+                                    colors = self.colors)
+        self.popup.open()
+        self.popup_open = True
+
+
+    def close_popup(self, value):
+        self.popup.dismiss()
+        self.popup_open = False
+        self.event2.cancel()
+        self.comport_to_test = None
+       
+
     def comportIsUsable(self, portName):
         try:
             ser = serial.Serial(port = portName)
@@ -2262,6 +2289,20 @@ class StationConfigurationScreen(Screen):
             return None
 
 
+    def check_comports(self, dt):
+        if self.comport_to_test == None:
+            self.comport_to_test = 0
+            self.valid_comports = []
+        self.comport_to_test += 1
+        if self.comport_to_test > __LASTCOMPORT__:
+            self.comport_widgit.spinner.values = list(filter(None.__ne__, self.valid_comports))
+            self.event2.cancel()
+            self.close_popup(None)
+            self.comport_to_test = None
+        else:
+            self.valid_comports.append(self.comportIsUsable("COM%s" % self.comport_to_test))
+
+    
     def comports(self):
         return list(filter(None.__ne__, [self.comportIsUsable("COM%s" % comno) for comno in range(1, __LASTCOMPORT__ + 1)]))
 
@@ -2280,13 +2321,13 @@ class StationConfigurationScreen(Screen):
                                             id = 'communications',
                                             colors = self.colors,
                                             default = self.ini.get_value(__program__, 'COMMUNICATIONS')))
-        self.layout.add_widget(station_setting(label_text = 'Port Number',
-#                                            spinner_values = self.comports(),
+        self.comport_widgit = station_setting(label_text = 'Port Number',
                                             spinner_values = [],
                                             call_back = self.update_ini,
                                             id = 'comport',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'COMPORT')))
+                                            default = self.ini.get_value(__program__, 'COMPORT'))
+        self.layout.add_widget(self.comport_widgit)
         self.layout.add_widget(station_setting(label_text = 'Baud rate',
                                             spinner_values = ("1200", "2400", "4800", "9600", "14400", "19200"),
                                             call_back = self.update_ini,

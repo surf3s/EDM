@@ -1137,6 +1137,12 @@ class e5_MessageBox(Popup):
                                                 selected = True,
                                                 button_height = .2,
                                                 colors = colors))
+        elif response_type == 'CANCEL':
+            popup_contents.add_widget(e5_button('CANCEL',
+                                                call_back = call_back,
+                                                selected = True,
+                                                button_height = .2,
+                                                colors = colors))
         elif response_type == 'YESNO':
             popup_contents.add_widget(e5_side_by_side_buttons(text = ['Yes', 'No'],
                                                 call_back = call_back,
@@ -1184,9 +1190,10 @@ class e5_Program(App):
             if self.ini.get_value(__program__, "CFG"):
                 self.cfg.open(self.ini.get_value(__program__, "CFG"))
                 if self.cfg.filename:
+                    found_db = False
                     if self.cfg.get_value(__program__,'DATABASE'):
-                        self.data.open(self.cfg.get_value(__program__,'DATABASE'))
-                    else:
+                        found_db = self.data.open(self.cfg.get_value(__program__,'DATABASE'))
+                    if not found_db:
                         database = os.path.split(self.cfg.filename)[1]
                         if "." in database:
                             database = database.split('.')[0]
