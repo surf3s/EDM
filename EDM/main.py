@@ -19,11 +19,12 @@
 #   Add bluetooth communications
 
 # ToDo Serial Communications with TS
-#   put getting comports into a pre_enter function rather than on startup to save time
+#   Add maybe a simulate station type and a manual station type (maybe with VHD vs XYZ)
+#   Debug with Dave's station
 
 __version__ = '1.0.8'
 __date__ = 'June, 2021'
-from constants import __program__ 
+from src.constants import __program__ 
 
 __DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','ID']
 __BUTTONS__ = 13
@@ -67,6 +68,7 @@ import os
 import random
 import datetime
 from math import sqrt
+from math import pi
 import re
 import string
 from platform import python_version
@@ -77,12 +79,12 @@ import logging.handlers as handlers
 #import serial
 
 # My libraries for this project
-from blockdata import blockdata
-from dbs import dbs
-from e5_widgets import *
-from constants import *
-from colorscheme import *
-from misc import *
+from src.blockdata import blockdata
+from src.dbs import dbs
+from src.e5_widgets import *
+from src.constants import *
+from src.colorscheme import *
+from src.misc import *
 
 # The database - pure Python
 from tinydb import TinyDB, Query, where
@@ -738,9 +740,6 @@ class totalstation:
                     n += 1
         return(txt)
 
-    def initialize(self):
-        pass
-
     def parseangle(self, hangle):
         hangle = str(hangle)
         if hangle.find("."): 
@@ -814,75 +813,42 @@ class totalstation:
         self.xyz = point()
         self.xyz_global = point()
 
-    def set_horizontal_angle(self, angle):
-        pass
-
     def vhd_to_nez(self):
         pass
 
     def parse_nez(self):
         pass
 
-    def make_bcc(self, itext):
-        #Dim b As Integer = 0
-        #Dim i As Integer
-        #Dim q As Integer
-        #Dim b1 As Integer
-        #Dim b2 As Integer
-
-        b = 0 
-        for i in range(0,len(itext)):
-            #q = asc(itext[i:i+1])
-            #b1 = q and (Not b) # this is not at all ready
-            #b2 = b and (Not q)
-            #b = b1 or b2
-            pass
-
-        bcc = "000" + str(b).strip()
-        return(bcc[-3])
-
-    def init_edm(self):
-        if self.make=='TOPCON':
-            edm_output("ST0")
-        if self.make=="WILD" or self.make=="LEICA":
-            if edm_output("SET/41/0")==0:
-                edm_input()
-            if edm_output("SET/149/2")==0:
-                edm_input()
-
-    def horizontal(self):
-        if self.make=='TOPCON':
-            edm_output("Z10")
-            return(edm_input)
-
-    def edm_output(self, d):
+    def send(self, d):
         error_code = 0
         return(error_code)
 
-    def edm_input(self):
+    def receive(self):
         return('')
 
-    def close_com(self):
+    def close(self):
         pass
 
-    def open_com(self):
+    def open(self):
         pass
 
     def clear_com(self):
         pass
 
-    def deg_to_rad(self):
-        pass
-
-    def conv_angle_to_degminsec(self):
-        pass
-
-    def calculate_angle(self):
-        pass
-
     def distance(self, p1, p2):
         return(sqrt( (p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2 ))
 
+    def dms_to_decdeg(self, angle):
+        degrees = int(angle.split(".")[0])        
+        minutes = int(angle.split(".")[1][0:2])
+        seconds = int(angle.split(".")[1][2:4])
+        return(degrees + minutes / 60.0 + seconds / 3600.0)
+
+    def decdeg_to_radians(self, angle):
+        return(angle / 360 * (2 * pi))
+
+
+class Microscribe(totalstation):
 
     # The following functions are needed by the rotation function at the end of this list.
     # Note too that all of the dependent routines are self written
@@ -990,7 +956,6 @@ class totalstation:
                         (p.x * r[0][1]) + (p.y * r[1][1]) + (p.z * r[2][1]),
                         (p.x * r[0][2]) + (p.y * r[1][2]) + (p.z * r[2][2])))                        
 
-
     def rotate_point_2d_2(self, rotation_vector, local_vector, global_vector, p):
         # local coodinate system and global coordinate system vectors that will be made to align with each other.
         # p is a point to be rotated along with this vector alignment.
@@ -1091,6 +1056,106 @@ class totalstation:
         self.rotate_global = global_datums
 
 
+class Topcon(totalstation):
+
+    def make_bcc(self, itext):
+        #Dim b As Integer = 0
+        #Dim i As Integer
+        #Dim q As Integer
+        #Dim b1 As Integer
+        #Dim b2 As Integer
+
+        b = 0 
+        for i in range(0,len(itext)):
+            #q = asc(itext[i:i+1])
+            #b1 = q and (Not b) # this is not at all ready
+            #b2 = b and (Not q)
+            #b = b1 or b2
+            pass
+
+        bcc = "000" + str(b).strip()
+        return(bcc[-3])
+
+    def horizontal(self):
+        self.send("Z10")
+        return(self.receive())
+
+    def initialize(self):
+        self.send("ST0")
+
+
+class Leica(totalstation):
+
+    def pad_dms(self, angle):
+        degrees = ('000' + angle.split('.')[0])[-3:]
+        minutes_seconds = (angle.split('.')[1] + '0000')[0:4]
+        return( degrees + minutes_seconds)
+
+    def set_horizontal_angle(self, angle):
+        # function expects angle as ddd.mmss input
+        output = "PUT/21...4+" + self.pad_dms(angle) + "0 "
+        errorcode = self.send(output)
+        returncode = self.receive()
+
+    def record_point(self):
+        self.clear_com()
+        self.send("GET/M/WI11/WI21/WI22/WI31/WI51")
+        result = self.receive()
+        self.clear_com()
+
+    def initialize(self):
+        self.send("SET/41/0")
+        self.clear_com()
+        self.send("SET/149/2")
+        self.clear_com()
+
+
+class LeicaGeoCom(totalstation):
+
+    def initialize(self):
+        pass
+        
+    def set_horizontal_angle(self, angle):
+        # function expects angle as ddd.mmss as input
+        # %R1Q,2113:HzOrientation[double]
+        output = "%R1Q,2113:{:10.8f}".format(self.decdeg_to_radians(self.dms_to_decdeg(angle)))
+        errorcode = self.send(output)
+        returncode = self.receive()
+
+    def record_point(self):
+        self.clear_com()
+        self.send("%R1Q,2008:1,1")          # Use the defaults with 1 and 1
+        errorcode = self.receive()
+        if not errorcode:
+            # %R1Q,2108:WaitTime[long],Mode[long]
+            # Waittime is in ms
+            # Mode 1 = automatic
+            self.clear_com()
+            self.send("%R1Q,2108:10000,1")  # Wait for the measurements and return the angles + sloped
+            result = self.receive()
+        self.clear_com()    
+        self.send("%R1Q,2008:3,1")          # Empty the measurement buffer as a precaution
+        returncode = self.receive()
+
+
+class totalstations(object):
+    def __init__(self):
+        self._stations = {}
+        self.register('Leica', Leica())
+        self.register('LeicaGeoCom', LeicaGeoCom())
+        self.register('Topcon', Topcon())
+
+    def register(self, station_name, station_class):
+        self._stations[station_name] = station_class
+
+    def _get(self, station_name):
+        station_class = self._stations.get(station_name)
+        return(station_class)
+
+    def initialize(self, station_name):
+        return(self._get(station_name))
+
+
 #endregion
 
 class MainScreen(e5_MainScreen):
@@ -1189,15 +1254,15 @@ class MainScreen(e5_MainScreen):
         shot_buttons = GridLayout(cols = 3, size_hint = (1, size_hints['shot_buttons']), spacing = 20)
         
         shot_buttons.add_widget(e5_button(text = 'Record',
-#                        id = 'record',
+                        id = 'record',
                         colors = self.colors, call_back = self.take_shot, selected = True))
 
         shot_buttons.add_widget(e5_button(text = 'Continue',
-#                        id = 'continue',
+                        id = 'continue',
                         colors = self.colors, call_back = self.take_shot, selected = True))
 
         shot_buttons.add_widget(e5_button(text = 'Measure',
-#                        id = 'measure',
+                        id = 'measure',
                         colors = self.colors, call_back = self.take_shot, selected = True))
 
         self.layout.add_widget(shot_buttons)
@@ -2228,10 +2293,12 @@ class EditDatumsScreen(e5_DatagridScreen):
 class station_setting(GridLayout):
     label = ObjectProperty(None)
     spinner = ObjectProperty(None)
+    id = ObjectProperty(None)
     def __init__(self, label_text = '', spinner_values = (), default = '',
                         id = None, call_back = None, colors = None, **kwargs):
         super(station_setting, self).__init__(**kwargs)
 
+        self.id = id
         self.cols = 2
         self.size_hint_max_x = 300
 
@@ -2265,7 +2332,7 @@ class StationConfigurationScreen(Screen):
 
 
     def show_popup_message(self, dt):
-        self.popup = e5_MessageBox('COM Ports','Looking for valid COM ports...This can take several seconds...And the Cancel button might appear non-responsive...',
+        self.popup = e5_MessageBox('COM Ports','\nLooking for valid COM ports...This can take several seconds...And the Cancel button might appear non-responsive...',
                                     response_type = "CANCEL",
                                     call_back = self.close_popup,
                                     colors = self.colors)
@@ -2354,32 +2421,31 @@ class StationConfigurationScreen(Screen):
                                             default = self.ini.get_value(__program__, 'STOPBITS')))
 
         button2 = e5_button(text = 'Back', size_hint_y = None, size_hint_x = 1,
-#                        id = 'cancel',
-                        colors = self.colors, selected = True)
+                        id = 'cancel', colors = self.colors, selected = True)
         self.layout.add_widget(button2)
         button2.bind(on_press = self.close_screen)
         self.changes = False
 
     def update_ini(self, instance, value):
-        if instance.id == 'stopbits':
+        if instance.parent.id == 'stopbits':
             self.station.stopbits = value
             self.ini.update_value(__program__, 'STOPBITS', value)
-        elif instance.id == 'baudrate':
+        elif instance.parent.id == 'baudrate':
             self.station.baudrate = value
             self.ini.update_value(__program__, 'BAUDRATE', value)
-        elif instance.id == 'databits':
+        elif instance.parent.id == 'databits':
             self.station.databits = value
             self.ini.update_value(__program__, 'DATABITS', value)
-        elif instance.id == 'comport':
+        elif instance.parent.id == 'comport':
             self.station.comport = value
             self.ini.update_value(__program__, 'COMPORT', value)
-        elif instance.id=='parity':
+        elif instance.parent.id=='parity':
             self.station.parity = value
             self.ini.update_value(__program__, 'PARITY', value)
-        elif instance.id=='communications':
+        elif instance.parent.id=='communications':
             self.station.communications = value
             self.ini.update_value(__program__, 'COMMUNICATIONS', value)
-        elif instance.id=='station_type':
+        elif instance.parent.id=='station_type':
             self.station.make = value
             self.ini.update_value(__program__, 'STATION', value)
         self.changes = True

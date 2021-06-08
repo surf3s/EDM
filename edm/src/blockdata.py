@@ -3,7 +3,7 @@
 
 import logging
 import os
-from constants import __program__ 
+from src.constants import __program__ 
 
 class blockdata:
 

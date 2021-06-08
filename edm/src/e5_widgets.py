@@ -17,9 +17,9 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.switch import Switch
 from kivy.uix.slider import Slider
 
-from constants import BLACK, WHITE, SCROLLBAR_WIDTH, GOOGLE_COLORS, SPLASH_HELP, __program__
-from colorscheme import ColorScheme, make_rgb
-from misc import platform_name, locate_file
+from src.constants import BLACK, WHITE, SCROLLBAR_WIDTH, GOOGLE_COLORS, SPLASH_HELP, __program__
+from src.colorscheme import ColorScheme, make_rgb
+from src.misc import platform_name, locate_file
 import ntpath
 import os
 from shutil import copyfile
@@ -223,7 +223,7 @@ class e5_scrollview_label(ScrollView):
         info = e5_label(text = text, markup = True,
                     size_hint_y = None,
                     color = self.colors.text_color if not popup else self.colors.popup_text_color,
-                    id = widget_id + '_label',
+                    id = widget_id + '_label', popup = popup,
                     text_size = (self.width, None))
         if colors:
             if colors.text_font_size:
