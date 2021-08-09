@@ -28,6 +28,12 @@ from datetime import date
 from tinydb import TinyDB, Query, where
 import re
 
+def width_calculator(fraction_size = .8, maximum_width = 800):
+    if Window.size[0] * fraction_size > maximum_width:
+        return( maximum_width / Window.size[0])
+    else:
+        return( fraction_size)
+
 class e5_PopUpMenu(Popup):
     
     def __init__(self, title, menu_list, menu_selected = '', call_back = None, colors = None, **kwargs):
@@ -56,6 +62,15 @@ class e5_PopUpMenu(Popup):
         self.title = title
         self.size_hint = (.9, .9)
         self.auto_dismiss = True
+
+
+class e5_textinput(TextInput):
+    id = ObjectProperty('')
+    def __init__(self, **kwargs):
+        super(e5_textinput, self).__init__(**kwargs)
+        if 'id' in kwargs:
+            self.id = kwargs.get('id')
+
 
 class e5_label(Label):
     id = ObjectProperty('')
@@ -321,10 +336,10 @@ class e5_MainScreen(Screen):
             return(self.cfg.current_field.info)
 
     def save_window_location(self):
-        self.ini.update_value(__program__,'TOP', Window.top)
-        self.ini.update_value(__program__,'LEFT', Window.left)
-        self.ini.update_value(__program__,'WIDTH', Window.width)
-        self.ini.update_value(__program__,'HEIGHT', Window.height)
+        self.ini.update_value(__program__,'ScreenTop', Window.top)
+        self.ini.update_value(__program__,'ScreenLeft', Window.left)
+        self.ini.update_value(__program__,'ScreenWidth', Window.size[0])
+        self.ini.update_value(__program__,'ScreenHeight', Window.size[1])
         self.ini.save()
 
     def dismiss_popup(self, *args):
@@ -582,15 +597,17 @@ class e5_MainScreen(Screen):
         self.popup.open()
         self.popup_open = True
 
+
 class e5_gridlayout(GridLayout):
     id = ObjectProperty(None)
     def __init__(self, **kwargs):
         super(e5_gridlayout, self).__init__(**kwargs)
 
 class e5_SettingsScreen(Screen):
+
     def __init__(self, cfg = None, ini = None, colors = None, **kwargs):
         super(e5_SettingsScreen, self).__init__(**kwargs)
-        self.colors = colors if  colors else ColorScheme()
+        self.colors = colors if colors else ColorScheme()
         self.ini = ini
         self.cfg = cfg
 
@@ -599,7 +616,12 @@ class e5_SettingsScreen(Screen):
 
     def build_screen(self):
         self.clear_widgets()
-        layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
+        layout = GridLayout(cols = 1,
+                            #size_hint_x = width_calculator(.9, 800),
+                            #size_hint_y = .9,
+                            spacing = 5,
+                            padding = 5,
+                            pos_hint = {'center_x': .5, 'center_y': .5})
         layout.bind(minimum_height = layout.setter('height'))
 
         darkmode = GridLayout(cols = 2, size_hint_y = .1, spacing = 5, padding = 5)
@@ -613,6 +635,7 @@ class e5_SettingsScreen(Screen):
         colorscheme.add_widget(e5_label('Color Scheme', colors = self.colors))
         colorscheme.add_widget(e5_scrollview_menu(self.colors.color_names(),
                                                   menu_selected = '',
+                                                  colors = self.colors,
                                                   call_back = [self.color_scheme_selected]))
         temp = ColorScheme()
         for widget in colorscheme.walk():
@@ -671,8 +694,12 @@ class e5_SettingsScreen(Screen):
         button_font_slide.bind(value = self.update_button_font_size)
         layout.add_widget(button_font_size)
 
-        settings_layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
-        scrollview = ScrollView(size_hint = (1, 1),
+        settings_layout = GridLayout(cols = 1,
+                                    size_hint_x = width_calculator(.9, 800),
+                                    size_hint_y = .9,
+                                    spacing = 5,
+                                    pos_hint = {'center_x': .5, 'center_y': .5})
+        scrollview = ScrollView(size_hint = (1, 1), 
                                  bar_width = SCROLLBAR_WIDTH)
         scrollview.add_widget(layout)
         settings_layout.add_widget(scrollview)
@@ -871,7 +898,12 @@ class e5_RecordEditScreen(Screen):
         self.doc_id = doc_id
         self.one_record_only = one_record_only
         self.can_update_data_table = False
-        self.layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
+        self.layout = GridLayout(cols = 1,
+                                 size_hint_y = 1,
+                                 size_hint_x = width_calculator(.9, 600),
+                                 spacing = 5,
+                                 padding = 5,
+                                 pos_hint={'center_x': .5})
         self.data_fields = GridLayout(cols = 1, size_hint_y = None, spacing = 5, padding = 5)
         self.make_empty_frame()
         scroll = ScrollView(size_hint = (1, 1))
@@ -930,11 +962,12 @@ class e5_RecordEditScreen(Screen):
             if data_record:
                 for field in self.e5_cfg.fields():
                     for widget in self.layout.walk():
-                        if widget.id == field:
-                            widget.text = '%s' % data_record[field] if field in data_record.keys() else ''
-                            widget.bind(text = self.update_db)
-                            widget.bind(focus = self.show_menu)
-                            break
+                        if hasattr(widget, 'id'):
+                            if widget.id == field:
+                                widget.text = '%s' % data_record[field] if field in data_record.keys() else ''
+                                widget.bind(text = self.update_db)
+                                widget.bind(focus = self.show_menu)
+                                break
         self.can_update_data_table = True
 
     def update_db(self, instance, value):
@@ -965,9 +998,10 @@ class e5_RecordEditScreen(Screen):
             field = self.e5_cfg.get(field_name)
             if field.required:
                 for widget in self.layout.walk():
-                    if widget.id == field_name:
-                        if widget.text == '':
-                            save_errors.append('The field %s requires a value.' % field_name)
+                    if hasattr(widget, 'id'):
+                        if widget.id == field_name:
+                            if widget.text == '':
+                                save_errors.append('The field %s requires a value.' % field_name)
         return(save_errors)
 
     def save_record(self, instance):
@@ -1223,7 +1257,7 @@ class DataGridMenuList(Popup):
         pop_content = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
 
         new_item = GridLayout(cols = 2, spacing = 5, size_hint_y = .15)
-        self.txt = TextInput(id = 'new_item', size_hint_y = .15)
+        self.txt = e5_textinput(id = 'new_item', size_hint_y = .15)
         new_item.add_widget(self.txt)
         new_item.add_widget(e5_button('Add',
                                             id = 'add_button',
@@ -1261,6 +1295,8 @@ class DataGridMenuList(Popup):
 
 class DataGridTextInput(TextInput):
 
+    id = ObjectProperty(None)
+
     def __init__(self, call_back = None, **kwargs):
         super(DataGridTextInput, self).__init__(**kwargs)
         self.call_back = call_back
@@ -1268,6 +1304,7 @@ class DataGridTextInput(TextInput):
     def keyboard_on_key_up(self, window, keycode):
         print(keycode)
         return super(DataGridTextInput, self).keyboard_on_key_up(window, keycode)
+
 
 class DataGridTextBox(Popup):
 
@@ -1298,9 +1335,9 @@ class DataGridTextBox(Popup):
         self.title = title
         self.content = content
         if not multiline:
-            self.size_hint = (.8, .35 if label is None else .5)
+            self.size_hint = (width_calculator(.8, 800), .35 if label is None else .5)
         else:
-            self.size_hint = (.8, .45 if label is None else .6)
+            self.size_hint = (width_calculator(.8, 800), .45 if label is None else .6)
         self.auto_dismiss = True
 
         self.event = Clock.schedule_once(self.set_focus, .35)
@@ -1433,13 +1470,13 @@ class DataGridTableData(RecycleView):
         self.field = field
         self.tb = db
         cfg_field = self.e5_cfg.get(field)
-        self.inputtype = cfg_field.inputtype
-        if cfg_field.inputtype in ['MENU','BOOLEAN']:
+        self.inputtype = cfg_field.inputtype.upper()
+        if self.inputtype in ['MENU','BOOLEAN']:
             self.popup = DataGridMenuList(field, cfg_field.menu, editcell_widget.text, self.menu_selection, self.colors)
             self.popup.open()
-        if cfg_field.inputtype in ['TEXT','NUMERIC','NOTE']:
+        if self.inputtype in ['TEXT','NUMERIC','NOTE']:
             self.popup = DataGridTextBox(title = field, text = editcell_widget.text,
-                                            multiline = cfg_field.inputtype == 'NOTE',
+                                            multiline = self.inputtype == 'NOTE',
                                             call_back = self.menu_selection,
                                             colors = self.colors)
             self.popup.open()
@@ -1529,10 +1566,10 @@ class DataGridLabelAndField(BoxLayout):
         self.size_hint = (0.9, None)
         self.spacing = 10
         label = e5_label(text = col, id = '__label')
-        self.txt = TextInput(multiline = note_field,
+        self.txt = e5_textinput(multiline = note_field,
                         size_hint = (0.75, None),
-#                        id = col,
-                        size_hint_y = .95)
+                        id = col,
+                        size_hint_y = 1)
         if colors:
             if colors.text_font_size:
                 self.txt.font_size = colors.text_font_size 
@@ -1557,10 +1594,11 @@ class DataGridDeletePanel(GridLayout):
             self.add_widget(e5_scrollview_label('\nSelect a record in the grid view first, and then delete that record here.',
                                                  popup = False, colors = self.colors))
 
-class DataGridAddNewPanel(BoxLayout):
+class DataGridAddNewPanel(GridLayout):
 
     def populate(self, data, fields, colors = None, addnew = False, call_back = None):
         self.colors = colors if colors else ColorScheme()
+        self.cols = 1
         if addnew:
             self.addnew_list.bind(minimum_height = self.addnew_list.setter('height'))
             self.addnew_list.clear_widgets()
@@ -1669,12 +1707,12 @@ class DataGridWidget(TabbedPanel):
                                         colors = self.colors)
 
     def open_panel4(self):
+        self.textboxes_will_update_db = False
         cfg_fields = self.fields.fields()
         for widget in self.ids.edit_panel.children[0].walk():
             if hasattr(widget, 'id'):
                 if widget.id in cfg_fields:
                     widget.text = ''
-        self.textboxes_will_update_db = False
 
     def show_menu(self, instance, value):
         if instance.focus:

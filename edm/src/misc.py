@@ -28,17 +28,17 @@ def platform_name():
 def restore_window_size_position(main_name, main_ini):
     Window.minimum_width = 450
     Window.minimum_height = 450
-    if main_ini.get_value(main_name, "TOP"):
-        temp = max(int(main_ini.get_value(main_name, "TOP")), 0)
+    if main_ini.get_value(main_name, "SCREENTOP"):
+        temp = max(int(main_ini.get_value(main_name, "SCREENTOP")), 0)
         Window.top = temp
-    if not main_ini.get_value(main_name,"LEFT") == '':
-        temp = max(int(main_ini.get_value(main_name, "LEFT")), 0)
+    if not main_ini.get_value(main_name,"SCREENLEFT") == '':
+        temp = max(int(main_ini.get_value(main_name, "SCREENLEFT")), 0)
         Window.left = temp
     window_width = None
     window_height = None
-    if not main_ini.get_value(main_name, "WIDTH") == '':
-        window_width = max(int(main_ini.get_value(main_name, "WIDTH")), 450)
-    if not main_ini.get_value(main_name,"HEIGHT") == '':
-        window_height = max(int(main_ini.get_value(main_name, "HEIGHT")), 450)
+    if not main_ini.get_value(main_name, "SCREENWIDTH") == '':
+        window_width = max(int(main_ini.get_value(main_name, "SCREENWIDTH")), 450)
+    if not main_ini.get_value(main_name,"SCREENHEIGHT") == '':
+        window_height = max(int(main_ini.get_value(main_name, "SCREENHEIGHT")), 450)
     if window_width and window_height:
-        Window.size = (window_width, window_height)
+        Window.size = (window_width, window_height)    

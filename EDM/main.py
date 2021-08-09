@@ -22,8 +22,11 @@
 #   Add maybe a simulate station type and a manual station type (maybe with VHD vs XYZ)
 #   Debug with Dave's station
 
-__version__ = '1.0.8'
-__date__ = 'June, 2021'
+# Immediate To DO
+#   Starting program with no cfg and then opening an existing cfg zaps existing json (maybe)
+
+__version__ = '1.0.9'
+__date__ = 'August, 2021'
 from src.constants import __program__ 
 
 __DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','ID']
@@ -40,7 +43,7 @@ from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.spinner import Spinner
+from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.textinput import TextInput
 from kivy.lang import Builder
 from kivy.uix.behaviors import FocusBehavior
@@ -237,7 +240,8 @@ class DB(dbs):
     def names(self, table_name):
         name_list = []
         for row in self.db.table(table_name):
-            name_list.append(row['NAME'])
+            if 'NAME' in row:
+                name_list.append(row['NAME'])
         return(name_list)
 
     def fields(self):
@@ -637,7 +641,7 @@ class CFG(blockdata):
         except:
             return('\nCould not write data to %s.' % (filename))
 
-class totalstation:
+class totalstation(object):
 
     popup = ObjectProperty(None)
     popup_open = False
@@ -671,6 +675,17 @@ class totalstation:
         self.last_setup_type = ''
 
 
+    def text_to_point(self, txt):
+        if len(txt.split(',')) == 3:
+            x, y, z = txt.split(',')
+            try:
+                return(point(float(x), float(y), float(z)))
+            except:
+                return(None)
+        else:
+            return(None)
+
+
     def setup(self, ini, data):
         if ini.get_value(__program__,'STATION'):
             self.make = ini.get_value(__program__,'STATION')
@@ -701,16 +716,6 @@ class totalstation:
             point3 = data.get_datum(ini.get_value('SETUPS','3DATUM_SHIFT_GLOBAL_3'))
             if point1 is not None and point2 is not None and point3 is not None:
                 self.rotate_global = [point1.as_point(), point2.as_point(), point3.as_point()]
-
-    def text_to_point(self, txt):
-        if len(txt.split(',')) == 3:
-            x, y, z = txt.split(',')
-            try:
-                return(point(float(x), float(y), float(z)))
-            except:
-                return(None)
-        else:
-            return(None)
 
     def status(self):
         txt = '\nTotal Station:\n'
@@ -846,9 +851,6 @@ class totalstation:
 
     def decdeg_to_radians(self, angle):
         return(angle / 360 * (2 * pi))
-
-
-class Microscribe(totalstation):
 
     # The following functions are needed by the rotation function at the end of this list.
     # Note too that all of the dependent routines are self written
@@ -1056,9 +1058,8 @@ class Microscribe(totalstation):
         self.rotate_global = global_datums
 
 
-class Topcon(totalstation):
-
-    def make_bcc(self, itext):
+    ### Function specific to Topcon ###
+    def make_bcc_topcon(self, itext):
         #Dim b As Integer = 0
         #Dim i As Integer
         #Dim q As Integer
@@ -1076,53 +1077,51 @@ class Topcon(totalstation):
         bcc = "000" + str(b).strip()
         return(bcc[-3])
 
-    def horizontal(self):
+    def horizontal_topcon(self):
         self.send("Z10")
         return(self.receive())
 
-    def initialize(self):
+    def initialize_topcon(self):
         self.send("ST0")
+    ### end Topcon
 
-
-class Leica(totalstation):
-
-    def pad_dms(self, angle):
+    ### Leica functions ###
+    def pad_dms_leica(self, angle):
         degrees = ('000' + angle.split('.')[0])[-3:]
         minutes_seconds = (angle.split('.')[1] + '0000')[0:4]
         return( degrees + minutes_seconds)
 
-    def set_horizontal_angle(self, angle):
+    def set_horizontal_angle_leica(self, angle):
         # function expects angle as ddd.mmss input
         output = "PUT/21...4+" + self.pad_dms(angle) + "0 "
         errorcode = self.send(output)
         returncode = self.receive()
 
-    def record_point(self):
+    def record_point_leica(self):
         self.clear_com()
         self.send("GET/M/WI11/WI21/WI22/WI31/WI51")
         result = self.receive()
         self.clear_com()
 
-    def initialize(self):
+    def initialize_leica(self):
         self.send("SET/41/0")
         self.clear_com()
         self.send("SET/149/2")
         self.clear_com()
+    ### Leica functions ###
 
-
-class LeicaGeoCom(totalstation):
-
-    def initialize(self):
+    ### Leica geocom functions ###
+    def initialize_geocom(self):
         pass
         
-    def set_horizontal_angle(self, angle):
+    def set_horizontal_angle_geocom(self, angle):
         # function expects angle as ddd.mmss as input
         # %R1Q,2113:HzOrientation[double]
         output = "%R1Q,2113:{:10.8f}".format(self.decdeg_to_radians(self.dms_to_decdeg(angle)))
         errorcode = self.send(output)
         returncode = self.receive()
 
-    def record_point(self):
+    def record_point_geocom(self):
         self.clear_com()
         self.send("%R1Q,2008:1,1")          # Use the defaults with 1 and 1
         errorcode = self.receive()
@@ -1136,25 +1135,7 @@ class LeicaGeoCom(totalstation):
         self.clear_com()    
         self.send("%R1Q,2008:3,1")          # Empty the measurement buffer as a precaution
         returncode = self.receive()
-
-
-class totalstations(object):
-    def __init__(self):
-        self._stations = {}
-        self.register('Leica', Leica())
-        self.register('LeicaGeoCom', LeicaGeoCom())
-        self.register('Topcon', Topcon())
-
-    def register(self, station_name, station_class):
-        self._stations[station_name] = station_class
-
-    def _get(self, station_name):
-        station_class = self._stations.get(station_name)
-        return(station_class)
-
-    def initialize(self, station_name):
-        return(self._get(station_name))
-
+    ### Leica geocom functions ###
 
 #endregion
 
@@ -1201,10 +1182,10 @@ class MainScreen(e5_MainScreen):
 
         self.layout.clear_widgets()
 
-        self.info = Label(text = 'EDM',
+        self.info = e5_label(text = 'EDM',
                     size_hint = (1, size_hints['info']),
                     color = self.colors.text_color,
-#                    id = 'lastshot',
+                    id = 'lastshot',
                     halign = 'center')
         if self.colors:
             if self.colors.text_font_size:
@@ -1292,12 +1273,12 @@ class MainScreen(e5_MainScreen):
             self.station.take_shot()
             prism_names = self.data.names('prisms')
             if len(prism_names) > 0 :
-                self.popup = DataGridMenuList(title = "Prism Height",
+                self.popup = DataGridMenuList(title = "Select or Enter a Prism Height",
                                                 menu_list = prism_names,
                                                 menu_selected = '',
                                                 call_back = self.have_shot)
             else:
-                self.popup = DataGridTextBox(title = 'Prism Height',
+                self.popup = DataGridTextBox(title = 'Enter a Prism Height',
                                             call_back = self.have_shot,
                                             button_text = ['Back','Next'])
         self.popup.open()
@@ -1606,6 +1587,12 @@ class MainScreen(e5_MainScreen):
                     return(last_record[field_name])
         return(None)
 
+
+    def exit_program(self):
+        self.save_window_location()
+        App.get_running_app().stop()
+
+
 class RecordDatumsScreen(Screen):
 
     def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
@@ -1625,7 +1612,7 @@ class RecordDatumsScreen(Screen):
                                 spacing = 20)
         self.add_widget(self.content)
 
-        self.content.add_widget(e5_label('Provide a name and optinal notes, record and save.', colors = self.colors))
+        self.content.add_widget(e5_label('Provide a name and notes (optional), then record and save.', colors = self.colors))
 
         self.datum_name = DataGridLabelAndField('Name', colors = self.colors)
         self.content.add_widget(self.datum_name)
@@ -1910,6 +1897,7 @@ class setups(ScrollView):
         self.station = station
         self.ini = ini
         self.recorder = []
+        self.bar_width = 10
 
         y_sizes = {"Horizontal Angle Only" : 3.0,
                     "Over a datum": 1.1,
@@ -1918,7 +1906,7 @@ class setups(ScrollView):
                     "Three datum shift" : 6.0}
         
         self.scrollbox = GridLayout(cols = 1,
-                                size_hint_y = None,
+                                size_hint = (1, None),
 #                                id = 'setups_box',
                                 spacing = 5)
         self.scrollbox.bind(minimum_height = self.scrollbox.setter('height'))
@@ -1942,17 +1930,17 @@ class setups(ScrollView):
             self.scrollbox.add_widget(content2)
 
         elif setup_type == "Over a datum":
-            instructions.text = 'Enter select the datum point under the station and enter the station height.  Note this option assumes the horizontal angle is already correct or will be otherwise set.'
+            instructions.text = 'Use this option when the station is setup over a known point and you can measure the station height or to set the station location directly (with no station height).  Note this option assumes the horizontal angle is already correct or will be otherwise set.'
             self.scrollbox.add_widget(instructions)
 
-            self.over_datum = datum_selector(text = 'Select the datum\nunder the station',
+            self.over_datum = datum_selector(text = 'Select a datum',
                                                 data = self.data,
                                                 colors = self.colors,
                                                 default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
             self.scrollbox.add_widget(self.over_datum)
 
             content2 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
-            content2.add_widget(e5_label('Height over datum'))
+            content2.add_widget(e5_label('Station height (optional)'))
             self.station_height = TextInput(text = '', multiline = False,
 #                                            id = 'station_height',
                                             size_hint_max_y = 30)
@@ -2039,8 +2027,8 @@ class setups(ScrollView):
         instructions.bind(texture_size = lambda instance, value: setattr(instance, 'height', value[1]))
         instructions.bind(width = lambda instance, value: setattr(instance, 'text_size', (value * .95, None)))
         
-        self.size_hint = (1, None)
-        self.size = (Window.width, Window.height / 2)
+        self.size_hint = (1, .9)
+        #self.size = (Window.width, Window.height / 2)
         self.id = 'setup_scroll'
         self.add_widget(self.scrollbox)
 
@@ -2080,16 +2068,23 @@ class InitializeStationScreen(Screen):
 
         self.content = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
-                                size_hint_x = .8,
+                                size_hint_x = width_calculator(.9, 400),
                                 pos_hint = {'center_x': .5, 'center_y': .5},
 #                                id = 'content',
-                                padding = 0,
-                                spacing = 0)
+                                padding = 5,
+                                spacing = 5)
         self.add_widget(self.content)
 
-        setup_type_box = GridLayout(cols = 2, size_hint = (.9, .2),
-                            pos_hint = {'center_x': .5, 'center_y': .5})
-        setup_type_box.add_widget(e5_label('Setup type', colors = self.colors))
+        setup_type_box = GridLayout(cols = 2,
+                                    #size_hint = (width_calculator(.9, 400), None),
+                                    size_hint_y = None,
+                                    pos_hint = {'center_x': .5, 'center_y': .5})
+        setup_type_box.add_widget(e5_label('Select a setup type', colors = self.colors, size_hint = (.5, None)))
+
+        spinner_dropdown_button = SpinnerOptions
+        spinner_dropdown_button.font_size = colors.button_font_size.replace("sp",'') if colors.button_font_size else None
+        spinner_dropdown_button.background_color = (0, 0, 0, 1)
+
         self.setup_type = Spinner(text = self.setup,
                                     values=["Horizontal Angle Only",
                                             "Over a datum",
@@ -2097,22 +2092,27 @@ class InitializeStationScreen(Screen):
                                             "Record two datums",
                                             "Three datum shift"],
 #                                    id = 'setup_type',
-                                    size_hint = (.7, None)
-                                    #pos_hint = {'center_x': .5, 'center_y': .5},
+                                    size_hint = (.5, None),
+                                    option_cls = spinner_dropdown_button
+                                    #pos_hint = {'center_x': .5, 'center_y': .5}
                                     )
+        if colors.button_font_size:
+            self.setup_type.font_size = colors.button_font_size
         setup_type_box.add_widget(self.setup_type)
         self.setup_type.bind(text = self.rebuild)
         self.content.add_widget(setup_type_box)
 
-        self.scroll_content = BoxLayout(orientation = 'vertical', size_hint = (1, .6),
+        self.scroll_content = BoxLayout(orientation = 'vertical',
+                                        size_hint = (1, .9),
                                         spacing = 5, padding = 5)
+
         self.content.add_widget(self.scroll_content)
 
         self.setup_widgets = setups(self.setup_type.text,                                                
-                                                data = self.data,
-                                                ini = self.ini,
-                                                station = self.station,
-                                                colors = self.colors)
+                                    data = self.data,
+                                    ini = self.ini,
+                                    station = self.station,
+                                    colors = self.colors)
         self.scroll_content.add_widget(self.setup_widgets)
 
         self.content.add_widget(e5_side_by_side_buttons(text = ['Back','Accept Setup'],
@@ -2290,43 +2290,49 @@ class EditUnitsScreen(e5_DatagridScreen):
 class EditDatumsScreen(e5_DatagridScreen):
     pass
 
+class SpinnerOptions(SpinnerOption):
+    def __init__(self, **kwargs):
+        super(SpinnerOptions, self).__init__(**kwargs)
+
 class station_setting(GridLayout):
     label = ObjectProperty(None)
     spinner = ObjectProperty(None)
     id = ObjectProperty(None)
+    comport_to_test = None
+    valid_comports = []
+
     def __init__(self, label_text = '', spinner_values = (), default = '',
                         id = None, call_back = None, colors = None, **kwargs):
         super(station_setting, self).__init__(**kwargs)
 
         self.id = id
         self.cols = 2
-        self.size_hint_max_x = 300
-
+        self.pos_hint = {'center_x': .5},
+        self.colors = colors
         self.label = e5_label(text = label_text, colors = colors)
         self.add_widget(self.label)
-        
-        self.spinner = Spinner(text = default if default is not None else '', values = spinner_values)
-        self.add_widget(self.spinner)
-        self.spinner.bind(text = call_back)
 
-class StationConfigurationScreen(Screen):
-    comport_widgit = ObjectProperty(None)
-    comport_to_test = None
-    valid_comports = []
-    def __init__(self, station = None, ini = None, colors = None, **kwargs):
-        super(StationConfigurationScreen, self).__init__(**kwargs)
+        # Create a default dropdown button and then modify its properties
+        # For some reason, the usual font size specification doesn't work here and sp has to be removed
+        spinner_dropdown_button = SpinnerOptions
+        spinner_dropdown_button.font_size = colors.button_font_size.replace("sp",'') if colors.button_font_size else None
+        spinner_dropdown_button.background_color = (0, 0, 0, 1)
 
-        self.station = station
-        self.colors = colors
-        self.ini = ini
+        self.spinner = Spinner(text = default if default is not None else '',
+                                values = spinner_values,
+                                font_size = colors.button_font_size if colors.button_font_size else None,
+                                option_cls = spinner_dropdown_button)
+        if label_text == 'Port Number':
+            comport = GridLayout(cols = 2, spacing = 5)
+            comport.add_widget(self.spinner)
+            comport.add_widget(e5_button('Scan', colors = colors, call_back = self.scanner))
+            self.add_widget(comport)
+        else:
+            self.add_widget(self.spinner)
+        if call_back:
+            self.spinner.bind(text = call_back)
 
-        self.layout = GridLayout(cols = 1, spacing = 5, col_default_width = 600)
-        self.add_widget(self.layout)
-
-        self.build_screen()
-
-
-    def on_enter(self):
+    def scanner(self, instance):
         self.event1 = Clock.schedule_once(self.show_popup_message, .2)
         self.event2 = Clock.schedule_interval(self.check_comports, .2)
 
@@ -2362,7 +2368,7 @@ class StationConfigurationScreen(Screen):
             self.valid_comports = []
         self.comport_to_test += 1
         if self.comport_to_test > __LASTCOMPORT__:
-            self.comport_widgit.spinner.values = list(filter(None.__ne__, self.valid_comports))
+            self.spinner.values = list(filter(None.__ne__, self.valid_comports))
             self.event2.cancel()
             self.close_popup(None)
             self.comport_to_test = None
@@ -2374,85 +2380,119 @@ class StationConfigurationScreen(Screen):
         return list(filter(None.__ne__, [self.comportIsUsable("COM%s" % comno) for comno in range(1, __LASTCOMPORT__ + 1)]))
 
 
+class StationConfigurationScreen(Screen):
+
+    def __init__(self, station = None, ini = None, colors = None, **kwargs):
+        super(StationConfigurationScreen, self).__init__(**kwargs)
+
+        self.station = station
+        self.colors = colors
+        self.ini = ini
+
+    def on_enter(self):
+        self.clear_widgets()
+        self.layout = GridLayout(cols = 1,
+                                 spacing = 5,
+                                 size_hint_x = width_calculator(.9, 800),
+                                 size_hint_y = .9,
+                                 pos_hint = {'center_x': .5, 'center_y': .5})
+        self.add_widget(self.layout)
+        self.build_screen()
+
     def build_screen(self):
-        self.layout.clear_widgets()
-        self.layout.add_widget(station_setting(label_text = 'Station type',
+        self.station_type = station_setting(label_text = 'Station type',
                                             spinner_values = ("Leica", "Wild", "Topcon", "Microscribe", "Simulate"),
-                                            call_back = self.update_ini,
+                                            call_back = self.toggle_buttons,
                                             id = 'station_type',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'STATION')))
-        self.layout.add_widget(station_setting(label_text = 'Communications',
+                                            default = self.ini.get_value(__program__, 'STATION'))
+        self.layout.add_widget(self.station_type)
+
+        self.communications = station_setting(label_text = 'Communications',
                                             spinner_values = ("Serial", "Bluetooth"),
-                                            call_back = self.update_ini,
+                                            #call_back = self.update_ini,
                                             id = 'communications',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'COMMUNICATIONS')))
-        self.comport_widgit = station_setting(label_text = 'Port Number',
+                                            default = self.ini.get_value(__program__, 'COMMUNICATIONS'))
+        self.layout.add_widget(self.communications)
+
+        self.comports = station_setting(label_text = 'Port Number',
                                             spinner_values = [],
-                                            call_back = self.update_ini,
+                                            #call_back = self.update_ini,
                                             id = 'comport',
                                             colors = self.colors,
                                             default = self.ini.get_value(__program__, 'COMPORT'))
-        self.layout.add_widget(self.comport_widgit)
-        self.layout.add_widget(station_setting(label_text = 'Baud rate',
+        self.layout.add_widget(self.comports)
+        
+        self.baud_rate = station_setting(label_text = 'Baud rate',
                                             spinner_values = ("1200", "2400", "4800", "9600", "14400", "19200"),
-                                            call_back = self.update_ini,
+                                            #call_back = self.update_ini,
                                             id = 'baudrate',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'BAUDRATE')))
-        self.layout.add_widget(station_setting(label_text = 'Parity',
+                                            default = self.ini.get_value(__program__, 'BAUDRATE'))
+        self.layout.add_widget(self.baud_rate)
+
+        self.parity = station_setting(label_text = 'Parity',
                                             spinner_values = ("Even", "Odd","None"),
-                                            call_back = self.update_ini,
+                                            #call_back = self.update_ini,
                                             id = 'parity',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'PARITY')))
-        self.layout.add_widget(station_setting(label_text = 'Databits',
+                                            default = self.ini.get_value(__program__, 'PARITY'))
+        self.layout.add_widget(self.parity)
+
+        self.data_bits = station_setting(label_text = 'Databits',
                                             spinner_values = ("7", "8"),
-                                            call_back = self.update_ini,
+                                            #call_back = self.update_ini,
                                             id = 'databits',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'DATABITS')))
-        self.layout.add_widget(station_setting(label_text = 'Stopbits',
+                                            default = self.ini.get_value(__program__, 'DATABITS'))
+        self.layout.add_widget(self.data_bits)
+
+        self.stop_bits = station_setting(label_text = 'Stopbits',
                                             spinner_values = ("0","1","2"),
-                                            call_back = self.update_ini,
+                                            #call_back = self.update_ini,
                                             id = 'stopbits',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'STOPBITS')))
+                                            default = self.ini.get_value(__program__, 'STOPBITS'))
+        self.layout.add_widget(self.stop_bits)                                                
 
-        button2 = e5_button(text = 'Back', size_hint_y = None, size_hint_x = 1,
-                        id = 'cancel', colors = self.colors, selected = True)
-        self.layout.add_widget(button2)
-        button2.bind(on_press = self.close_screen)
+        self.buttons = e5_side_by_side_buttons(text = ['Back','Set'],
+                                                id = ['Back','Set'],
+                                                selected = [True, False],
+                                                call_back = [self.close_screen, self.update_ini],
+                                                colors = self.colors)
+        self.layout.add_widget(self.buttons)
+        self.toggle_buttons(None, None)
         self.changes = False
 
-    def update_ini(self, instance, value):
-        if instance.parent.id == 'stopbits':
-            self.station.stopbits = value
-            self.ini.update_value(__program__, 'STOPBITS', value)
-        elif instance.parent.id == 'baudrate':
-            self.station.baudrate = value
-            self.ini.update_value(__program__, 'BAUDRATE', value)
-        elif instance.parent.id == 'databits':
-            self.station.databits = value
-            self.ini.update_value(__program__, 'DATABITS', value)
-        elif instance.parent.id == 'comport':
-            self.station.comport = value
-            self.ini.update_value(__program__, 'COMPORT', value)
-        elif instance.parent.id=='parity':
-            self.station.parity = value
-            self.ini.update_value(__program__, 'PARITY', value)
-        elif instance.parent.id=='communications':
-            self.station.communications = value
-            self.ini.update_value(__program__, 'COMMUNICATIONS', value)
-        elif instance.parent.id=='station_type':
-            self.station.make = value
-            self.ini.update_value(__program__, 'STATION', value)
-        self.changes = True
+    def toggle_buttons(self, instance, value):
+        disabled = self.station_type.spinner.text in ['Simulate', 'Microscribe']
+        self.stop_bits.spinner.disabled = disabled
+        self.parity.spinner.disabled = disabled
+        self.data_bits.spinner.disabled = disabled
+        self.baud_rate.spinner.disabled = disabled
+        self.comports.spinner.disabled = disabled
+        self.communications.spinner.disabled = disabled
 
+    def update_ini(self, instance):
+        self.station.make = self.station_type.spinner.text 
+        self.ini.update_value(__program__, 'STATION', self.station_type.spinner.text)
+        self.station.stopbits = self.stop_bits.spinner.text
+        self.ini.update_value(__program__, 'STOPBITS', self.stop_bits.spinner.text)
+        self.station.baudrate = self.baud_rate.spinner.text
+        self.ini.update_value(__program__, 'BAUDRATE', self.baud_rate.spinner.text)
+        self.station.databits = self.data_bits.spinner.text
+        self.ini.update_value(__program__, 'DATABITS', self.data_bits.spinner.text)
+        self.station.comport = self.comports.spinner.text
+        self.ini.update_value(__program__, 'COMPORT', self.comports.spinner.text)
+        self.station.parity = self.parity.spinner.text
+        self.ini.update_value(__program__, 'PARITY', self.parity.spinner.text)
+        self.station.communications = self.communications.spinner.text
+        self.ini.update_value(__program__, 'COMMUNICATIONS', self.communications.spinner.text)
+        self.ini.save()
+        self.close_screen(None)
+        
     def close_screen(self, value):
-        if self.changes:
-            self.ini.save()
         self.parent.current = 'MainScreen'
 
 #Region Help Screens
@@ -2506,11 +2546,12 @@ class EDMApp(e5_Program):
         self.ini = INI()
         self.cfg = CFG()
         self.data = DB()
-        self.station = totalstation()
 
         self.app_path = self.user_data_dir
         self.setup_logger()
         self.setup_program()
+
+        self.station = totalstation(self.ini.get_value(__program__,'STATION'))
         self.station.setup(self.ini, self.data)
 
     def setup_logger(self):
@@ -2645,7 +2686,7 @@ class EDMApp(e5_Program):
     def build(self):
         self.add_screens()
         restore_window_size_position(__program__, self.ini)
-        Window.borderless = True
+        #Window.borderless = True
         self.title = __program__ + " " + __version__
         logger.info(__program__ + ' started, logger initialized, and application built.')
         sm.screens[0].build_mainscreen()
