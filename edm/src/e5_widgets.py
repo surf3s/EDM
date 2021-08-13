@@ -1,4 +1,5 @@
 from kivy.app import App
+from kivy.metrics import sp
 from kivy.clock import Clock, mainthread
 from kivy.uix.textinput import TextInput
 from kivy.uix.label import Label
@@ -899,21 +900,22 @@ class e5_RecordEditScreen(Screen):
         self.one_record_only = one_record_only
         self.can_update_data_table = False
         self.layout = GridLayout(cols = 1,
-                                 size_hint_y = 1,
+                                 size_hint_y = .9,
                                  size_hint_x = width_calculator(.9, 600),
                                  spacing = 5,
                                  padding = 5,
-                                 pos_hint={'center_x': .5})
+                                 pos_hint={'center_x': .5, 'center_y': .5})
         self.data_fields = GridLayout(cols = 1, size_hint_y = None, spacing = 5, padding = 5)
         self.make_empty_frame()
         scroll = ScrollView(size_hint = (1, 1))
         scroll.add_widget(self.data_fields)
         self.layout.add_widget(scroll)
         if not self.one_record_only:
-            self.layout.add_widget(e5_side_by_side_buttons(text = ['Previous record','Next record'],
-                                                            id = ['previous','next'],
-                                                            call_back = [self.previous_record, self.next_record],
-                                                            selected = [True, True],
+            self.layout.add_widget(e5_side_by_side_buttons(text = ['First','Previous','Next','Last'],
+                                                            id = ['first','previous','next','last'],
+                                                            call_back = [self.first_record, self.previous_record,
+                                                                         self.next_record, self.last_record],
+                                                            selected = [True, True, True, True],
                                                             colors = self.colors))
             self.layout.add_widget(e5_button('Back',
                                         id = 'back',
@@ -923,7 +925,8 @@ class e5_RecordEditScreen(Screen):
             self.layout.add_widget(e5_side_by_side_buttons(text = ['Save','Cancel'],
                                                             id = ['save','cancel'],
                                                             call_back = [self.save_record, self.cancel_record],
-                                                            selected = [True, True]))
+                                                            selected = [True, True],
+                                                            colors = self.colors))
 
         self.add_widget(self.layout)
 
@@ -936,14 +939,32 @@ class e5_RecordEditScreen(Screen):
                                                                 colors = self.colors,
                                                                 note_field = (field_type == 'NOTE')))
 
+    def first_record(self, value):
+        if self.doc_id:
+            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
+            self.doc_id = doc_ids[0]
+            self.put_data_in_frame()
+
     def previous_record(self, value):
         if self.doc_id:
-            self.doc_id = max(self.data.db.table(self.data_table).all()[0].doc_id, self.doc_id - 1)
+            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
+            current = doc_ids.index(self.doc_id)
+            new = max(current - 1, 0)
+            self.doc_id = doc_ids[new]
             self.put_data_in_frame()
 
     def next_record(self, value):
         if self.doc_id and self.data_table:
-            self.doc_id = min(self.data.db.table(self.data_table).all()[-1].doc_id, self.doc_id + 1)
+            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
+            current = doc_ids.index(self.doc_id)
+            new = min(current + 1, len(doc_ids) - 1)
+            self.doc_id = doc_ids[new]
+            self.put_data_in_frame()
+
+    def last_record(self, value):
+        if self.doc_id:
+            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
+            self.doc_id = doc_ids[-1]
             self.put_data_in_frame()
 
     def clear_the_frame(self):
@@ -983,14 +1004,15 @@ class e5_RecordEditScreen(Screen):
             linkfields = self.data.get_link_fields(fieldname, value)
             if linkfields:
                 for widget in self.layout.walk():
-                    if widget.id in linkfields.keys() and widget.id != fieldname:
-                        widget.text = linkfields[widget.id]
-                        widget_field = self.e5_cfg.get(widget.id)
-                        if widget_field.increment:
-                            try:
-                                widget.text = str(int(widget.text) + 1)
-                            except:
-                                pass
+                    if hasattr(widget, 'id'):
+                        if widget.id in linkfields.keys() and widget.id != fieldname:
+                            widget.text = linkfields[widget.id]
+                            widget_field = self.e5_cfg.get(widget.id)
+                            if widget_field.increment:
+                                try:
+                                    widget.text = str(int(widget.text) + 1)
+                                except:
+                                    pass
 
     def check_required_fields(self):
         save_errors = []
@@ -1028,18 +1050,20 @@ class e5_RecordEditScreen(Screen):
             for field_name in self.e5_cfg.link_fields:
                 cfg_field = self.e5_cfg.get(field_name)
                 for widget in self.layout.walk():
-                    if widget.id == field_name:
-                        q = Query()
-                        db_rec = self.data.db.table(field_name).search(q[field_name].matches('^' + widget.text + '$', re.IGNORECASE))
-                        if db_rec == []:
-                            self.data.db.table(field_name).insert({field_name: widget.text})
-                            db_rec = self.data.db.table(field_name).search(where(field_name) == widget.text)
-                        for link_field_name in cfg_field.link_fields:
-                            for widget in self.layout.walk():
-                                if widget.id == link_field_name:
-                                    if (widget.id == 'ID' and self.is_numeric(widget.text)) or widget.id != 'ID':
-                                        update = {link_field_name: widget.text}
-                                        self.data.db.table(field_name).update(update, doc_ids = [db_rec[0].doc_id])
+                    if hasattr(widget, 'id'):
+                        if widget.id == field_name:
+                            q = Query()
+                            db_rec = self.data.db.table(field_name).search(q[field_name].matches('^' + widget.text + '$', re.IGNORECASE))
+                            if db_rec == []:
+                                self.data.db.table(field_name).insert({field_name: widget.text})
+                                db_rec = self.data.db.table(field_name).search(where(field_name) == widget.text)
+                            for link_field_name in cfg_field.link_fields:
+                                for widget in self.layout.walk():
+                                    if hasattr(widget, 'id'):
+                                        if widget.id == link_field_name:
+                                            if (widget.id == 'ID' and self.is_numeric(widget.text)) or widget.id != 'ID':
+                                                update = {link_field_name: widget.text}
+                                                self.data.db.table(field_name).update(update, doc_ids = [db_rec[0].doc_id])
 
     def is_numeric(self, value):
         try:
@@ -1258,6 +1282,9 @@ class DataGridMenuList(Popup):
 
         new_item = GridLayout(cols = 2, spacing = 5, size_hint_y = .15)
         self.txt = e5_textinput(id = 'new_item', size_hint_y = .15)
+        if colors:
+            if colors.text_font_size:
+                self.txt.font_size = colors.text_font_size 
         new_item.add_widget(self.txt)
         new_item.add_widget(e5_button('Add',
                                             id = 'add_button',
@@ -1302,7 +1329,7 @@ class DataGridTextInput(TextInput):
         self.call_back = call_back
 
     def keyboard_on_key_up(self, window, keycode):
-        print(keycode)
+        #print(keycode)
         return super(DataGridTextInput, self).keyboard_on_key_up(window, keycode)
 
 
@@ -1317,9 +1344,17 @@ class DataGridTextBox(Popup):
         self.colors = colors if colors else ColorScheme()
         content = GridLayout(cols = 1, spacing = 5, padding = 10)
         if label:
-            content.add_widget(Label(text = label, text_size = (None, 30)))
+            #e5_label(text = col, id = '__label', colors = colors)
+            #content.add_widget(Label(text = label, text_size = (None, 30)))
+            content.add_widget(e5_label(text = label, colors = self.colors, popup = True))
         self.txt = DataGridTextInput(text = text, size_hint_y = None, height = 30 if not multiline else 90,
                                 multiline = multiline, id = 'new_item')
+        if self.colors:
+            if self.colors.text_font_size:
+                self.txt.font_size = self.colors.text_font_size 
+            if not multiline:
+                if self.colors.text_font_size:
+                    self.txt.height = int(self.colors.text_font_size.replace('sp','')) * 1.8
         self.result = text
         self.txt.bind(text = self.update)
         self.txt.bind(on_text_validate = self.accept_value)
@@ -1562,10 +1597,12 @@ class DataGridLabelAndField(BoxLayout):
         self.update_db = False
         self.widget_type = 'data'
         if not note_field:
-            self.height = "30sp"
+            if colors:
+                if colors.text_font_size:
+                    self.height = int(colors.text_font_size.replace('sp','')) * 1.9
         self.size_hint = (0.9, None)
         self.spacing = 10
-        label = e5_label(text = col, id = '__label')
+        label = e5_label(text = col, id = '__label', colors = colors)
         self.txt = e5_textinput(multiline = note_field,
                         size_hint = (0.75, None),
                         id = col,

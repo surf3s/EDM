@@ -25,7 +25,7 @@
 # Immediate To DO
 #   Starting program with no cfg and then opening an existing cfg zaps existing json (maybe)
 
-__version__ = '1.0.9'
+__version__ = '1.0.13'
 __date__ = 'August, 2021'
 from src.constants import __program__ 
 
@@ -249,9 +249,9 @@ class DB(dbs):
 
     def delete_all(self, table_name = None):
         if table_name is None:
-            self.db.purge()
+            self.db.drop_tables()
         else:
-            self.db.table(table_name).purge()
+            self.db.table(table_name).truncate()
 
     def export_csv(self):
         pass
@@ -1268,7 +1268,8 @@ class MainScreen(e5_MainScreen):
             self.popup = DataGridTextBox(title = 'EDM', text = '<Microscribe>',
                                             label = 'Waiting on...',
                                             button_text = ['Cancel', 'Next'],
-                                            call_back = self.have_shot)
+                                            call_back = self.have_shot,
+                                            colors = self.colors)
         else:
             self.station.take_shot()
             prism_names = self.data.names('prisms')
@@ -2593,6 +2594,7 @@ class EDMApp(e5_Program):
                                         e5_cfg = self.cfg))
 
         sm.add_widget(EditPointScreen(name = 'EditPointScreen',
+                                        colors = self.colors,
 #                                        id = 'editpoint_screen',
                                         data = self.data,
                                         data_table = self.data.table,
