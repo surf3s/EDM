@@ -23,9 +23,8 @@
 #   Debug with Dave's station
 
 # Immediate To DO
-#   Starting program with no cfg and then opening an existing cfg zaps existing json (maybe)
 
-__version__ = '1.0.13'
+__version__ = '1.0.14'
 __date__ = 'August, 2021'
 from src.constants import __program__ 
 
