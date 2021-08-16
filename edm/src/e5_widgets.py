@@ -941,8 +941,7 @@ class e5_RecordEditScreen(Screen):
 
     def first_record(self, value):
         if self.doc_id:
-            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
-            self.doc_id = doc_ids[0]
+            self.doc_id = self.data.doc_ids()[0]
             self.put_data_in_frame()
 
     def previous_record(self, value):
@@ -963,8 +962,7 @@ class e5_RecordEditScreen(Screen):
 
     def last_record(self, value):
         if self.doc_id:
-            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
-            self.doc_id = doc_ids[-1]
+            self.doc_id =  self.data.doc_ids()[-1]
             self.put_data_in_frame()
 
     def clear_the_frame(self):
@@ -1026,11 +1024,31 @@ class e5_RecordEditScreen(Screen):
                                 save_errors.append('The field %s requires a value.' % field_name)
         return(save_errors)
 
+    def get_unique_key(self, doc_id):
+        unique_key = []
+        data_record = self.data.db.table(self.data_table).get(doc_id = doc_id)
+        for field in self.e5_cfg.unique_together:
+            unique_key.append("%s" % data_record[field])
+        return(",".join(unique_key))
+
+    def check_unique_together(self):
+        save_errors = []
+        if self.e5_cfg.unique_together and len(self.data.db.table(self.data_table)) > 1:
+            doc_ids = self.data.doc_ids()
+            unique_key = self.get_unique_key(doc_ids[-1])
+            for doc_id in doc_ids:
+                if unique_key == self.get_unique_key(doc_id):
+                    save_errors.append("Based on the field(s) %s, this record's unique key of %s duplicates the record with a doc_id of %s." %
+                                        (",".join(self.e5_cfg.unique_together), unique_key, doc_id))
+                    break
+        return(save_errors)
+
     def save_record(self, instance):
         save_errors = self.check_required_fields()
+        save_errors += self.check_unique_together()
         if hasattr(self.data.db.table(self.data_table), 'on_save') and save_errors == []:
-            save_errors = self.data.db.table(self.data_table).on_save()
-        if save_errors is None:
+            save_errors += self.data.db.table(self.data_table).on_save()
+        if not save_errors:
             self.update_link_fields()
             self.data.new_data = True
             self.parent.current = 'MainScreen'

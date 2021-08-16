@@ -378,6 +378,7 @@ class CFG(blockdata):
         self.gps = False
         self.link_fields = []
         self.errors = []
+        self.unique_together = []
 
     def open(self, filename = ''):
         if filename:
@@ -392,6 +393,9 @@ class CFG(blockdata):
                 return('Required field %s is empty.  Please provide a value.' % field)
             if f.length!=0 and len(value) > f.length:
                 return('Maximum length for %s is set to %s.  Please shorten your response.  Field lengths can be set in the CFG file.  A value of 0 means no length limit.')
+        if self.unique_together:
+            pass
+        
         return(True)
 
     def get(self, field_name):
@@ -548,6 +552,20 @@ class CFG(blockdata):
                 self.errors.append("Error: The table name '%s' has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '%s' characters.  Change the name before collecting data." % (table_name, r' !@#$%^&*()?/\{}<.,.|+=~`-'))
                 self.has_errors = True
     
+        unique_together = self.get_value('EDM','UNIQUE_TOGETHER')
+        if unique_together:
+            no_errors = True
+            for field_name in unique_together.split(','):
+                if not field_name in field_names:
+                    self.errors.append("Error: The field '%s' is listed in UNIQUE_TOGETHER but does not appear as a field in the CFG file.")
+                    self.has_errors = True
+                    no_errors = False
+                    break
+            if no_errors:
+                self.unique_together = unique_together.split(',')
+            else:
+                self.unique_together = ''
+
         for field_name in field_names:
             if any((c in set(r' !@#$%^&*()?/\{}<.,.|+=~`-')) for c in field_name):
                 self.errors.append("Error: The field name '%s' has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '%s' characters.  Change the name before collecting data." % (table_name, r' !@#$%^&*()?/\{}<.,.|+=~`-'))
@@ -1322,6 +1340,7 @@ class MainScreen(e5_MainScreen):
         self.update_info_label()
         self.make_backup()
         self.check_for_duplicate_xyz()
+        return([])
 
     def on_cancel(self):
         last_record = self.data.db.table(self.data.table).all()[-1]

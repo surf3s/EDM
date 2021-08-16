@@ -92,3 +92,6 @@ class dbs:
         except:
             last = None
         return(last)
+
+    def doc_ids(self):
+        return([r.doc_id for r in self.db.table(self.table).all()])
