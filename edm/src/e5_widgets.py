@@ -1036,7 +1036,7 @@ class e5_RecordEditScreen(Screen):
         if self.e5_cfg.unique_together and len(self.data.db.table(self.data_table)) > 1:
             doc_ids = self.data.doc_ids()
             unique_key = self.get_unique_key(doc_ids[-1])
-            for doc_id in doc_ids:
+            for doc_id in doc_ids[0:-1]:
                 if unique_key == self.get_unique_key(doc_id):
                     save_errors.append("Based on the field(s) %s, this record's unique key of %s duplicates the record with a doc_id of %s." %
                                         (",".join(self.e5_cfg.unique_together), unique_key, doc_id))

@@ -23,10 +23,11 @@
 #   Debug with Dave's station
 
 # Immediate To DO
-#   Add a unique field
+#   arrow keys (and or tab keys) to move between fields in edit last record
 
-__version__ = '1.0.14'
+__version__ = '1.0.15'
 __date__ = 'August, 2021'
+from serial.win32 import ERROR_INVALID_USER_BUFFER
 from src.constants import __program__ 
 
 __DEFAULT_FIELDS__ = ['X','Y','Z','SLOPED','VANGLE','HANGLE','STATIONX','STATIONY','STATIONZ','DATE','PRISM','ID']
@@ -72,6 +73,9 @@ import random
 import datetime
 from math import sqrt
 from math import pi
+from math import cos
+from math import sin
+
 import re
 import string
 from platform import python_version
@@ -107,7 +111,17 @@ __plyer_version__ = 'None'
 # or get angles.py library (looks maybe better)
 
 # use pySerial for serial communications
+# io is used for input/output on the serial port
 import serial
+from time import sleep
+
+if os.name == 'nt':  # sys.platform == 'win32':
+    from serial.tools.list_ports_windows import comports
+elif os.name == 'posix':
+    from serial.tools.list_ports_posix import comports
+#~ elif os.name == 'java':
+else:
+    raise ImportError("Sorry: no implementation for your platform ('{}') available".format(os.name))
 
 #Region Data Classes
 class point:
@@ -207,7 +221,7 @@ class DB(dbs):
             return(None)
 
     def get_datum(self, name = ''):
-        if name is not '' and self.db is not None:
+        if name and self.db:
             a_datum = Query()
             p = self.db.table('datums').search(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
             #p = self.db.table('datums').search( (where('NAME') == name, flags = re.IGNORECASE) )
@@ -221,7 +235,7 @@ class DB(dbs):
         return(None)
 
     def delete_datum(self, name = ''):
-        if name is not '':
+        if name:
             a_datum = Query()
             self.db.table('datums').remove(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
 
@@ -676,12 +690,13 @@ class totalstation(object):
         self.databits = 7
         self.stopbits = 1
         self.comport_settings = ''
+        self.serialcom = serial.Serial()
         self.input_string = ''
         self.output_string = ''
         self.port_open = False
         self.location = point(0, 0, 0)
         self.xyz = point()
-        self.prism = 0
+        self.prism_constant = 0
         self.hangle = ''
         self.vangle = ''
         self.sloped = 0
@@ -691,7 +706,7 @@ class totalstation(object):
         self.rotate_local = []
         self.rotate_global = []
         self.last_setup_type = ''
-
+        self.open()
 
     def text_to_point(self, txt):
         if len(txt.split(',')) == 3:
@@ -742,7 +757,7 @@ class totalstation(object):
             txt += '  Communication type is %s\n' % self.communication
             txt += '  COM Port is %s\n' % self.comport
             txt += '  Com settings are %s, %s, %s, %s\n' % (self.baudrate, self.parity, self.databits, self.stopbits)
-            if self.port_open:
+            if self.serialcom.is_open:
                 txt += 'COM Port is open\n'
             else:
                 txt += 'COM port is closed\n'
@@ -797,9 +812,8 @@ class totalstation(object):
             self.edm_input()
             #delay(0.5)
 
-        elif self.make=="WILD" or self.make=="LEICA":
-            self.clear_com()
-            self.edm_output("GET/M/WI11/WI21/WI22/WI31/WI51")   
+        elif self.make == "WILD" or self.make == "Leica":
+            self.launch_point_leica()
 
         elif self.make=="SOKKIA":
             self.edm_output(chr(17))
@@ -810,17 +824,22 @@ class totalstation(object):
                                 round(random.uniform(0, 1), 3 ))
             self.make_global()
     
+    def fetch_point(self):
+        if self.make in ['WILD','Leica']:
+            self.fetch_point_leica()
+
     def make_global(self):
-        if self.make == 'Microscribe':
-            if len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
-                self.xyz_global = self.rotate_point(self.xyz)
-            else:
-                self.xyz_global = self.xyz
-            self.round_xyz()
-        else:
-            self.xyz_global = point(self.xyz.x + self.location.x,
-                                    self.xyz.y + self.location.y,
-                                    self.xyz.z + self.location.z,)
+        if self.xyz:
+            if self.make == 'Microscribe':
+                if len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
+                    self.xyz_global = self.rotate_point(self.xyz)
+                else:
+                    self.xyz_global = self.xyz
+                self.round_xyz()
+            elif self.location:
+                self.xyz_global = point(self.xyz.x + self.location.x,
+                                        self.xyz.y + self.location.y,
+                                        self.xyz.z + self.location.z,)
 
     def round_xyz(self):
         if self.xyz_global.x is not None:
@@ -842,26 +861,57 @@ class totalstation(object):
     def parse_nez(self):
         pass
 
-    def send(self, d):
-        error_code = 0
-        return(error_code)
+    def comport_nos(self):
+        ports = self.list_comports()
+        return(list([port[0]['port'] for port in ports]))
+
+    def list_comports(self):
+        ports = []
+        for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
+            ports.append([{'port': port, 'desc': desc}])
+        return(ports)
+
+    def send(self, text):
+        if self.serialcom.is_open:
+            self.serialcom.write(text)
+            print(text)
+            #sleep(0.1) 
 
     def receive(self):
-        return('')
-
+        if self.serialcom.is_open:
+            return(self.serialcom.readline().decode())
+            
     def close(self):
-        pass
+        if self.serialcom.is_open:
+            self.serialcom.close()
 
     def open(self):
-        pass
-
+        self.close()
+        if self.baudrate and self.comport and self.parity and self.databits and self.stopbits:
+            if self.comport in self.comport_nos():
+                self.serialcom.port = self.comport
+                self.serialcom.baudrate = int(self.baudrate)
+                if self.parity == 'Even':
+                    self.serialcom.parity = serial.PARITY_EVEN
+                elif self.parity == 'Odd':
+                    self.serialcom.parity = serial.PARITY_ODD
+                elif self.parity == 'None':
+                    self.serialcom.parity = serial.PARITY_NONE
+                self.serialcom.stopbits = int(self.stopbits)
+                self.serialcom.bytesize = int(self.databits)
+                self.serialcom.timeout = 30
+                self.serialcom.open()
+        
     def clear_com(self):
-        pass
+        if self.serialcom.is_open:
+            self.serialcom.reset_input_buffer()
+            self.serialcom.reset_output_buffer()
 
     def distance(self, p1, p2):
         return(sqrt( (p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2 ))
 
     def dms_to_decdeg(self, angle):
+        angle = str(angle)
         degrees = int(angle.split(".")[0])        
         minutes = int(angle.split(".")[1][0:2])
         seconds = int(angle.split(".")[1][2:4])
@@ -1026,7 +1076,7 @@ class totalstation(object):
         if p is None:
             p = self.xyz
 
-        if len(self.rotate_local) is 3 and len(self.rotate_global) is 3 and p is not None:
+        if len(self.rotate_local) == 3 and len(self.rotate_global) == 3 and p:
             rotated_local = []
 
             # Shift point to relative to the origin
@@ -1111,21 +1161,53 @@ class totalstation(object):
 
     def set_horizontal_angle_leica(self, angle):
         # function expects angle as ddd.mmss input
-        output = "PUT/21...4+" + self.pad_dms(angle) + "0 "
-        errorcode = self.send(output)
-        returncode = self.receive()
+        self.send("PUT/21...4+" + self.pad_dms(angle) + "0 ")
+        return(self.receive())
 
-    def record_point_leica(self):
-        self.clear_com()
-        self.send("GET/M/WI11/WI21/WI22/WI31/WI51")
-        result = self.receive()
-        self.clear_com()
+    def launch_point_leica(self):
+        self.send(b"GET/M/WI21/WI22/WI31/WI51\r\n")
+
+    def fetch_point_leica(self):
+        self.pnt = self.receive()
+        if self.pnt:
+            self.parce_leica()
+            self.vhd_to_nez()
+
+    def vhd_to_xyz(self):
+        if self.vangle and self.hangle and self.sloped:
+            angle_decdeg = self.dms_to_decdeg(self.vangle)
+            z = self.sloped * cos(self.decdeg_to_radians(angle_decdeg))
+            actual_distance = sqrt(self.sloped**2 - z**2)
+
+            angle_decdeg = self.dms_to_decdeg(self.hangle)
+            angle_decdeg = 450 - angle_decdeg
+            x = cos(self.decdeg_to_radians(angle_decdeg)) * actual_distance
+            y = sin(self.decdeg_to_radians(angle_decdeg)) * actual_distance
+            self.xyz = point(x, y, z)
+
+    def parce_leica(self):
+        if self.pnt:
+            if self.pnt.startswith('*'):
+                pnt = self.pnt[1:]
+            for component in pnt.split(' '):
+                if component.startswith('21.'):
+                    self.hangle = float(component[6:]) / 100000
+                elif component.startswith('22.'):
+                    self.vangle = float(component[6:]) / 100000
+                elif component.startswith('31.'):
+                    self.sloped = float(component[6:]) / 1000
+                elif component.startswith('51.'):
+                    component = component[7:]
+                    component = component[component.find('+') + 1 :]
+                    self.prism_constant = float(component)
+                
 
     def initialize_leica(self):
         self.send("SET/41/0")
-        self.clear_com()
+        acknow1 = self.receive()
         self.send("SET/149/2")
-        self.clear_com()
+        acknow2 = self.receive()
+        return(acknow1 + acknow2)
     ### Leica functions ###
 
     ### Leica geocom functions ###
@@ -1275,14 +1357,14 @@ class MainScreen(e5_MainScreen):
     def update_title(self):
         self.children[-1].children[0].children[0].action_previous.title = 'EDM'
         if self.cfg is not None:
-            if self.cfg.filename is not "":
+            if self.cfg.filename:
                 self.children[-1].children[0].children[0].action_previous.title = filename_only(self.cfg.filename)
 
     def take_shot(self, instance):
         
         self.station.shot_type = instance.id
+        self.station.clear_xyz()
         if self.station.make == 'Microscribe':
-            self.station.clear_xyz()
             self.popup = DataGridTextBox(title = 'EDM', text = '<Microscribe>',
                                             label = 'Waiting on...',
                                             button_text = ['Cancel', 'Next'],
@@ -1313,6 +1395,10 @@ class MainScreen(e5_MainScreen):
                     p.z = p.z / 1000
                     self.station.xyz = p
                     self.station.make_global()
+        if self.station.make in ['Leica']:
+            self.station.fetch_point()
+            self.station.make_global()
+
         self.popup.dismiss()
 
         if self.station.xyz.x is not None:
@@ -1478,7 +1564,7 @@ class MainScreen(e5_MainScreen):
     def add_record(self):
         new_record = {}
         new_record = self.fill_default_fields(new_record)
-        if self.station.shot_type is not 'continue':
+        if not self.station.shot_type == 'continue':
             new_record = self.find_unit_and_fill_fields(new_record)
             new_record = self.fill_carry_fields(new_record)
             new_record = self.fill_link_fields(new_record)
@@ -2322,9 +2408,10 @@ class station_setting(GridLayout):
     valid_comports = []
 
     def __init__(self, label_text = '', spinner_values = (), default = '',
-                        id = None, call_back = None, colors = None, **kwargs):
+                        id = None, call_back = None, colors = None, station = None, **kwargs):
         super(station_setting, self).__init__(**kwargs)
 
+        self.station = station
         self.id = id
         self.cols = 2
         self.pos_hint = {'center_x': .5},
@@ -2353,8 +2440,21 @@ class station_setting(GridLayout):
             self.spinner.bind(text = call_back)
 
     def scanner(self, instance):
-        self.event1 = Clock.schedule_once(self.show_popup_message, .2)
-        self.event2 = Clock.schedule_interval(self.check_comports, .2)
+        if self.station:
+            ports = self.station.list_comports()
+            text = 'Available ports:\n\n'
+            for port in ports:
+                text += '%s - %s\n' % (port[0]['port'], port[0]['desc'])
+            self.spinner.values = list([port[0]['port'] for port in ports])
+            self.popup = e5_MessageBox('COM Ports', text,
+                                        response_type = "OK",
+                                        call_back = self.close_popup_comports,
+                                        colors = self.colors)
+            self.popup.open()
+            self.popup_open = True
+        else:
+            self.event1 = Clock.schedule_once(self.show_popup_message, .2)
+            self.event2 = Clock.schedule_interval(self.check_comports, .2)
 
 
     def show_popup_message(self, dt):
@@ -2372,6 +2472,9 @@ class station_setting(GridLayout):
         self.event2.cancel()
         self.comport_to_test = None
        
+    def close_popup_comports(self, value):
+        self.popup.dismiss()
+        self.popup_open = False
 
     def comportIsUsable(self, portName):
         try:
@@ -2440,7 +2543,7 @@ class StationConfigurationScreen(Screen):
                                             spinner_values = [],
                                             #call_back = self.update_ini,
                                             id = 'comport',
-                                            colors = self.colors,
+                                            colors = self.colors, station = self.station,
                                             default = self.ini.get_value(__program__, 'COMPORT'))
         self.layout.add_widget(self.comports)
         
@@ -2510,6 +2613,7 @@ class StationConfigurationScreen(Screen):
         self.station.communications = self.communications.spinner.text
         self.ini.update_value(__program__, 'COMMUNICATIONS', self.communications.spinner.text)
         self.ini.save()
+        self.station.open()
         self.close_screen(None)
         
     def close_screen(self, value):
