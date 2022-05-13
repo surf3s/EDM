@@ -35,6 +35,14 @@ def width_calculator(fraction_size = .8, maximum_width = 800):
     else:
         return( fraction_size)
 
+
+def set_color(popup, colors):
+    if not popup:
+        return(colors.text_color if colors else make_rgb(BLACK))
+    else:
+        return(colors.popup_text_color if colors else make_rgb(WHITE))
+
+
 class e5_PopUpMenu(Popup):
     
     def __init__(self, title, menu_list, menu_selected = '', call_back = None, colors = None, **kwargs):
@@ -65,6 +73,63 @@ class e5_PopUpMenu(Popup):
         self.auto_dismiss = True
 
 
+class edm_manual_xyz(Popup):
+
+    def __init__(self, call_back = None, colors = None, **kwargs):
+        super(edm_manual_xyz, self).__init__(**kwargs)
+
+        pop_content = GridLayout(cols = 1, spacing = 5, padding = 5)
+        input = DataGridLabelAndField(col = 'X', colors = colors, popup = True)
+        input.txt.bind(on_text_validate = self.next_field)
+        self.xcoord = input.txt
+        pop_content.add_widget(input)
+        input = DataGridLabelAndField(col = 'Y', colors = colors, popup = True)
+        input.txt.bind(on_text_validate = self.next_field)
+        self.ycoord = input.txt
+        pop_content.add_widget(input)
+        input = DataGridLabelAndField(col = 'Z', colors = colors, popup = True)
+        input.txt.bind(on_text_validate = self.next_field)
+        self.zcoord = input.txt
+        pop_content.add_widget(input)
+        skip = BoxLayout(size_hint = (0.9, None), spacing = 10)
+        skip.add_widget(e5_label('or', colors = colors, popup = True))
+        pop_content.add_widget(skip)
+        input = DataGridLabelAndField(col = 'Horizontal angle', colors = colors, popup = True)
+        input.txt.bind(on_text_validate = self.next_field)
+        self.hangle = input.txt
+        pop_content.add_widget(input)
+        input = DataGridLabelAndField(col = 'Vertical angle', colors = colors, popup = True)
+        input.txt.bind(on_text_validate = self.next_field)
+        self.vangle = input.txt
+        pop_content.add_widget(input)
+        input = DataGridLabelAndField(col = 'Slope distance', colors = colors, popup = True)
+        input.txt.bind(on_text_validate = self.next_field)
+        self.sloped = input.txt
+        pop_content.add_widget(input)
+        buttons = e5_side_by_side_buttons(text = ['Cancel', 'Next'],
+                                            button_height = None,
+                                            id = ['cancel', 'next'],
+                                            selected = [True, True],
+                                            call_back = [self.dismiss, call_back],
+                                            colors = colors)
+        self.call_back = call_back
+        pop_content.add_widget(buttons)
+        self.content = pop_content
+        self.title = 'Manual Input'
+        self.size_hint = (.9, .8)
+        #self.size_hint_x = .9
+        #self.bind(height = pop_content.setter('height'))
+        self.auto_dismiss = True
+        
+    def on_open(self):
+        self.xcoord.focus = True
+
+    def next_field(self, instance):
+        if instance.id == 'Slope distance':
+            self.call_back(instance)
+        instance.get_focus_next().focus = True
+
+
 class e5_textinput(TextInput):
     id = ObjectProperty('')
     def __init__(self, **kwargs):
@@ -78,10 +143,7 @@ class e5_label(Label):
     def __init__(self, text, popup = False, colors = None, **kwargs):
         super(e5_label, self).__init__(**kwargs)
         self.text = text
-        if not popup:
-            self.color = colors.text_color if colors else make_rgb(BLACK)
-        else:
-            self.color = colors.popup_text_color if colors else make_rgb(WHITE)
+        self.color = set_color(popup, colors)
         if colors:
             if colors.text_font_size:
                 self.font_size = colors.text_font_size 
@@ -100,6 +162,7 @@ class e5_side_by_side_buttons(GridLayout):
                             id = id[i],
                             selected = selected[i], call_back = call_back[i],
                             button_height = button_height, colors = colors))
+
 
 class e5_button(Button):
     id = ObjectProperty('')
@@ -123,6 +186,7 @@ class e5_button(Button):
         if call_back:
             self.bind(on_press = call_back)
         self.background_normal = ''
+
 
 class e5_scrollview_menu(ScrollView):
     id = ObjectProperty(None)
@@ -225,6 +289,7 @@ class e5_scrollview_menu(ScrollView):
                     new_index = (new_index + 1) % len(menu_list)
                     # need new logic to auto select when only one case is available
 
+
 class e5_scrollview_label(ScrollView):
     id = ObjectProperty(None)
     def __init__(self, text, widget_id = '', popup = False, colors = None, **kwargs):
@@ -256,6 +321,7 @@ class e5_scrollview_label(ScrollView):
         self.id = widget_id + '_scroll'
         self.add_widget(scrollbox)
 
+
 class e5_MainScreen(Screen):
 
     popup = ObjectProperty(None)
@@ -263,6 +329,49 @@ class e5_MainScreen(Screen):
     event = ObjectProperty(None)
     widget_with_focus = ObjectProperty(None)
     text_color = (0, 0, 0, 1)
+
+    def setup_program(self):
+        self.ini.open(os.path.join(self.user_data_dir, __program__ + '.ini'))
+
+        if not self.ini.first_time:
+
+            if self.ini.get_value(__program__,'ColorScheme'):
+                self.colors.set_to(self.ini.get_value(__program__,'ColorScheme'))
+            if self.ini.get_value(__program__,'DarkMode').upper() == 'TRUE':
+                self.colors.darkmode = True
+            else:
+                self.colors.darkmode = False
+
+            if self.ini.get_value(__program__,'ButtonFontSize'):
+                self.colors.button_font_size = (self.ini.get_value(__program__,'ButtonFontSize'))
+            if self.ini.get_value(__program__,'TextFontSize'):
+                self.colors.text_font_size = (self.ini.get_value(__program__,'TextFontSize'))
+
+            if self.ini.get_value(__program__, "CFG"):
+                self.cfg.open(self.ini.get_value(__program__, "CFG"))
+                if self.cfg.filename:
+                    found_db = False
+                    if self.cfg.get_value(__program__,'DATABASE'):
+                        found_db = self.data.open(self.cfg.get_value(__program__,'DATABASE'))
+                    if not found_db:
+                        database = os.path.split(self.cfg.filename)[1]
+                        if "." in database:
+                            database = database.split('.')[0]
+                        database = database + '.json'
+                        self.data.open(os.path.join(self.cfg.path, database))
+                    if self.cfg.get_value(__program__,'TABLE'):    
+                        self.data.table = self.cfg.get_value(__program__,'TABLE')
+                    else:
+                        self.data.table = '_default'
+                    self.cfg.update_value(__program__,'DATABASE', self.data.filename)
+                    self.cfg.update_value(__program__,'TABLE', self.data.table)
+                    self.cfg.save()
+            self.ini.update(self.colors, self.cfg)
+            self.ini.save()
+        self.colors.set_colormode()
+        self.colors.need_redraw = False    
+        self.ini.update_value(__program__,'APP_PATH', os.path.abspath(os.path.dirname(__file__)) if  platform_name() == 'Windows' else self.user_data_dir)
+
 
     def get_path(self):
         if self.ini.get_value(__program__, "CFG"):
@@ -604,6 +713,7 @@ class e5_gridlayout(GridLayout):
     def __init__(self, **kwargs):
         super(e5_gridlayout, self).__init__(**kwargs)
 
+
 class e5_SettingsScreen(Screen):
 
     def __init__(self, cfg = None, ini = None, colors = None, **kwargs):
@@ -742,6 +852,7 @@ class e5_SettingsScreen(Screen):
         self.ini.update(self.colors, self.cfg)
         self.parent.current = 'MainScreen'
 
+
 class e5_InfoScreen(Screen):
     content = ObjectProperty(None)
     back_button = ObjectProperty(None)
@@ -765,6 +876,7 @@ class e5_InfoScreen(Screen):
     def go_back(self, *args):
         self.parent.current = 'MainScreen'
 
+
 class e5_LogScreen(e5_InfoScreen):
 
     def __init__(self, logger = None, **kwargs):
@@ -783,6 +895,7 @@ class e5_LogScreen(e5_InfoScreen):
         self.back_button.background_color = self.colors.button_background
         self.back_button.color = self.colors.button_color
 
+
 class e5_INIScreen(e5_InfoScreen):
 
     def __init__(self, ini = None, **kwargs):
@@ -795,6 +908,7 @@ class e5_INIScreen(e5_InfoScreen):
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
         self.back_button.color = self.colors.button_color
+
 
 class e5_CFGScreen(e5_InfoScreen):
 
@@ -815,6 +929,7 @@ class e5_CFGScreen(e5_InfoScreen):
         self.back_button.background_color = self.colors.button_background
         self.back_button.color = self.colors.button_color
 
+
 class e5_LoadDialog(FloatLayout):
     start_path =  ObjectProperty(None)
     load = ObjectProperty(None)
@@ -822,6 +937,7 @@ class e5_LoadDialog(FloatLayout):
     button_color = ObjectProperty(None)
     button_background = ObjectProperty(None)
     filters = ObjectProperty(['*.cfg','*.CFG'])
+
 
 class e5_SaveDialog(BoxLayout):
     save = ObjectProperty(None)
@@ -835,15 +951,20 @@ class e5_SaveDialog(BoxLayout):
         self.colors = colors if colors else ColorScheme()
 
         content = BoxLayout(orientation = 'vertical', padding = 5, spacing = 5)
+        self.pathlabel = e5_textinput(text = self.start_path, background_color = (0,0,0,0), foreground_color = (1,1,1,.8), size_hint = (1, None))
+        self.pathlabel.bind(minimum_height = self.pathlabel.setter('height'))
+        content.add_widget(self.pathlabel)
         self.filesaver = FileChooserListView(path = self.start_path)
         self.filesaver.bind(selection = self.path_selected)
+        self.filesaver.bind(path = self.path_changed)
         content.add_widget(self.filesaver)
 
         self.txt = TextInput(text = self.filename, 
                         multiline = False,
-                        size_hint = (1, .1))
+                        size_hint = (1, None))
 #                        id = 'filename')
         self.txt.bind(text = self.update_filename)
+        self.txt.bind(minimum_height = self.txt.setter('height'))
         content.add_widget(self.txt)
 
         content.add_widget(e5_side_by_side_buttons(text = ['Save','Cancel'],
@@ -858,9 +979,13 @@ class e5_SaveDialog(BoxLayout):
     def update_filename(self, instance, value):
         self.filename = value
 
+    def path_changed(self, instance, value):
+        self.path = instance.path
+        self.pathlabel.text = instance.path 
+
     def path_selected(self, instance, value):
         self.path = instance.path
-        self.txt.text = ntpath.split(value[0])[1]
+        self.txt.text = ntpath.split(value[0])[1] if value else ''
 
     def does_file_exist(self, instance):
         filename = os.path.join(self.path, self.filename)
@@ -871,7 +996,7 @@ class e5_SaveDialog(BoxLayout):
                                         colors = self.colors)
             self.popup.open()    
         else:
-            self.save(instance)
+            self.save()
  
     def overwrite_file(self, instance):
         self.popup.dismiss()
@@ -880,12 +1005,13 @@ class e5_SaveDialog(BoxLayout):
     def close_popup(self, instance):
         self.popup.dismiss()
 
+
 class e5_RecordEditScreen(Screen):
 
     can_update_data_table = False
+    first_field_widget = ObjectProperty(None)
 
     def __init__(self, data = None,
-                        data_table = None,
                         doc_id = None,
                         e5_cfg = None,
                         colors = None,
@@ -894,7 +1020,6 @@ class e5_RecordEditScreen(Screen):
         super(e5_RecordEditScreen, self).__init__(**kwargs)
         self.colors = colors if colors is not None else ColorScheme()
         self.e5_cfg = e5_cfg
-        self.data_table = data_table
         self.data = data
         self.doc_id = doc_id
         self.one_record_only = one_record_only
@@ -938,6 +1063,7 @@ class e5_RecordEditScreen(Screen):
             self.data_fields.add_widget(DataGridLabelAndField(col = col,
                                                                 colors = self.colors,
                                                                 note_field = (field_type == 'NOTE')))
+        self.first_field_widget = self.get_widget_by_id(self.data_fields, self.e5_cfg.fields()[0])
 
     def first_record(self, value):
         if self.doc_id:
@@ -946,7 +1072,7 @@ class e5_RecordEditScreen(Screen):
 
     def previous_record(self, value):
         if self.doc_id:
-            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
+            doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()]
             current = doc_ids.index(self.doc_id)
             new = max(current - 1, 0)
             self.doc_id = doc_ids[new]
@@ -954,7 +1080,7 @@ class e5_RecordEditScreen(Screen):
 
     def next_record(self, value):
         if self.doc_id and self.data_table:
-            doc_ids = [r.doc_id for r in self.data.db.table(self.data_table).all()]
+            doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()]
             current = doc_ids.index(self.doc_id)
             new = min(current + 1, len(doc_ids) - 1)
             self.doc_id = doc_ids[new]
@@ -976,8 +1102,8 @@ class e5_RecordEditScreen(Screen):
 
     def put_data_in_frame(self):
         self.clear_the_frame()  
-        if self.doc_id and self.data_table and self.e5_cfg:
-            data_record = self.data.db.table(self.data_table).get(doc_id = self.doc_id)
+        if self.doc_id and self.data.table and self.e5_cfg:
+            data_record = self.data.db.table(self.data.table).get(doc_id = self.doc_id)
             if data_record:
                 for field in self.e5_cfg.fields():
                     for widget in self.layout.walk():
@@ -990,9 +1116,9 @@ class e5_RecordEditScreen(Screen):
         self.can_update_data_table = True
 
     def update_db(self, instance, value):
-        if self.data_table and self.can_update_data_table:
+        if self.data.table and self.can_update_data_table:
             update = {instance.id: value}
-            self.data.db.table(self.data_table).update(update, doc_ids = [self.doc_id])
+            self.data.db.table(self.data.table).update(update, doc_ids = [self.doc_id])
             self.refresh_linked_fields(instance.id, value)
             self.data.new_data = True
 
@@ -1026,14 +1152,14 @@ class e5_RecordEditScreen(Screen):
 
     def get_unique_key(self, doc_id):
         unique_key = []
-        data_record = self.data.db.table(self.data_table).get(doc_id = doc_id)
+        data_record = self.data.db.table(self.data.table).get(doc_id = doc_id)
         for field in self.e5_cfg.unique_together:
             unique_key.append("%s" % data_record[field])
         return(",".join(unique_key))
 
     def check_unique_together(self):
         save_errors = []
-        if self.e5_cfg.unique_together and len(self.data.db.table(self.data_table)) > 1:
+        if self.e5_cfg.unique_together and len(self.data.db.table(self.data.table)) > 1:
             doc_ids = self.data.doc_ids()
             unique_key = self.get_unique_key(doc_ids[-1])
             for doc_id in doc_ids[0:-1]:
@@ -1046,8 +1172,8 @@ class e5_RecordEditScreen(Screen):
     def save_record(self, instance):
         save_errors = self.check_required_fields()
         save_errors += self.check_unique_together()
-        if hasattr(self.data.db.table(self.data_table), 'on_save') and save_errors == []:
-            save_errors += self.data.db.table(self.data_table).on_save()
+        if hasattr(self.data.db.table(self.data.table), 'on_save') and save_errors == []:
+            save_errors += self.data.db.table(self.data.table).on_save()
         if not save_errors:
             self.update_link_fields()
             self.data.new_data = True
@@ -1091,8 +1217,8 @@ class e5_RecordEditScreen(Screen):
             return(False)
 
     def cancel_record(self, instance):
-        if hasattr(self.data.db.table(self.data_table), 'on_cancel'):
-            self.data.db.table(self.data_table).on_cancel()
+        if hasattr(self.data.db.table(self.data.table), 'on_cancel'):
+            self.data.db.table(self.data.table).on_cancel()
         self.parent.current = 'MainScreen'
 
     def show_menu(self, instance, ValueError):
@@ -1131,6 +1257,7 @@ class e5_RecordEditScreen(Screen):
 
     def call_back(self, value):
         self.parent.current = 'MainScreen'
+
 
 class e5_DatagridScreen(Screen):
 
@@ -1196,6 +1323,7 @@ class e5_DatagridScreen(Screen):
     def on_leave(self):
         Window.unbind(on_key_down = self._on_keyboard_down)
 
+
 class e5_MessageBox(Popup):
     def __init__(self, title, message, 
                     response_type = 'OK',
@@ -1234,7 +1362,7 @@ class e5_MessageBox(Popup):
         else:
             popup_contents.add_widget(e5_side_by_side_buttons(text = response_text,
                                                 call_back = call_back,
-                                                selected = [True, True, True],
+                                                selected = [True, True],
                                                 button_height = .2,
                                                 colors = colors))
 
@@ -1244,49 +1372,6 @@ class e5_MessageBox(Popup):
         self.size = (400, 400)
         self.auto_dismiss = False
 
-class e5_Program(App):
-
-    def setup_program(self):
-        self.ini.open(os.path.join(self.app_path, __program__ + '.ini'))
-
-        if not self.ini.first_time:
-
-            if self.ini.get_value(__program__,'ColorScheme'):
-                self.colors.set_to(self.ini.get_value(__program__,'ColorScheme'))
-            if self.ini.get_value(__program__,'DarkMode').upper() == 'TRUE':
-                self.colors.darkmode = True
-            else:
-                self.colors.darkmode = False
-
-            if self.ini.get_value(__program__,'ButtonFontSize'):
-                self.colors.button_font_size = (self.ini.get_value(__program__,'ButtonFontSize'))
-            if self.ini.get_value(__program__,'TextFontSize'):
-                self.colors.text_font_size = (self.ini.get_value(__program__,'TextFontSize'))
-
-            if self.ini.get_value(__program__, "CFG"):
-                self.cfg.open(self.ini.get_value(__program__, "CFG"))
-                if self.cfg.filename:
-                    found_db = False
-                    if self.cfg.get_value(__program__,'DATABASE'):
-                        found_db = self.data.open(self.cfg.get_value(__program__,'DATABASE'))
-                    if not found_db:
-                        database = os.path.split(self.cfg.filename)[1]
-                        if "." in database:
-                            database = database.split('.')[0]
-                        database = database + '.json'
-                        self.data.open(os.path.join(self.cfg.path, database))
-                    if self.cfg.get_value(__program__,'TABLE'):    
-                        self.data.table = self.cfg.get_value(__program__,'TABLE')
-                    else:
-                        self.data.table = '_default'
-                    self.cfg.update_value(__program__,'DATABASE', self.data.filename)
-                    self.cfg.update_value(__program__,'TABLE', self.data.table)
-                    self.cfg.save()
-            self.ini.update(self.colors, self.cfg)
-            self.ini.save()
-        self.colors.set_colormode()
-        self.colors.need_redraw = False    
-        self.ini.update_value(__program__,'APP_PATH', self.user_data_dir)
 
 #region Data Grid
 #### Code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
@@ -1610,7 +1695,7 @@ class DataGridLabelAndField(BoxLayout):
     popup = ObjectProperty(None)
     sorted_result = None
 
-    def __init__(self, col, colors, note_field = False, **kwargs):
+    def __init__(self, col, colors, note_field = False, popup = False, **kwargs):
         super(DataGridLabelAndField, self).__init__(**kwargs)
         self.update_db = False
         self.widget_type = 'data'
@@ -1619,18 +1704,23 @@ class DataGridLabelAndField(BoxLayout):
                 if colors.text_font_size:
                     self.height = int(colors.text_font_size.replace('sp','')) * 1.9
         self.size_hint = (0.9, None)
+        self.bind(minimum_height = self.setter('height'))
         self.spacing = 10
-        label = e5_label(text = col, id = '__label', colors = colors)
+        label = e5_label(text = col, id = '__label', colors = colors, popup = popup, size_hint_y = None)
+        label.bind(texture_size=label.setter('size'))
         self.txt = e5_textinput(multiline = note_field,
                         size_hint = (0.75, None),
                         id = col,
-                        size_hint_y = 1)
+                        #size_hint_y = 1,
+                        write_tab = False)
+        self.txt.bind(minimum_height = self.txt.setter('height'))
         if colors:
             if colors.text_font_size:
                 self.txt.font_size = colors.text_font_size 
-        #self.txt.bind(minimum_height = self.txt.setter('height'))
         self.add_widget(label)
         self.add_widget(self.txt)
+
+
 
 class DataGridDeletePanel(GridLayout):
 

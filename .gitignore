@@ -8,3 +8,5 @@ manuals/
 Backups/
 venv/
 *.json
+test.cfg
+test2.cfg

@@ -25,8 +25,9 @@
 # Immediate To DO
 #   arrow keys (and or tab keys) to move between fields in edit last record
 
-__version__ = '1.0.15'
-__date__ = 'August, 2021'
+__version__ = '1.0.16'
+__date__ = 'May, 2022'
+from tkinter import EXCEPTION, N
 from serial.win32 import ERROR_INVALID_USER_BUFFER
 from src.constants import __program__ 
 
@@ -107,8 +108,7 @@ __plyer_version__ = 'None'
 
 #endregion
 
-# get anglr.py library
-# or get angles.py library (looks maybe better)
+from angles import bear, r2d, d2r, deci2sexa, Angle
 
 # use pySerial for serial communications
 # io is used for input/output on the serial port
@@ -220,8 +220,8 @@ class DB(dbs):
         else:
             return(None)
 
-    def get_datum(self, name = ''):
-        if name and self.db:
+    def get_datum(self, name = None):
+        if name is not None and self.db is not None:
             a_datum = Query()
             p = self.db.table('datums').search(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
             #p = self.db.table('datums').search( (where('NAME') == name, flags = re.IGNORECASE) )
@@ -551,6 +551,7 @@ class CFG(blockdata):
         self.has_warnings = False
         field_names = self.fields()
         self.link_fields = []
+        bad_characters = r' !@#$%^&*()?/\{}<.,.|+=~`-'
 
         # This is a legacy issue.  Linked fields are now listed with each field.
         unit_fields = self.get_value('EDM', 'UNITFIELDS')
@@ -563,8 +564,8 @@ class CFG(blockdata):
 
         table_name = self.get_value('EDM','TABLE')
         if table_name:
-            if any((c in set(r' !@#$%^&*()?/\{}<.,.|+=~`-')) for c in table_name):
-                self.errors.append("Error: The table name '%s' has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '%s' characters.  Change the name before collecting data." % (table_name, r' !@#$%^&*()?/\{}<.,.|+=~`-'))
+            if any((c in set(bad_characters)) for c in table_name):
+                self.errors.append(f"Error: The table name {table_name} has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '{bad_characters}' characters.  Change the name before collecting data.")
                 self.has_errors = True
     
         unique_together = self.get_value('EDM','UNIQUE_TOGETHER')
@@ -572,7 +573,7 @@ class CFG(blockdata):
             no_errors = True
             for field_name in unique_together.split(','):
                 if not field_name in field_names:
-                    self.errors.append("Error: The field '%s' is listed in UNIQUE_TOGETHER but does not appear as a field in the CFG file.")
+                    self.errors.append(f"Error: The field '{field_name}' is listed in UNIQUE_TOGETHER but does not appear as a field in the CFG file.")
                     self.has_errors = True
                     no_errors = False
                     break
@@ -582,8 +583,8 @@ class CFG(blockdata):
                 self.unique_together = ''
 
         for field_name in field_names:
-            if any((c in set(r' !@#$%^&*()?/\{}<.,.|+=~`-')) for c in field_name):
-                self.errors.append("Error: The field name '%s' has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '%s' characters.  Change the name before collecting data." % (table_name, r' !@#$%^&*()?/\{}<.,.|+=~`-'))
+            if any((c in set(bad_characters)) for c in field_name):
+                self.errors.append(f"Error: The field name '{field_name}' has non-standard characters in it that cause a problem in JSON files.  Do not use any of these '{bad_characters}' characters.  Change the name before collecting data.")
                 self.has_errors = True
             f = self.get(field_name)
             if f.prompt == '':
@@ -598,7 +599,7 @@ class CFG(blockdata):
                 # uppercase the link fields
                 for link_field_name in f.link_fields:
                     if link_field_name not in field_names:
-                        self.errors.append("Warning: The field %s is set to link to %s but the field %s does not exist in the CFG." % (field_name, link_field_name, link_field_name))
+                        self.errors.append(f"Warning: The field {field_name} is set to link to {link_field_name} but the field {link_field_name} does not exist in the CFG.")
             self.put(field_name, f)
 
             for field_option in ['UNIQUE','CARRY','INCREMENT','REQUIRED','SORTED']:
@@ -713,7 +714,7 @@ class totalstation(object):
             x, y, z = txt.split(',')
             try:
                 return(point(float(x), float(y), float(z)))
-            except:
+            except Exception:
                 return(None)
         else:
             return(None)
@@ -725,7 +726,7 @@ class totalstation(object):
         if ini.get_value(__program__,'COMMUNICATIONS'):
             self.communication = ini.get_value(__program__,'COMMUNICATIONS')
         if ini.get_value(__program__,'COMPORT'):
-            self.commport = ini.get_value(__program__,'COMPORT')
+            self.comport = ini.get_value(__program__,'COMPORT')
         if ini.get_value(__program__,'BAUDRATE'):
             self.baudrate = ini.get_value(__program__,'BAUDRATE')
         if ini.get_value(__program__,'PARITY'):
@@ -778,6 +779,21 @@ class totalstation(object):
                     n += 1
         return(txt)
 
+    def prism_adjust(self):
+        if self.prism:
+            if self.xyz.z:
+                self.xyz.z -= self.prism
+            if self.xyz_global.z:
+                self.xyz_global.z -= self.prism
+
+    def angle_between_points(self, p1, p2):
+        return self.angle_between_xy_pairs(p1.x, p1.y, p2.x, p2.y)
+
+    def angle_between_xy_pairs(self, x1, y1, x2, y2):
+        # angle is from p1 to p2
+        # result is in decimal degrees
+        return(r2d(bear(x1, y1, x2, y2)))
+
     def parseangle(self, hangle):
         hangle = str(hangle)
         if hangle.find("."): 
@@ -792,11 +808,43 @@ class totalstation(object):
 
         return([angle, minutes, seconds])
 
+    def decimal_degrees_to_dddmmss(self, angle):
+        if not angle is None:
+            sexa  = deci2sexa(angle)
+            return(f'{sexa[1]}.{sexa[2]}{sexa[3]}')
+        else:
+            return('')
+
+    def decimal_degrees_to_sexastr(self, angle):
+        if not angle is None:
+            sexa  = deci2sexa(angle)
+            return(f'{sexa[1]}° {sexa[2]}\" {sexa[3]}\'')
+        else:
+            return('')
+
+    def add_points(self, p1, p2):
+        return point(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z)
+
+    def subtract_points(self, p1, p2):
+        return point(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z)
+
     def hash(self, hashlen = 5):
         hash = ""
         for a in range(0, hashlen):
             hash += random.choice(string.ascii_uppercase)
         return(hash)
+
+    def set_horizontal_angle(self, angle):
+        if self.make == 'TOPCON':
+            pass
+        elif self.make in ['WILD', 'Leica']:
+            self.set_horizontal_angle_leica(angle)
+        elif self.make == 'SOKKIA':
+            pass
+        elif self.make == 'Simulate':
+            pass
+        elif self.make == 'Manual':
+            pass
 
     def take_shot(self):
 
@@ -823,23 +871,37 @@ class totalstation(object):
                                 round(random.uniform(1000, 1010), 3),
                                 round(random.uniform(0, 1), 3 ))
             self.make_global()
-    
+            self.vhd_from_xyz()
+
+        else:
+            pass
+
+
+    def vhd_from_xyz(self):
+        self.hangle = self.angle_between_xy_pairs(self.location.x, self.location.y, self.xyz.x, self.xyz.y)
+        level_distance = sqrt((self.xyz.x - self.location.x)**2 + (self.xyz.y - self.location.y)**2)
+        self.sloped = self.distance(self.location, self.xyz)
+        self.vangle = self.angle_between_xy_pairs(0, 0, level_distance, self.xyz.z)
+
     def fetch_point(self):
         if self.make in ['WILD','Leica']:
             self.fetch_point_leica()
 
     def make_global(self):
-        if self.xyz:
+        if self.xyz.x and self.xyz.y and self.xyz.z:
             if self.make == 'Microscribe':
                 if len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
                     self.xyz_global = self.rotate_point(self.xyz)
                 else:
                     self.xyz_global = self.xyz
                 self.round_xyz()
-            elif self.location:
-                self.xyz_global = point(self.xyz.x + self.location.x,
-                                        self.xyz.y + self.location.y,
-                                        self.xyz.z + self.location.z,)
+            else:
+                if self.location.x and self.location.y and self.location.z:
+                    self.xyz_global = point(self.xyz.x + self.location.x,
+                                            self.xyz.y + self.location.y,
+                                            self.xyz.z + self.location.z,)
+                else:
+                    self.xyz_global = self.xyz
 
     def round_xyz(self):
         if self.xyz_global.x is not None:
@@ -854,9 +916,6 @@ class totalstation(object):
     def clear_xyz(self):
         self.xyz = point()
         self.xyz_global = point()
-
-    def vhd_to_nez(self):
-        pass
 
     def parse_nez(self):
         pass
@@ -914,7 +973,7 @@ class totalstation(object):
         angle = str(angle)
         degrees = int(angle.split(".")[0])        
         minutes = int(angle.split(".")[1][0:2])
-        seconds = int(angle.split(".")[1][2:4])
+        seconds = int(angle.split(".")[1][2:])
         return(degrees + minutes / 60.0 + seconds / 3600.0)
 
     def decdeg_to_radians(self, angle):
@@ -1157,11 +1216,11 @@ class totalstation(object):
     def pad_dms_leica(self, angle):
         degrees = ('000' + angle.split('.')[0])[-3:]
         minutes_seconds = (angle.split('.')[1] + '0000')[0:4]
-        return( degrees + minutes_seconds)
+        return(degrees + minutes_seconds)
 
     def set_horizontal_angle_leica(self, angle):
         # function expects angle as ddd.mmss input
-        self.send("PUT/21...4+" + self.pad_dms(angle) + "0 ")
+        self.send("PUT/21...4+" + self.pad_dms_leica(angle) + "0 ")
         return(self.receive())
 
     def launch_point_leica(self):
@@ -1171,16 +1230,16 @@ class totalstation(object):
         self.pnt = self.receive()
         if self.pnt:
             self.parce_leica()
-            self.vhd_to_nez()
+            self.vhd_to_xyz()
 
     def vhd_to_xyz(self):
         if self.vangle and self.hangle and self.sloped:
-            angle_decdeg = self.dms_to_decdeg(self.vangle)
-            z = self.sloped * cos(self.decdeg_to_radians(angle_decdeg))
+            #angle_decdeg = self.dms_to_decdeg(self.vangle)
+            z = self.sloped * cos(self.decdeg_to_radians(self.vangle))
             actual_distance = sqrt(self.sloped**2 - z**2)
 
-            angle_decdeg = self.dms_to_decdeg(self.hangle)
-            angle_decdeg = 450 - angle_decdeg
+            #angle_decdeg = self.dms_to_decdeg(self.hangle)
+            angle_decdeg = 450 - self.hangle
             x = cos(self.decdeg_to_radians(angle_decdeg)) * actual_distance
             y = sin(self.decdeg_to_radians(angle_decdeg)) * actual_distance
             self.xyz = point(x, y, z)
@@ -1188,18 +1247,24 @@ class totalstation(object):
     def parce_leica(self):
         if self.pnt:
             if self.pnt.startswith('*'):
-                pnt = self.pnt[1:]
-            for component in pnt.split(' '):
+                self.pnt = self.pnt[1:]
+            for component in self.pnt.split(' '):
                 if component.startswith('21.'):
-                    self.hangle = float(component[6:]) / 100000
+                    data = component[6:]
+                    self.hangle = Angle(f'{data[:-5]}d{data[-5:-3]}m{data[-3:-1]}.{data[-1]}').d
                 elif component.startswith('22.'):
-                    self.vangle = float(component[6:]) / 100000
+                    data = component[6:]
+                    self.vangle = Angle(f'{data[:-5]}d{data[-5:-3]}m{data[-3:-1]}.{data[-1]}').d
                 elif component.startswith('31.'):
-                    self.sloped = float(component[6:]) / 1000
+                    try:
+                        self.sloped = float(component[6:]) / 1000
+                    except:
+                        self.sloped = None
                 elif component.startswith('51.'):
-                    component = component[7:]
-                    component = component[component.find('+') + 1 :]
-                    self.prism_constant = float(component)
+                    try:
+                        self.prism_constant = float(component[-4:]) / 1000
+                    except EXCEPTION:
+                        self.prism_constant = None
                 
 
     def initialize_leica(self):
@@ -1246,14 +1311,21 @@ class MainScreen(e5_MainScreen):
     text_color = (0, 0, 0, 1)
     title = __program__
 
-    def __init__(self, data = None, cfg = None, ini = None, colors = None, station = None, **kwargs):
+    def __init__(self, user_data_dir, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
 
-        self.colors = colors if colors else ColorScheme()
-        self.ini = ini if ini else INI()
-        self.data = data if data else DB()
-        self.cfg = cfg 
-        self.station = station if station else totalstation()
+        self.user_data_dir = user_data_dir
+        self.colors = ColorScheme()
+        self.ini = INI()
+        self.cfg = CFG()
+        self.data = DB()
+
+        self.setup_program()
+
+        self.station = totalstation(self.ini.get_value(__program__,'STATION'))
+        self.station.setup(self.ini, self.data)
+        self.station.open()
+
         self.cfg_datums = CFG()
         self.cfg_datums.build_datum()
         self.cfg_prisms = CFG().build_prism()
@@ -1268,6 +1340,123 @@ class MainScreen(e5_MainScreen):
                                 spacing = 20)
         self.build_mainscreen()
         self.add_widget(self.layout)
+        self.add_screens()
+        restore_window_size_position(__program__, self.ini)
+
+    def add_screens(self):
+        sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen',
+#                                        id = 'editlastrecord_screen',
+                                        colors = self.colors,
+                                        data = self.data,
+                                        doc_id = None,
+                                        e5_cfg = self.cfg))
+
+        sm.add_widget(VerifyStationScreen(name = 'VerifyStationScreen',
+                                            id = 'verify_station',
+                                            data = self.data,
+                                            station = self.station,
+                                            colors = self.colors,
+                                            ini = self.ini))
+
+        sm.add_widget(RecordDatumsScreen(name = 'RecordDatumsScreen',
+#                                            id = 'record_datums',
+                                            data = self.data,
+                                            station = self.station,
+                                            colors = self.colors,
+                                            ini = self.ini))
+
+
+        sm.add_widget(EditPointScreen(name = 'EditPointScreen',
+                                        colors = self.colors,
+#                                        id = 'editpoint_screen',
+                                        data = self.data,
+                                        #data_table = self.data.table,
+                                        doc_id = None,
+                                        e5_cfg = self.cfg,
+                                        one_record_only = True))
+
+        sm.add_widget(EditPointsScreen(name = 'EditPointsScreen',
+#                                        id = 'editpoints_screen',
+                                        colors = self.colors,
+                                        main_data = self.data,
+                                        main_tablename = self.data.table,
+                                        main_cfg = self.cfg))
+
+        sm.add_widget(EditPointsScreen(name = 'EditDatumsScreen',
+#                                        id = 'editdatums_screen',
+                                        colors = self.colors,
+                                        main_data = self.data,
+                                        main_tablename = 'datums',
+                                        main_cfg = self.cfg_datums,
+                                        addnew = True))
+
+        sm.add_widget(EditPointsScreen(name = 'EditPrismsScreen',
+#                                        id = 'editprisms_screen',
+                                        colors = self.colors,
+                                        main_data = self.data,
+                                        main_tablename = 'prisms',
+                                        main_cfg = self.cfg_prisms,
+                                        addnew = True))
+
+        sm.add_widget(EditPointsScreen(name = 'EditUnitsScreen',
+#                                        id = 'editunits_screen',
+                                        colors = self.colors,
+                                        main_data = self.data,
+                                        main_tablename = 'units',
+                                        main_cfg = self.cfg_units,
+                                        addnew = True))
+
+        sm.add_widget(StatusScreen(name = 'StatusScreen',
+#                                    id = 'status_screen',
+                                    colors = self.colors,
+                                    cfg = self.cfg,
+                                    ini = self.ini,
+                                    data = self.data,
+                                    station = self.station))
+
+        sm.add_widget(e5_LogScreen(name = 'LogScreen',
+#                                id = 'log_screen',
+                                colors = self.colors,
+                                logger = logger))
+
+        sm.add_widget(e5_CFGScreen(name = 'CFGScreen',
+#                                id = 'cfg_screen',
+                                colors = self.colors,
+                                cfg = self.cfg))
+
+        sm.add_widget(e5_INIScreen(name = 'INIScreen',
+#                                id = 'ini_screen',
+                                colors = self.colors,
+                                ini = self.ini))
+
+        sm.add_widget(AboutScreen(name = 'AboutScreen',
+#                                    id = 'about_screen',
+                                    colors = self.colors))
+
+        sm.add_widget(StationConfigurationScreen(name = 'StationConfigurationScreen',
+#                                    id = 'station_configuration_screen',
+                                    station = self.station,
+                                    ini = self.ini,
+                                    colors = self.colors))
+
+        sm.add_widget(InitializeStationScreen(name = 'InitializeStationScreen',
+#                                                id = 'initialize_station_screen',
+                                                data = self.data,
+                                                station = self.station,
+                                                ini = self.ini,
+                                                colors = self.colors))
+
+        sm.add_widget(e5_SettingsScreen(name = 'EDMSettingsScreen',
+#                                        id = 'edmsettings_screen',
+                                        colors = self.colors,
+                                        ini = self.ini,
+                                        cfg = self.cfg))
+
+    def reset_screens(self):
+        for screen in sm.screens[:]:
+            if screen.name != 'MainScreen':
+                sm.remove_widget(screen)
+        self.add_screens()
 
     def build_mainscreen(self):
 
@@ -1370,19 +1559,44 @@ class MainScreen(e5_MainScreen):
                                             button_text = ['Cancel', 'Next'],
                                             call_back = self.have_shot,
                                             colors = self.colors)
+        elif self.station.make == 'Manual':
+            self.popup = edm_manual_xyz(call_back = self.have_shot_manual, colors = self.colors)
+
         else:
             self.station.take_shot()
-            prism_names = self.data.names('prisms')
-            if len(prism_names) > 0 :
-                self.popup = DataGridMenuList(title = "Select or Enter a Prism Height",
-                                                menu_list = prism_names,
-                                                menu_selected = '',
-                                                call_back = self.have_shot)
-            else:
-                self.popup = DataGridTextBox(title = 'Enter a Prism Height',
-                                            call_back = self.have_shot,
-                                            button_text = ['Back','Next'])
+            self.popup = self.get_prism_height()
+
         self.popup.open()
+
+
+    def have_shot_manual(self, instance):
+        # check that next was pressed and get values
+        p = self.station.text_to_point(f'{self.popup.xcoord.text},{self.popup.ycoord.text},{self.popup.zcoord.text}')
+        if p:
+            self.station.xyz = p
+            self.station.make_global()
+            self.station.vhd_from_xyz()
+        else:
+            self.station.hangle = self.popup.hangle.text if isinstance(self.popup.hangle.text, int) or isinstance(self.popup.hangle.text, float) else ''
+            self.station.vangle = self.popup.vangle.text if isinstance(self.popup.vangle.text, int) or isinstance(self.popup.vangle.text, float) else ''
+            self.station.sloped = self.popup.sloped.text if isinstance(self.popup.sloped.text, int) or isinstance(self.popup.sloped.text, float) else ''
+            self.station.vhd_to_xyz()
+        self.popup.dismiss()
+        self.popup = self.get_prism_height()
+        self.popup.open()
+
+
+    def get_prism_height(self):
+        prism_names = self.data.names('prisms')
+        if len(prism_names) > 0 :
+            return(DataGridMenuList(title = "Select or Enter a Prism Height",
+                                            menu_list = prism_names,
+                                            menu_selected = '',
+                                            call_back = self.have_shot))
+        else:
+            return(DataGridTextBox(title = 'Enter a Prism Height',
+                                        call_back = self.have_shot,
+                                        button_text = ['Back','Next']))
 
     def have_shot(self, instance):
         if self.station.make == 'Microscribe':
@@ -1395,19 +1609,26 @@ class MainScreen(e5_MainScreen):
                     p.z = p.z / 1000
                     self.station.xyz = p
                     self.station.make_global()
-        if self.station.make in ['Leica']:
+        elif self.station.make in ['Leica']:
             self.station.fetch_point()
             self.station.make_global()
+        elif self.station.make in ['Simulate']:
+            pass
+        elif self.station.make in ['Manual']:
+            pass
 
         self.popup.dismiss()
 
-        if self.station.xyz.x is not None:
+        if self.station.xyz.x and self.station.xyz.y and self.station.xyz.z:
             if self.station.shot_type == 'measure':
-                txt = 'Local coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz.x, self.station.xyz.y, self.station.xyz.z)
-                txt += '\n\nGlobal coordinates:\n  X: %s\n  Y: %s\n  Z: %s' % (self.station.xyz_global.x, self.station.xyz_global.y, self.station.xyz_global.z)
+                txt = f'\nCoordinates:\n  X:  {self.station.xyz_global.x:.3f}\n  Y:  {self.station.xyz_global.y:.3f}\n  Z:  {self.station.xyz_global.z:.3f}'
                 if self.station.make != 'Microscribe':
-                    txt += '\n\nRaw Data:\n  Horizontal angle: %s\n  Vertical angle: %s\n  Slope distance: %s' % (self.station.hangle, self.station.vangle, self.station.sloped)
-                    txt += '\n\nStation coordinates:\n  X:  %s\n  Y:  %s\n  Z:  %s' % (self.station.location.x, self.station.location.y, self.station.location.z)
+                    txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexastr(self.station.hangle)}\n  Vertical angle:  {self.station.decimal_degrees_to_sexastr(self.station.vangle)}\n  Slope distance:  {self.station.sloped:.3f}' 
+                    txt += f'\n  X:  {self.station.xyz.x:.3f}\n  Y:  {self.station.xyz.y:.3f}\n  Z:  {self.station.xyz.z:.3f}'
+                    txt += f'\n\nStation coordinates:\n  X:  {self.station.location.x:.3f}\n  Y:  {self.station.location.y:.3f}\n  Z:  {self.station.location.z:.3f}'
+                    if self.station.prism_constant:
+                        txt += f'\n\nPrism constant :  {self.station.prism_constant} m'
+                    txt += f'\n\nData stream:\n  {self.station.pnt}'
                 self.popup = e5_MessageBox('Measurement', txt,
                                         response_type = "OK",
                                         call_back = self.close_popup,
@@ -1456,6 +1677,36 @@ class MainScreen(e5_MainScreen):
     def close_popup(self, instance):
         self.popup.dismiss()
 
+    def save_default_cfg(self):
+        content = e5_SaveDialog(filename = '',
+                            start_path = self.cfg.path,
+                            save = self.save_default, 
+                            cancel = self.dismiss_popup)
+        self.popup = Popup(title = "Create a new default CFG file",
+                            content = content,
+                            size_hint = (0.9, 0.9))
+        self.popup.open()
+        self.popup_open = True
+
+
+    def save_default(self):
+        path = self.popup.content.filesaver.path
+        filename = self.popup.content.filename
+        if not '.cfg' in filename.lower():
+            filename = filename + '.cfg'
+        self.cfg.initialize()
+        self.cfg.build_default()
+        self.ini.update_value(__program__,'CFG', os.path.join(path, filename))
+        self.cfg.update_value(__program__,'DATABASE', os.path.join(path, filename.split('.')[0] + '.json'))
+        self.cfg.update_value(__program__,'TABLE', filename.split('.')[0])
+        self.data.open(os.path.join(path, filename.split('.')[0] + '.json'))
+        self.open_db()
+        self.ini.update(self.colors, self.cfg)
+        self.cfg.filename = os.path.join(path, filename)
+        self.cfg.save()
+        self.dismiss_popup()
+        self.build_mainscreen()
+
     def show_load_cfg(self):
         if self.cfg.filename and self.cfg.path:
             start_path = self.cfg.path
@@ -1477,6 +1728,13 @@ class MainScreen(e5_MainScreen):
             self.open_db()
         self.ini.update(self.colors, self.cfg)
         self.build_mainscreen()
+        self.reset_screens()
+
+    def reset_screen_defaults(self):
+        sm.get_screen('EditPointScreen').e5_cfg = self.cfg
+        sm.get_screen('EditPointScreen').data_table = self.data.table
+        sm.get_screen('EditPointScreen').data = self.data
+        sm.get_screen('EditLastRecordScreen').data_table = self.data.table
 
     def show_import_csv(self):
         self.popup = e5_PopUpMenu(title = "Load which kind of data",
@@ -1793,7 +2051,7 @@ class VerifyStationScreen(Screen):
                                 spacing = 20)
         self.add_widget(self.content)
 
-        self.content.add_widget(e5_label('Select a datum to use as verification and record it.', colors = self.colors))
+        #self.content.add_widget(e5_label('Select a datum to use as verification and record it.', colors = self.colors))
 
         self.datum1 = datum_selector(text = 'Select\nverification\ndatum',
                                             data = self.data,
@@ -1803,7 +2061,7 @@ class VerifyStationScreen(Screen):
 
         self.recorder = datum_recorder('Record\nverification\ndatum', station = self.station,
                                         colors = self.colors, setup_type = 'verify',
-                                        on_record = self.compute_error)
+                                        on_record = self.compute_error, data = self.data)
         self.content.add_widget(self.recorder)
 
         self.results = e5_label('', colors = self.colors)
@@ -1832,8 +2090,9 @@ class VerifyStationScreen(Screen):
 class record_button(e5_button):
 
     popup = ObjectProperty(None)
+    datum_name = None
 
-    def __init__(self, station = None, result_label = None, setup_type = None, on_record = None, **kwargs):
+    def __init__(self, station = None, result_label = None, setup_type = None, on_record = None, datum1 = None, datum2 = None, datum3 = None, data = None, **kwargs):
         super(record_button, self).__init__(**kwargs)
         #self.colors = colors if colors is not None else ColorScheme()
         self.station = station
@@ -1841,10 +2100,38 @@ class record_button(e5_button):
         self.result_label = result_label
         self.setup_type = setup_type
         self.on_record = on_record
-        
+        self.datum1 = datum1
+        self.datum2 = datum2
+        self.datum3 = datum3
+        self.data = data
+
     def record_datum(self, instance):
-        if self.id == 'datum1' and self.setup_type in ['Over a datum + Record a datum','Record two datums']:
-            self.station.set_horizontal_angle(0)
+        self.set_angle()
+
+    def get_angle(self):
+        if self.id  == 'datum1':
+            if self.setup_type == 'Over a datum + Record a datum':
+                return(self.station.angle_between_points(self.datum1.datum, self.datum2.datum))
+            elif self.setup_type == 'Record two datums':
+                return(0)
+        else:
+            return(None)
+
+    def set_angle(self):
+        angle = self.get_angle()
+        if not angle is None:
+            if self.station.make =='Manual':
+                self.popup = e5_MessageBox('Set horizonal angle', f'\nAim at {self.datum1.datum.name} and set the horizontal angle to {self.station.decimal_degrees_to_sexastr(angle)}.',
+                                            call_back = self.now_take_shot, colors = self.colors)
+                self.popup.open()
+            elif self.station.make == 'Leica':
+                self.station.set_horizontal_angle_leica(self.station.decimal_degrees_to_dddmmss(angle))
+        else:
+            self.station.take_shot()
+            self.wait_for_shot()
+
+    def now_take_shot(self, instance):
+        self.popup.dismiss()
         self.station.take_shot()
         self.wait_for_shot()
 
@@ -1858,7 +2145,38 @@ class record_button(e5_button):
                                             call_back = self.microscribe,
                                             colors = self.colors)
             self.popup.open()
+        elif self.station.make == 'Manual':
+            self.popup = edm_manual_xyz(call_back = self.have_shot_manual, colors = self.colors)
+            self.popup.open()
 
+    def have_shot_manual(self, instance):
+        # check that next was pressed and get values
+        p = self.station.text_to_point(f'{self.popup.xcoord.text},{self.popup.ycoord.text},{self.popup.zcoord.text}')
+        if p:
+            self.station.xyz = p
+            self.station.make_global()
+            self.station.vhd_from_xyz()
+        else:
+            self.station.hangle = self.popup.hangle.text if isinstance(self.popup.hangle.text, int) or isinstance(self.popup.hangle.text, float) else ''
+            self.station.vangle = self.popup.vangle.text if isinstance(self.popup.vangle.text, int) or isinstance(self.popup.vangle.text, float) else ''
+            self.station.sloped = self.popup.sloped.text if isinstance(self.popup.sloped.text, int) or isinstance(self.popup.sloped.text, float) else ''
+            self.station.vhd_to_xyz()
+        self.popup.dismiss()
+        self.popup = self.get_prism_height()
+        self.popup.open()
+
+    def get_prism_height(self):
+        prism_names = self.data.names('prisms') if self.data else []
+        if len(prism_names) > 0 :
+            return(DataGridMenuList(title = "Select or Enter a Prism Height",
+                                            menu_list = prism_names,
+                                            menu_selected = '',
+                                            call_back = self.have_shot))
+        else:
+            return(DataGridTextBox(title = 'Enter a Prism Height',
+                                        call_back = self.have_shot,
+                                        button_text = ['Back','Next']))
+        
     def microscribe(self, instance):
         result = self.popup.result
         self.popup.dismiss()
@@ -1884,7 +2202,15 @@ class record_button(e5_button):
                                             colors = self.colors)
                 self.popup.open()
 
-    def have_shot(self):
+    def have_shot(self, instance = None):
+        self.popup.dismiss()
+        #prism_height = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
+        try:
+            prism_height = float(self.popup.result)
+        except EXCEPTION:
+            prism_height = 0
+        self.station.prism = prism_height
+        self.station.prism_adjust()
         if self.station.xyz:
             if self.setup_type == 'verify' or self.setup_type == 'record_new':
                 self.result_label.text = 'X: %s\nY: %s\nZ: %s' % (self.station.xyz_global.x,
@@ -1911,7 +2237,8 @@ class datum_recorder(GridLayout):
 
     def __init__(self, text = '', datum_no = 1, station = None,
                         colors = None, setup_type = None,
-                        on_record = None, **kwargs):
+                        on_record = None, datum1 = None, datum2 = None, datum3 = None,
+                        data = None,  **kwargs):
         super(datum_recorder, self).__init__(**kwargs)
         self.padding = 10
         self.spacing = 10
@@ -1929,7 +2256,11 @@ class datum_recorder(GridLayout):
                                     station = self.station,
                                     result_label = self.result,
                                     setup_type = setup_type,
-                                    on_record = on_record)
+                                    on_record = on_record,
+                                    datum1 = datum1,
+                                    datum2 = datum2,
+                                    datum3 = datum3,
+                                    data = data)
         self.add_widget(self.button)
         self.add_widget(self.result)
        
@@ -2004,13 +2335,7 @@ class setups(ScrollView):
         self.ini = ini
         self.recorder = []
         self.bar_width = 10
-
-        y_sizes = {"Horizontal Angle Only" : 3.0,
-                    "Over a datum": 1.1,
-                    "Over a datum + Record a datum" : 1.6,
-                    "Record two datums" : 2.6,
-                    "Three datum shift" : 6.0}
-        
+       
         self.scrollbox = GridLayout(cols = 1,
                                 size_hint = (1, None),
 #                                id = 'setups_box',
@@ -2024,7 +2349,7 @@ class setups(ScrollView):
             self.scrollbox.add_widget(instructions)
 
             content1 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
-            content1.add_widget(e5_label('Horizontal angle to the point\n(use ddd.mmss)'))
+            content1.add_widget(e5_label('Horizontal angle to the\npoint (use ddd.mmss)'))
             self.hangle = TextInput(text = '', multiline = False,
 #                                    id = 'h_angle',
                                     size_hint_max_y = 30)
@@ -2057,7 +2382,7 @@ class setups(ScrollView):
             instructions.text = "Select the datum under the station and a datum to be recorded.  EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
-            self.datum1 = datum_selector(text = 'Select datum\nunder the station',
+            self.datum1 = datum_selector(text = 'Select datum\nunder the\nstation',
                                                 data = self.data,
                                                 colors = self.colors,
                                                 default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
@@ -2070,21 +2395,25 @@ class setups(ScrollView):
                                                 call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum2)
             
-            self.recorder.append(datum_recorder('Record datum', station = self.station, colors = self.colors, setup_type = setup_type))
+            datum_name = self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM'))
+            datum_name = f'Record\n{datum_name.name}' if datum_name else f'Record datum {n + 1}'
+            self.recorder.append(datum_recorder(datum_name, station = self.station, colors = self.colors,
+                                                setup_type = setup_type, datum1 = self.datum1, datum2 = self.datum2,
+                                                data = self.data))
             self.scrollbox.add_widget(self.recorder[0])
 
         elif setup_type == "Record two datums":
             instructions.text = "Select two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
-            self.datum1 = datum_selector(text = 'Select first datum\nto record',
+            self.datum1 = datum_selector(text = 'Select\ndatum\none',
                                                 data = self.data,
                                                 colors = self.colors,
                                                 default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_1')),
                                                 call_back = self.datum1_selected)
             self.scrollbox.add_widget(self.datum1)
 
-            self.datum2 = datum_selector(text = 'Select second datum\nto record',
+            self.datum2 = datum_selector(text = 'Select\ndatum\ntwo',
                                                 data = self.data,
                                                 colors = self.colors,
                                                 default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_2')),
@@ -2092,7 +2421,10 @@ class setups(ScrollView):
             self.scrollbox.add_widget(self.datum2)
 
             for n in range(2):
-                self.recorder.append(datum_recorder('Record datum', datum_no = n + 1, station = station, colors = colors, setup_type = setup_type))
+                datum_name = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_%s' % (n + 1)))
+                datum_name = f'Record\n{datum_name.name}' if datum_name else f'Record datum {n + 1}'
+                self.recorder.append(datum_recorder(datum_name, datum_no = n + 1, station = station, colors = colors,
+                                                    setup_type = setup_type, datum1 = self.datum1, datum2 = self.datum2, data = self.data))
                 self.scrollbox.add_widget(self.recorder[n])
 
         elif setup_type == "Three datum shift":
@@ -2122,10 +2454,7 @@ class setups(ScrollView):
 
             for n in range(3):
                 datum_name = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_%s' % (n + 1)))
-                if datum_name is None:
-                    datum_name = 'Record datum %s' % (n + 1)
-                else:
-                    datum_name = 'Record %s' % datum_name.name
+                datum_name = f'Record {datum_name.name}' if datum_name else f'Record datum {n + 1}'
                 self.recorder.append(datum_recorder(datum_name, datum_no = n + 1, station = station,
                                                                 colors = self.colors, setup_type = setup_type))
                 self.scrollbox.add_widget(self.recorder[n])
@@ -2148,12 +2477,15 @@ class setups(ScrollView):
 
     def datum1_selected(self, instance):
         self.recorder[0].children[1].text = 'Record ' + instance.datum.name
+        self.recorder[0].children[1].datum_name = instance.datum.name
 
     def datum2_selected(self, instance):
         self.recorder[1].children[1].text = 'Record ' + instance.datum.name
+        self.recorder[1].children[1].datum_name = instance.datum.name
 
     def datum3_selected(self, instance):
         self.recorder[2].children[1].text = 'Record ' + instance.datum.name
+        self.recorder[2].children[1].datum_name = instance.datum.name
 
     def set_hangle(self, instance):
         if self.hangle:
@@ -2185,7 +2517,6 @@ class InitializeStationScreen(Screen):
                                     #size_hint = (width_calculator(.9, 400), None),
                                     size_hint_y = None,
                                     pos_hint = {'center_x': .5, 'center_y': .5})
-        setup_type_box.add_widget(e5_label('Select a setup type', colors = self.colors, size_hint = (.5, None)))
 
         spinner_dropdown_button = SpinnerOptions
         spinner_dropdown_button.font_size = colors.button_font_size.replace("sp",'') if colors.button_font_size else None
@@ -2244,7 +2575,9 @@ class InitializeStationScreen(Screen):
     def accept_setup(self, instance):
 
         self.new_station = None
+        self.foresight = None
         txt = None
+        error_message = None
 
         if self.setup_type.text == 'Horizontal Angle Only':
             pass
@@ -2253,30 +2586,66 @@ class InitializeStationScreen(Screen):
             if self.setup_widgets.over_datum.datum is None:
                 error_message = '\nSelect the datum under the total station and optionally provide the station height.'
             else:
-                station_height = float(self.setup_widgets.station_height.text) if self.setup_widgets.station_height.text  else 0
+                station_height = float(self.setup_widgets.station_height.text) if self.setup_widgets.station_height.text else 0
                 self.new_station = self.setup_widgets.over_datum.datum
                 self.new_station.z += station_height
-                txt = '\nSet the station coordinates to\nX : %s\nY: %s\nZ: %s' % (self.new_station.x, self.new_station.y, self.new_station.z)
+                txt = '\nSet the station coordinates to\nX : %s\nY : %s\nZ : %s' % (self.new_station.x, self.new_station.y, self.new_station.z)
 
         elif self.setup_type.text == 'Over a datum + Record a datum':
             if self.setup_widgets.datum1.datum is None or self.setup_widgets.datum2.datum is None:
                 error_message = '\nSelect the datum under the total station and a datum to record.'
-            elif self.setup_widgets.recorder.results[1].xyz is None:
+            elif self.setup_widgets.datum1.datum == self.setup_widgets.datum2.datum:
+                error_message = '\nSelect two different datums.'
+            elif self.station.subtract_points(self.setup_widgets.datum1.datum, self.setup_widgets.datum2.datum) == point(0,0,0):
+                error_message = '\nSelect two different datums with different coordinates.'
+            elif self.setup_widgets.recorder[0].result.xyz is None:
                 error_message = '\nRecord the datum before accepting the setup.'
             else:
-                # compute difference between datums and compare this with station.xyz
-                # then report error and offer to upload angle
-                # angle is the angle between these two datums
-                pass
+                self.new_station = self.station.subtract_points(self.setup_widgets.datum2.datum, self.setup_widgets.recorder[0].result.xyz)
+                datum2 = self.station.add_points(self.setup_widgets.datum1.datum, self.setup_widgets.recorder[0].result.xyz)
+                station_error = self.station.subtract_points(self.setup_widgets.datum2.datum, datum2)
+                txt = f'\n{self.setup_widgets.datum2.datum.name} recorded as \nX : {datum2.x}\nY : {datum2.y}\nZ : {datum2.z}\n'
+                txt += f'\nThe error in this measurement is \nX : {station_error.x}\nY : {station_error.y}\nZ : {station_error.z}\n'
+                txt += '(Note that Z will be off by the station height in most setups)\n'
+                txt += f'\nIf the setup as measured is accepted, the new station coordinates will be \nX : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}'
 
         elif self.setup_type.text == 'Record two datums':
             if self.setup_widgets.datum1.datum is None or self.setup_widgets.datum2.datum is None:
                 error_message = '\nSelect two datums to record.'
-            elif self.setup_widgets.recorder.results[1].xyz is None or self.setup_widgets.recorder.results[2].xyz is None:
+            elif self.setup_widgets.datum1.datum == self.setup_widgets.datum2.datum:
+                error_message = '\nSelect two different datums.'
+            elif self.station.subtract_points(self.setup_widgets.datum1.datum, self.setup_widgets.datum2.datum) == point(0,0,0):
+                error_message = '\nSelect two different datums with different coordinates.'
+            elif self.setup_widgets.recorder[0].result.xyz is None or self.setup_widgets.recorder[1].result.xyz is None:
                 error_message = '\nRecord each datum.  It is important that the first datum is recorded and then the second and not the other way around.  Note that before the first datum is recorded, a horizontal angle of 0.0000 will be uploaded.'
             else:
-                # do a two shot math thing, report the new location, and if they accept it, upload the angle
-                pass
+                measured_distance = self.station.distance(self.setup_widgets.recorder[0].result.xyz, self.setup_widgets.recorder[1].result.xyz)
+                actual_distance = self.station.distance(self.setup_widgets.datum1.datum.as_point(), self.setup_widgets.datum2.datum.as_point())
+                error_distance = abs(measured_distance - actual_distance)
+
+                #Call calculate_angle(0, 0, currentxp, currentyp + firstyp, measuredangle)
+                p = self.setup_widgets.recorder[1].result.xyz
+                p.y = p.y + self.setup_widgets.recorder[0].result.y
+                measured_angle = self.station.angle_between_points(point(0,0,0), p)
+                # calc angle between datum1 and datum2
+                defined_angle = self.station.angle_between_points(self.setup_widgets.datum1.datum.as_point(), self.setup_widgets.datum2.datum.as_point())
+                
+                # get the difference between these two angles
+                angle_difference = defined_angle - measured_angle
+
+                #self.new_station.x = firstyp * sinangle + datum1x
+                #currentstationy = firstyp * cosangle + datum1y
+                #currentstationz = ((datum1z - firstzp) + (datum2z - currentzp)) / 2
+                self.new_station = point(round(self.setup_widgets.datum1.y * sin(d2r(angle_difference)) + self.setup_widgets.datum1.datum.x,3),
+                                        round(self.setup_widgets.datum1.y * cos(d2r(angle_difference)) + self.setup_widgets.datum1.datum.y,3),
+                                        round((self.setup_widgets.datum1.datum.z - self.setup_widgets.recorder[0].result.xyz.z) + (self.setup_widgets.datum2.datum.z - self.setup_widgets.recorder[1].result.xyz.z),3))
+
+
+                self.foresight = self.station.angle_between_points(self.new_station, self.setup_widgets.datum2.datum.as_point())
+                txt = f'\nThe measured distance between {self.setup_widgets.datum1.datum.name} and {self.setup_widgets.datum2.datum.name} was {round(measured_distance,3)} m.  The distance based on the datum definitions should be {round(actual_distance,3)} m.  The error is {round(error_distance,3)} m.\n'
+                txt += f'\nIf the setup as measured is accepted, the new station coordinates will be \nX : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
+                txt += f'\nAn angle of {self.station.decimal_degrees_to_sexastr(self.foresight)} will be uploaded (do not turn the station until this angle is set).'
+                self.foresight = self.station.decimal_degrees_to_dddmmss(self.foresight)
 
         elif self.setup_type.text == 'Three datum shift':
             if self.setup_widgets.datum1.datum is None or self.setup_widgets.datum2.datum is None or self.setup_widgets.datum3.datum is None:
@@ -2353,6 +2722,8 @@ class InitializeStationScreen(Screen):
             self.ini.update_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3', self.setup_widgets.datum3.datum.name)
 
         self.popup.dismiss()
+        if self.foresight:
+            self.station.set_horizontal_angle(self.foresight)
         self.station.location = self.new_station
         self.ini.update_value('SETUPS', 'LASTSETUP_TYPE', self.setup_type.text)        
         self.ini.save()
@@ -2361,24 +2732,32 @@ class InitializeStationScreen(Screen):
 class EditLastRecordScreen(e5_RecordEditScreen):
 
     def on_pre_enter(self):
-        if self.data_table is not None and self.e5_cfg is not None:
+        if self.data.table is not None and self.e5_cfg is not None:
             try:
-                last = self.data.db.table(self.data_table).all()[-1]
+                last = self.data.db.table(self.data.table).all()[-1]
                 self.doc_id = last.doc_id
             except:
                 self.doc_id = None
         self.put_data_in_frame()
+
+    def on_enter(self):
+        if self.first_field_widget:
+            self.first_field_widget.focus = True
 
 class EditPointScreen(e5_RecordEditScreen):
 
     def on_pre_enter(self):
-        if self.data_table is not None and self.e5_cfg is not None:
+        if self.data.table is not None and self.e5_cfg is not None:
             try:
-                last = self.data.db.table(self.data_table).all()[-1]
+                last = self.data.db.table(self.data.table).all()[-1]
                 self.doc_id = last.doc_id
             except:
                 self.doc_id = None
         self.put_data_in_frame()
+
+    def on_enter(self):
+        if self.first_field_widget:
+            self.first_field_widget.focus = True
 
 class EditDatumScreen(Screen):
 
@@ -2524,7 +2903,7 @@ class StationConfigurationScreen(Screen):
 
     def build_screen(self):
         self.station_type = station_setting(label_text = 'Station type',
-                                            spinner_values = ("Leica", "Wild", "Topcon", "Microscribe", "Simulate"),
+                                            spinner_values = ("Leica", "Wild", "Topcon", "Microscribe", "Manual", "Simulate"),
                                             call_back = self.toggle_buttons,
                                             id = 'station_type',
                                             colors = self.colors,
@@ -2648,9 +3027,9 @@ class StatusScreen(e5_InfoScreen):
         txt += self.station.status() if self.station else 'Total station information is not available.\n\n'
         txt += '\nThe default user path is %s.\n' % self.ini.get_value(__program__,"APP_PATH")
         txt += '\nThe operating system is %s.\n' % platform_name()
-        txt += '\nPython buid is %s.\n' % (python_version())
+        txt += '\nPython build is %s.\n' % (python_version())
         txt += '\nLibraries installed include Kivy %s and TinyDB %s.\n' % (__kivy_version__, __tinydb_version__)
-        txt += '\nEDM was tested and distributed on Python 3.6, Kivy 1.10.1 and TinyDB 3.11.1.\n'
+        txt += '\nEDM was tested and distributed most recently on Python 3.8.1, Kivy 2.0.0 and TinyDB 4.4.0.\n'
         self.content.text = txt
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
@@ -2661,22 +3040,13 @@ class StatusScreen(e5_InfoScreen):
 #sm = ScreenManager(id = 'screen_manager')
 sm = ScreenManager()
 
-class EDMApp(e5_Program):
+class EDMApp(App):
 
     def __init__(self, **kwargs):
         super(EDMApp, self).__init__(**kwargs)
 
-        self.colors = ColorScheme()
-        self.ini = INI()
-        self.cfg = CFG()
-        self.data = DB()
-
         self.app_path = self.user_data_dir
         self.setup_logger()
-        self.setup_program()
-
-        self.station = totalstation(self.ini.get_value(__program__,'STATION'))
-        self.station.setup(self.ini, self.data)
 
     def setup_logger(self):
         logger.setLevel(logging.INFO)
@@ -2686,135 +3056,13 @@ class EDMApp(e5_Program):
         fh.setFormatter(formatter)
         logger.addHandler(fh)
 
-    def add_screens(self):
-        sm.add_widget(MainScreen(name = 'MainScreen', 
-                                 colors = self.colors,
-                                 ini = self.ini,
-                                 cfg = self.cfg,
-                                 data = self.data,
-                                 station = self.station))
-
-        sm.add_widget(VerifyStationScreen(name = 'VerifyStationScreen',
-                                            id = 'verify_station',
-                                            data = self.data,
-                                            station = self.station,
-                                            colors = self.colors,
-                                            ini = self.ini))
-
-        sm.add_widget(RecordDatumsScreen(name = 'RecordDatumsScreen',
-#                                            id = 'record_datums',
-                                            data = self.data,
-                                            station = self.station,
-                                            colors = self.colors,
-                                            ini = self.ini))
-
-        sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen',
-#                                        id = 'editlastrecord_screen',
-                                        colors = self.colors,
-                                        data = self.data,
-                                        data_table = self.data.table,
-                                        doc_id = None,
-                                        e5_cfg = self.cfg))
-
-        sm.add_widget(EditPointScreen(name = 'EditPointScreen',
-                                        colors = self.colors,
-#                                        id = 'editpoint_screen',
-                                        data = self.data,
-                                        data_table = self.data.table,
-                                        doc_id = None,
-                                        e5_cfg = self.cfg,
-                                        one_record_only = True))
-
-        sm.add_widget(EditPointsScreen(name = 'EditPointsScreen',
-#                                        id = 'editpoints_screen',
-                                        colors = self.colors,
-                                        main_data = self.data,
-                                        main_tablename = self.data.table,
-                                        main_cfg = self.cfg))
-
-        datum_cfg = CFG()
-        datum_cfg.build_datum()
-        sm.add_widget(EditPointsScreen(name = 'EditDatumsScreen',
-#                                        id = 'editdatums_screen',
-                                        colors = self.colors,
-                                        main_data = self.data,
-                                        main_tablename = 'datums',
-                                        main_cfg = datum_cfg,
-                                        addnew = True))
-
-        prism_cfg = CFG()
-        prism_cfg.build_prism()
-        sm.add_widget(EditPointsScreen(name = 'EditPrismsScreen',
-#                                        id = 'editprisms_screen',
-                                        colors = self.colors,
-                                        main_data = self.data,
-                                        main_tablename = 'prisms',
-                                        main_cfg = prism_cfg,
-                                        addnew = True))
-
-        units_cfg = CFG()
-        units_cfg.build_unit()
-        sm.add_widget(EditPointsScreen(name = 'EditUnitsScreen',
-#                                        id = 'editunits_screen',
-                                        colors = self.colors,
-                                        main_data = self.data,
-                                        main_tablename = 'units',
-                                        main_cfg = units_cfg,
-                                        addnew = True))
-
-        sm.add_widget(StatusScreen(name = 'StatusScreen',
-#                                    id = 'status_screen',
-                                    colors = self.colors,
-                                    cfg = self.cfg,
-                                    ini = self.ini,
-                                    data = self.data,
-                                    station = self.station))
-
-        sm.add_widget(e5_LogScreen(name = 'LogScreen',
-#                                id = 'log_screen',
-                                colors = self.colors,
-                                logger = logger))
-
-        sm.add_widget(e5_CFGScreen(name = 'CFGScreen',
-#                                id = 'cfg_screen',
-                                colors = self.colors,
-                                cfg = self.cfg))
-
-        sm.add_widget(e5_INIScreen(name = 'INIScreen',
-#                                id = 'ini_screen',
-                                colors = self.colors,
-                                ini = self.ini))
-
-        sm.add_widget(AboutScreen(name = 'AboutScreen',
-#                                    id = 'about_screen',
-                                    colors = self.colors))
-
-        sm.add_widget(StationConfigurationScreen(name = 'StationConfigurationScreen',
-#                                    id = 'station_configuration_screen',
-                                    station = self.station,
-                                    ini = self.ini,
-                                    colors = self.colors))
-
-        sm.add_widget(InitializeStationScreen(name = 'InitializeStationScreen',
-#                                                id = 'initialize_station_screen',
-                                                data = self.data,
-                                                station = self.station,
-                                                ini = self.ini,
-                                                colors = self.colors))
-
-        sm.add_widget(e5_SettingsScreen(name = 'EDMSettingsScreen',
-#                                        id = 'edmsettings_screen',
-                                        colors = self.colors,
-                                        ini = self.ini,
-                                        cfg = self.cfg))
-
     def build(self):
-        self.add_screens()
-        restore_window_size_position(__program__, self.ini)
+        sm.add_widget(MainScreen(user_data_dir = self.user_data_dir, name = 'MainScreen'))
+        sm.current = 'MainScreen'
         #Window.borderless = True
         self.title = __program__ + " " + __version__
         logger.info(__program__ + ' started, logger initialized, and application built.')
-        sm.screens[0].build_mainscreen()
+        #sm.get_screen('MainScreen').build_mainscreen()
         return(sm)
 
 Factory.register(__program__, cls=EDMApp)
