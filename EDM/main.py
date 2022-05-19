@@ -25,6 +25,9 @@
 # Immediate To DO
 #   arrow keys (and or tab keys) to move between fields in edit last record
 
+
+# multiple add new buttons on edit screen for prisms, units, etc.
+
 __version__ = '1.0.16'
 __date__ = 'May, 2022'
 from tkinter import EXCEPTION, N
@@ -192,6 +195,7 @@ class DB(dbs):
     db = None
     filename = None
     db_name = 'points'
+    new_data = {}
 
     def __init__(self, filename = ''):
         self.filename = filename
@@ -203,8 +207,11 @@ class DB(dbs):
             self.db = TinyDB(filename)
             self.filename = filename
             self.prisms = self.db.table('prisms')
+            self.new_data['prisms'] = True
             self.units = self.db.table('units')
+            self.new_data['units'] = True
             self.datums = self.db.table('datums')
+            self.new_data['datums'] = True
             return(True)
         except:
             return(False)
@@ -681,8 +688,8 @@ class totalstation(object):
     rotate_source = []
     rotate_destination = []
 
-    def __init__(self, make = "Simulate", model = ''):
-        self.make = make
+    def __init__(self, make = None, model = None):
+        self.make = make if make else 'Manual'
         self.model = model
         self.communication = 'Serial'
         self.comport = 'COM1'
@@ -698,8 +705,8 @@ class totalstation(object):
         self.location = point(0, 0, 0)
         self.xyz = point()
         self.prism_constant = 0
-        self.hangle = ''
-        self.vangle = ''
+        self.hangle = None              # Decimal degrees
+        self.vangle = None              # Decimal degrees
         self.sloped = 0
         self.suffix = 0
         self.prism = 0
@@ -808,6 +815,9 @@ class totalstation(object):
 
         return([angle, minutes, seconds])
 
+    def point_pretty(self, point):
+        return(f'X: {round(point.x, 3)}\nY: {round(point.y, 3)}\nZ: {round(point.z, 3)}')
+
     def decimal_degrees_to_dddmmss(self, angle):
         if not angle is None:
             sexa  = deci2sexa(angle)
@@ -815,7 +825,7 @@ class totalstation(object):
         else:
             return('')
 
-    def decimal_degrees_to_sexastr(self, angle):
+    def decimal_degrees_to_sexa_pretty(self, angle):
         if not angle is None:
             sexa  = deci2sexa(angle)
             return(f'{sexa[1]}° {sexa[2]}\" {sexa[3]}\'')
@@ -849,6 +859,7 @@ class totalstation(object):
     def take_shot(self):
 
         self.clear_xyz()
+        self.clear_com()
 
         if self.make=='TOPCON':
             self.clearcom()
@@ -1220,7 +1231,16 @@ class totalstation(object):
 
     def set_horizontal_angle_leica(self, angle):
         # function expects angle as ddd.mmss input
-        self.send("PUT/21...4+" + self.pad_dms_leica(angle) + "0 ")
+        # but decimal seconds are possible
+        if angle.count('.') == 0:
+            angle = angle + '.0000'
+        elif angle.count('.') == 2:
+            dms = angle.split('.')
+            ms = '0000' + str(round(float(dms[1] + '.' + dms[2])))
+            ms = ms[-4:]
+            angle = str(dms[0] + '.' + ms)
+        set_angle_command = "PUT/21...4+%s0 \r\n" % self.pad_dms_leica(angle)
+        self.send(set_angle_command.encode())
         return(self.receive())
 
     def launch_point_leica(self):
@@ -1233,7 +1253,7 @@ class totalstation(object):
             self.vhd_to_xyz()
 
     def vhd_to_xyz(self):
-        if self.vangle and self.hangle and self.sloped:
+        if self.vangle is not None and self.hangle is not None and self.sloped is not None:
             #angle_decdeg = self.dms_to_decdeg(self.vangle)
             z = self.sloped * cos(self.decdeg_to_radians(self.vangle))
             actual_distance = sqrt(self.sloped**2 - z**2)
@@ -1258,12 +1278,12 @@ class totalstation(object):
                 elif component.startswith('31.'):
                     try:
                         self.sloped = float(component[6:]) / 1000
-                    except:
+                    except ValueError:
                         self.sloped = None
                 elif component.startswith('51.'):
                     try:
                         self.prism_constant = float(component[-4:]) / 1000
-                    except EXCEPTION:
+                    except ValueError:
                         self.prism_constant = None
                 
 
@@ -1328,8 +1348,10 @@ class MainScreen(e5_MainScreen):
 
         self.cfg_datums = CFG()
         self.cfg_datums.build_datum()
-        self.cfg_prisms = CFG().build_prism()
-        self.cfg_units = CFG().build_unit()
+        self.cfg_prisms = CFG()
+        self.cfg_prisms.build_prism()
+        self.cfg_units = CFG()
+        self.cfg_units.build_unit()
 
         self.layout = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
@@ -1623,7 +1645,7 @@ class MainScreen(e5_MainScreen):
             if self.station.shot_type == 'measure':
                 txt = f'\nCoordinates:\n  X:  {self.station.xyz_global.x:.3f}\n  Y:  {self.station.xyz_global.y:.3f}\n  Z:  {self.station.xyz_global.z:.3f}'
                 if self.station.make != 'Microscribe':
-                    txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexastr(self.station.hangle)}\n  Vertical angle:  {self.station.decimal_degrees_to_sexastr(self.station.vangle)}\n  Slope distance:  {self.station.sloped:.3f}' 
+                    txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  Slope distance:  {self.station.sloped:.3f}' 
                     txt += f'\n  X:  {self.station.xyz.x:.3f}\n  Y:  {self.station.xyz.y:.3f}\n  Z:  {self.station.xyz.z:.3f}'
                     txt += f'\n\nStation coordinates:\n  X:  {self.station.location.x:.3f}\n  Y:  {self.station.location.y:.3f}\n  Z:  {self.station.location.z:.3f}'
                     if self.station.prism_constant:
@@ -1984,7 +2006,7 @@ class RecordDatumsScreen(Screen):
         self.content.add_widget(self.datum_notes)
         
         self.recorder = datum_recorder('Record datum', station = self.station,
-                                        colors = self.colors, setup_type = 'record_new')
+                                        colors = self.colors, setup_type = 'record_new', data = self.data)
         self.content.add_widget(self.recorder)
 
         self.results = e5_label('', colors = self.colors)
@@ -2003,6 +2025,10 @@ class RecordDatumsScreen(Screen):
                                         response_type = "YESNO",
                                         call_back = [self.delete_and_save, self.close_popup],
                                         colors = self.colors)
+            self.popup.open()
+        elif self.datum_name.txt.text == "":
+            self.popup = e5_MessageBox('Error', '\nProvide a datum name before saving.', colors = self.colors)
+            self.popup.open()
         else:
             self.save_datum()
 
@@ -2012,19 +2038,28 @@ class RecordDatumsScreen(Screen):
         self.save_datum()
 
     def save_datum(self):
-        insert_record = {}
-        insert_record['NAME'] = self.datum_name.txt.text
-        insert_record['NOTES'] = self.datum_notes.txt.text
-        insert_record['X'] = str(self.recorder.result.xyz_global.x)
-        insert_record['Y'] = str(self.recorder.result.xyz_global.y)
-        insert_record['Z'] = str(self.recorder.result.xyz_global.z)
-        self.data.db.table('datums').insert(insert_record)
-        self.datum_name.txt.text = ''
-        self.datum_notes.txt.text = ''
-        self.recorder.result.text = ''
-        self.recorder.result.xyz = None
-        self.recorder.result.xyz_global = None
-        self.data.new_data = True
+        error_message = ''
+        if self.datum_name.txt.text == '':
+            error_message = '\nProvide a datum name.'
+        if self.recorder.result.xyz_global.x is None or self.recorder.result.xyz_global.y is None or self.recorder.result.xyz_global.z is None:
+            error_message = '\nThe point was not properly recorded.  Try again.'
+        if error_message == '':
+            insert_record = {}
+            insert_record['NAME'] = self.datum_name.txt.text
+            insert_record['NOTES'] = self.datum_notes.txt.text
+            insert_record['X'] = str(round(self.recorder.result.xyz_global.x,3))
+            insert_record['Y'] = str(round(self.recorder.result.xyz_global.y,3))
+            insert_record['Z'] = str(round(self.recorder.result.xyz_global.z,3))
+            self.data.db.table('datums').insert(insert_record)
+            self.datum_name.txt.text = ''
+            self.datum_notes.txt.text = ''
+            self.recorder.result.text = ''
+            self.recorder.result.xyz = None
+            self.recorder.result.xyz_global = None
+            self.data.new_data['datums'] = True
+        else:
+            self.popup = e5_MessageBox('Error', error_message, colors = self.colors)
+            self.popup.open()
 
     def close_popup(self, instance):
         self.popup.dismiss()
@@ -2126,9 +2161,13 @@ class record_button(e5_button):
                 self.popup.open()
             elif self.station.make == 'Leica':
                 self.station.set_horizontal_angle_leica(self.station.decimal_degrees_to_dddmmss(angle))
+                self.station.take_shot()
+                self.popup = self.get_prism_height()
+                self.popup.open()
         else:
             self.station.take_shot()
-            self.wait_for_shot()
+            self.popup = self.get_prism_height()
+            self.popup.open()
 
     def now_take_shot(self, instance):
         self.popup.dismiss()
@@ -2205,33 +2244,32 @@ class record_button(e5_button):
     def have_shot(self, instance = None):
         self.popup.dismiss()
         #prism_height = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
+        if self.station.make in ['Leica']:
+            self.station.fetch_point()
+            self.station.make_global()
         try:
             prism_height = float(self.popup.result)
-        except EXCEPTION:
+        except ValueError:
             prism_height = 0
         self.station.prism = prism_height
         self.station.prism_adjust()
-        if self.station.xyz:
+        if self.station.xyz.x and self.station.xyz.y and self.station.xyz.z:
             if self.setup_type == 'verify' or self.setup_type == 'record_new':
-                self.result_label.text = 'X: %s\nY: %s\nZ: %s' % (self.station.xyz_global.x,
-                                                                    self.station.xyz_global.y,
-                                                                    self.station.xyz_global.z)
+                self.result_label.text = self.station.point_pretty(self.station.xyz_global)
             else:
-                self.result_label.text = 'X: %s\nY: %s\nZ: %s' % (self.station.xyz.x,
-                                                                    self.station.xyz.y,
-                                                                    self.station.xyz.z)
-
+                self.result_label.text = self.station.point_pretty(self.station.xyz)
             self.result_label.xyz = self.station.xyz
             self.result_label.xyz_global = self.station.xyz_global
+            if self.on_record is not None:
+                self.on_record()
         else:
             self.result_label.text = 'Recording error.'
             self.result_label.xyz = None
             self.result_label.xyz_global = None
-        if self.on_record is not None:
-            self.on_record()
 
 class record_result(e5_label):
-    xyz = None
+    xyz = point()
+    xyz_global = point()
 
 class datum_recorder(GridLayout):
 
@@ -2345,11 +2383,11 @@ class setups(ScrollView):
         instructions = Label(color = self.colors.text_color, size_hint_y = None)
 
         if setup_type == "Horizontal Angle Only":
-            instructions.text = 'Enter the angle to be uploaded to the station.'
+            instructions.text = '\nEnter the horizontal angle to uploaded to the station.'
             self.scrollbox.add_widget(instructions)
 
             content1 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
-            content1.add_widget(e5_label('Horizontal angle to the\npoint (use ddd.mmss)'))
+            content1.add_widget(e5_label('Angle (use ddd.mmss)'))
             self.hangle = TextInput(text = '', multiline = False,
 #                                    id = 'h_angle',
                                     size_hint_max_y = 30)
@@ -2357,11 +2395,11 @@ class setups(ScrollView):
             self.scrollbox.add_widget(content1)
 
             content2 = GridLayout(cols = 1, padding = 10, size_hint_y = None)
-            content2.add_widget(e5_button(text = 'Upload angle', selected = True, call_back = self.set_hangle))
+            content2.add_widget(e5_button(text = 'Upload angle', selected = True, call_back = self.set_hangle, colors = self.colors))
             self.scrollbox.add_widget(content2)
 
         elif setup_type == "Over a datum":
-            instructions.text = 'Use this option when the station is setup over a known point and you can measure the station height or to set the station location directly (with no station height).  Note this option assumes the horizontal angle is already correct or will be otherwise set.'
+            instructions.text = '\nUse this option when the station is setup over a known point and you can measure the station height or to set the station location directly (with no station height).  Note this option assumes the horizontal angle is already correct or will be otherwise set.'
             self.scrollbox.add_widget(instructions)
 
             self.over_datum = datum_selector(text = 'Select a datum',
@@ -2379,7 +2417,7 @@ class setups(ScrollView):
             self.scrollbox.add_widget(content2)
 
         elif setup_type == "Over a datum + Record a datum":
-            instructions.text = "Select the datum under the station and a datum to be recorded.  EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
+            instructions.text = "\nSelect the datum under the station and a datum to recorded.  EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
             self.datum1 = datum_selector(text = 'Select datum\nunder the\nstation',
@@ -2403,7 +2441,7 @@ class setups(ScrollView):
             self.scrollbox.add_widget(self.recorder[0])
 
         elif setup_type == "Record two datums":
-            instructions.text = "Select two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
+            instructions.text = "\nSelect two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
             self.datum1 = datum_selector(text = 'Select\ndatum\none',
@@ -2428,7 +2466,7 @@ class setups(ScrollView):
                 self.scrollbox.add_widget(self.recorder[n])
 
         elif setup_type == "Three datum shift":
-            instructions.text = "This option is designed to let one grid be rotated into another and is best for when a block of sediment is being excavated in a lab.  It requires three datums points."
+            instructions.text = "\nThis option is designed to let one grid be rotated into another and is best for when a block of sediment is being excavated in a lab.  It requires three datums points."
             self.scrollbox.add_widget(instructions)
 
             self.datum1 = datum_selector(text = 'Select datum 1',
@@ -2760,7 +2798,6 @@ class EditPointScreen(e5_RecordEditScreen):
             self.first_field_widget.focus = True
 
 class EditDatumScreen(Screen):
-
     pass
 
 class EditPointsScreen(e5_DatagridScreen):
