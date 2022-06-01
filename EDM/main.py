@@ -4,8 +4,6 @@
 #   It should be backwards compatible with EDM-Mobile and EDMWin (but there are still some issues).
 
 # ToDo
-#   After XYZ are obtained, check units file, populate and maintain units file after save
-#   Need to make prism menu after shot work
 #   Make copy and paste work
 
 #   A text field can be linked to another table. [future feature]
@@ -15,21 +13,24 @@
 #   Read JSON file
 
 # ToDo More Longterm
-#   Add serial port communications
 #   Add bluetooth communications
 
-# ToDo Serial Communications with TS
-#   Add maybe a simulate station type and a manual station type (maybe with VHD vs XYZ)
-#   Debug with Dave's station
+# Bugs
+#   when you delete records one by one, the last one does not show as deleted (even though it is)
+#   could make menus work better with keyboard (at least with tab)
+#   there is no error checking on duplicates in datagrid edits
+#   round z to 3 digits after adjusting pole height
+#   when editing pole height after shot, offer to update Z
+#   offset x y and z by doing subtraction and addition in the field!
+#   remember the filter field and default to this each time
+#   Easy import of csv data from edm-mobile and edmwin
 
-# Immediate To DO
-#   arrow keys (and or tab keys) to move between fields in edit last record
 
-
-# multiple add new buttons on edit screen for prisms, units, etc.
 
 __version__ = '1.0.16'
-__date__ = 'May, 2022'
+__date__ = 'June, 2022'
+from decimal import MAX_EMAX
+from multiprocessing.sharedctypes import Value
 from tkinter import EXCEPTION, N
 from serial.win32 import ERROR_INVALID_USER_BUFFER
 from src.constants import __program__ 
@@ -147,48 +148,48 @@ class datum:
 class prism:
     def __init__(self, name = None, height = None, offset = None):
         self.name = name
-        self.height = height if height else 0
-        self.offset = offset if offset else 0
+        self.height = height
+        self.offset = offset
 
-    def valid(self, data_record):
-        if data_record['name'] == '':
+    def valid(self):
+        if self.name == '':
             return('A name field is required.')
-        if len(data_record['name']) > 20:
-            return('Prism names should be 20 characters or less.')
-        if data_record['height'] == '':
+        if len(self.name) > 20:
+            return('A prism name should be 20 characters or less.')
+        if self.height == '':
             return('A prism height is required.')
-        if float(data_record['height'])>10:
-            return('Prism height looks to large.  Prism heights are in meters.')
-        if data_record['offset'] == '':
-            data_record['offset'] == '0.0'
-        if float(data_record['offset']) > .2:
+        if float(self.height) > 10:
+            return('Prism height looks too large.  Prism heights are in meters.')
+        if self.offset == '':
+            self.offset == 0.0
+        if float(self.offset) > .2:
             return('Prism offset looks to be too large.  Prism offsets are expressed in meters.')
-        return(None)
+        return(True)
 
 class unit:
-    def __init__(self, name = None, x1 = None, y1 = None, x2 = None, y2 = None, radius = None):
+    def __init__(self, name = None, minx = None, miny = None, maxx = None, maxy = None, centerx = None, centery = None, radius = None):
         self.name = name
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
+        self.minx = minx
+        self.miny = miny
+        self.maxx = maxx 
+        self.maxy = maxy 
         self.radius = radius
+        self.centerx = centerx
+        self.centery = centery
 
-    # This represents a dramatic change made to generalize the concept of linking fields
-    # The idea is that the linked fields are listed in the CFG as an attribute of a field
-    # And now any field can be a link driven field.
-    # The issue is where to store the data - I think I try in the CFG as well.
-    def update_linked_fields(self, new_record):
-        for field_name in edm_cfg.fields():
-            field = edm_cfg.get(field_name)
-            if field.link_fields:
-                defaults = {}
-                for link_field in field.link_fields:
-                    defaults[link_field] = new_record[link_field]
-                field.defaults = defaults
-                #edm_cfg.put(field)
-                # Need a database for each of these
-                # The name field in the database should be the key with is the fieldname 
+    def valid(self):
+        if self.name == '':
+            return('A name field is required.')
+        if len(self.name) > 20:
+            return('A unit name should be 20 characters or less.')
+        if self.minx is not None and self.maxx is not None:
+            if self.minx >= self.maxx:
+                return('The unit X2 coordinate must be larger than the X1 coordinate.')
+        if self.miny is not None and self.maxy is not None:
+            if self.miny >= self.maxy:
+                return('The unit Y2 coordinate must be larger than the Y1 coordinate.')
+        return(True)
+
 
 class DB(dbs):
     MAX_FIELDS = 30
@@ -228,29 +229,51 @@ class DB(dbs):
             return(None)
 
     def get_datum(self, name = None):
-        if name is not None and self.db is not None:
-            a_datum = Query()
-            p = self.db.table('datums').search(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
-            #p = self.db.table('datums').search( (where('NAME') == name, flags = re.IGNORECASE) )
-            if p != []:
-                p = p[0]
-                return(datum(p['NAME'] if 'NAME' in p.keys() else None,
-                            float(p['X']) if 'X' in p.keys() else None,
-                            float(p['Y']) if 'Y' in p.keys() else None,
-                            float(p['Z']) if 'Z' in p.keys() else None,
-                            p['NOTES'] if 'NOTES' in p.keys() else None))
-        return(None)
-
-    def delete_datum(self, name = ''):
-        if name:
-            a_datum = Query()
-            self.db.table('datums').remove(a_datum.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
+        p = self.get_by_name('datums', name)
+        return(datum(p['NAME'] if 'NAME' in p.keys() else None,
+                    float(p['X']) if 'X' in p.keys() else None,
+                    float(p['Y']) if 'Y' in p.keys() else None,
+                    float(p['Z']) if 'Z' in p.keys() else None,
+                    p['NOTES'] if 'NOTES' in p.keys() else None))
 
     def get_unit(self, name):
-        pass
+        p = self.get_by_name('units', name)
+        return(unit(name = p['NAME'] if 'NAME' in p.keys() else None,
+                minx = float(p['MINX']) if 'MINX' in p.keys() else None,
+                miny = float(p['MINY']) if 'MINY' in p.keys() else None,
+                maxx = float(p['MAXX']) if 'MAXX' in p.keys() else None,
+                maxy = float(p['MAXY']) if 'MAXY' in p.keys() else None,
+                centerx = float(p['CENTERX']) if 'CENTERX' in p.keys() else None,
+                centery = float(p['CENTERY']) if 'CENTERY' in p.keys() else None,
+                radius = float(p['RADIUS']) if 'RADIUS' in p.keys() else None))
 
     def get_prism(self, name):
-        pass
+        p = self.get_by_name('prisms', name)
+        return(prism(p['NAME'] if 'NAME' in p.keys() else None,
+                    float(p['HEIGHT']) if 'HEIGHT' in p.keys() else None,
+                    float(p['OFFSET']) if 'OFFSET' in p.keys() else None))
+
+    def get_by_name(self, table = None, name = None):
+        if table is not None and name is not None and self.db is not None:
+            item = Query()
+            p = self.db.table(table).search(item.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
+            if p != []:
+                return(p[0])
+        return({})
+
+    def delete_unit(self, name = None):
+        self.delete_by_name('units', name)
+
+    def delete_prism(self, name = None):
+        self.delete_by_name('prisms', name)
+
+    def delete_datum(self, name = None):
+        self.delete_by_name('datums', name)
+
+    def delete_by_name(self, table = None, name = None):
+        if name is not None and table is not None:
+            item = Query()
+            self.db.table(table).remove(item.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
 
     def unit_ids(self):
         name_list = []
@@ -283,12 +306,19 @@ class DB(dbs):
     def add_record(self):
         pass
 
+    def distance(self, p1, a_unit):
+        return(sqrt( (p1.x - a_unit.centerx)**2 + (p1.y - a_unit.centery)**2 ))
+
     def point_in_unit(self, xyz = None):
-        if xyz:
-            for a_unit in self.db.table('units'):
-                if 'XMAX' in a_unit.keys() and 'YMAX' in a_unit.keys() and 'XMIN' in a_unit.keys() and 'YMIN' in a_unit.keys():
-                    if xyz.x <= float(a_unit['XMAX']) and xyz.x >= float(a_unit['XMIN']) and xyz.y <= float(a_unit['YMAX']) and xyz.y >= float(a_unit['YMIN']):
-                        return(a_unit['NAME'])
+        if xyz.x is not None and xyz.y is not None:
+            for unitname in self.names('units'):
+                a_unit = self.get_unit(unitname)
+                if a_unit.minx is not None and a_unit.miny is not None and a_unit.maxx is not None and a_unit.maxy is not None:
+                    if xyz.x <= a_unit.maxx and xyz.x >= a_unit.minx and xyz.y <= a_unit.maxy and xyz.y >= a_unit.miny:
+                        return(a_unit.name)
+                if a_unit.centerx is not None and a_unit.centery is not None and a_unit.radius is not None:
+                    if self.distance(xyz, a_unit) <= a_unit.radius:
+                        return(a_unit.name)
         return(None)
 
     def get_link_fields(self, name = None, value = None):
@@ -371,7 +401,7 @@ class CFG(blockdata):
         inputtype = ''
         prompt = ''
         length = 0
-        menu = ''
+        menu = []
         increment = False
         required = False
         carry = False 
@@ -398,7 +428,7 @@ class CFG(blockdata):
         self.key_field = None   # not implimented yet
         self.description = ''   # not implimented yet
         self.gps = False
-        self.link_fields = []
+        self.link_fields = []   # I think this is a holdover.  Linked fields are not associated with a particular field
         self.errors = []
         self.unique_together = []
 
@@ -407,31 +437,79 @@ class CFG(blockdata):
             self.filename = filename
         return(self.load())
 
-    def valid_datarecord(self, data_record):
-        for field in data_record:
+    def validate_datafield(self, data_to_insert, data_table):
+        # This just validates one field (e.g. when an existing record is edit)
+        if data_to_insert and data_table and len(data_to_insert) == 1:
+            for field, value in data_to_insert.items():
+                f = self.get(field)
+                if f.required and value.strip() == "":
+                    error_message = f'\nThe field {field} is set to unique or required.  Enter a value to save this record.'
+                    return(error_message)
+                if f.inputtype == 'NUMERIC':
+                    try:
+                        a = float(value)
+                    except ValueError:
+                        error_message = f'\nThe field {field} requires a valid number.  Correct to save this record.'
+                        return(error_message)
+                if f.unique:
+                    result = data_table.search(where(field) == value)
+                    if result:
+                        error_message = f'\nThe field {field} is set to unique and the value {value} already exists for this field in this data table.'
+                        return(error_message)
+        return(True)
+
+    def validate_datarecord(self, data_to_insert, data_table):
+        # This validates one record (e.g. one a record is about to be inserted)
+        for field in self.fields():
             f = self.get(field)
-            value = data_record[field]
-            if f.required and not value:
-                return('Required field %s is empty.  Please provide a value.' % field)
-            if f.length!=0 and len(value) > f.length:
-                return('Maximum length for %s is set to %s.  Please shorten your response.  Field lengths can be set in the CFG file.  A value of 0 means no length limit.')
-        if self.unique_together:
-            pass
-        
+            if f.required:
+                if field in data_to_insert.keys():
+                    if data_to_insert[field].strip() == '':
+                        error_message = f'\nThe field {field} is set to unique or required.  Enter a value to save this record.'
+                        return(error_message)
+                else:
+                    error_message = f'\nThe field {field} is set to unique or required.  Enter a value to save this record.'
+                    return(error_message)
+            if f.inputtype == 'NUMERIC':
+                if field in data_to_insert.keys():
+                    try:
+                        a = float(data_to_insert[field])
+                    except ValueError:
+                        error_message = f'\nThe field {field} requires a valid number.  Correct to save this record.'
+                        return(error_message)
+            if f.unique:
+                if field in data_to_insert.keys():
+                    result = data_table.search(where(field) == data_to_insert[field])
+                    if result:
+                        error_message = f'\nThe field {field} is set to unique and the value {data_to_insert[field]} already exists for this field in this data table.'
+                        return(error_message)
+                else:
+                    error_message =  f'\nThe field {field} is set to unique and a value was not provided for this field.  Unique fields require a value.'
+                    return(error_message)
+
+        ### test to see if it is units, prisms or datums
+        ### create a unit, prism or datum from the dictionary using *data_to_insert
+        ### run the validator in whichever 
+        ### and return results
         return(True)
 
     def get(self, field_name):
         f = self.field(field_name)
-        f.inputtype = self.get_value(field_name, 'TYPE')
+        f.inputtype = self.get_value(field_name, 'TYPE').upper()
         f.prompt = self.get_value(field_name, 'PROMPT')
         f.length = self.get_value(field_name, 'LENGTH')
-        f.menu = self.get_value(field_name, 'MENU').split(",")
+        menulist = self.get_value(field_name, 'MENU')
+        if menulist:
+            f.menu = self.get_value(field_name, 'MENU').split(",")
         link_fields = self.get_value(field_name, 'LINKED')
         if link_fields:
             f.link_fields = link_fields.upper().split(",")
         f.carry = self.get_value(field_name, 'CARRY').upper() == 'TRUE'
         f.required = self.get_value(field_name, 'REQUIRED').upper() == 'TRUE'
         f.increment = self.get_value(field_name, 'INCREMENT').upper() == 'TRUE'
+        f.unique = self.get_value(field_name, 'UNIQUE').upper() == 'TRUE'
+        if f.unique:
+            f.required = True
         return(f)
 
     def put(self, field_name, f):
@@ -458,9 +536,12 @@ class CFG(blockdata):
         self.update_value('NAME', 'Prompt', 'Name :')
         self.update_value('NAME', 'Type', 'Text')
         self.update_value('NAME', 'Length', 20)
+        self.update_value('NAME', 'UNIQUE', 'TRUE')
+        self.update_value('NAME', 'REQUIRED','TRUE')
 
         self.update_value('HEIGHT', 'Prompt', 'Height :')
         self.update_value('HEIGHT', 'Type', 'Numeric')
+        self.update_value('HEIGHT', 'REQUIRED','TRUE')
 
         self.update_value('OFFSET', 'Prompt', 'Offset :')
         self.update_value('OFFSET', 'Type', 'Numeric')
@@ -469,18 +550,20 @@ class CFG(blockdata):
         self.update_value('NAME', 'Prompt', 'Name :')
         self.update_value('NAME', 'Type', 'Text')
         self.update_value('NAME', 'Length', 20)
+        self.update_value('NAME', 'UNIQUE', 'TRUE')
+        self.update_value('NAME', 'REQUIRED','TRUE')
 
-        self.update_value('XMIN', 'Prompt', 'X Minimum :')
-        self.update_value('XMIN', 'Type', 'Numeric')
+        self.update_value('MINX', 'Prompt', 'X Minimum :')
+        self.update_value('MINX', 'Type', 'Numeric')
 
-        self.update_value('YMIN', 'Prompt', 'Y Minimum :')
-        self.update_value('YMIN', 'Type', 'Numeric')
+        self.update_value('MINY', 'Prompt', 'Y Minimum :')
+        self.update_value('MINY', 'Type', 'Numeric')
 
-        self.update_value('XMAX', 'Prompt', 'X Maximum :')
-        self.update_value('XMAX', 'Type', 'Numeric')
+        self.update_value('MAXX', 'Prompt', 'X Maximum :')
+        self.update_value('MAXX', 'Type', 'Numeric')
 
-        self.update_value('YMAX', 'Prompt', 'Y Maximum :')
-        self.update_value('YMAX', 'Type', 'Numeric')
+        self.update_value('MAXY', 'Prompt', 'Y Maximum :')
+        self.update_value('MAXY', 'Type', 'Numeric')
 
         self.update_value('RADIUS', 'Prompt', 'or enter a Radius :')
         self.update_value('RADIUS', 'Type', 'Text')
@@ -496,15 +579,20 @@ class CFG(blockdata):
         self.update_value('NAME', 'Prompt', 'Name :')
         self.update_value('NAME', 'Type', 'Text')
         self.update_value('NAME', 'Length', 20)
+        self.update_value('NAME', 'UNIQUE', 'TRUE')
+        self.update_value('NAME', 'REQUIRED','TRUE')
 
         self.update_value('X', 'Prompt', 'X :')
         self.update_value('X', 'Type', 'Numeric')
+        self.update_value('X', 'REQUIRED','TRUE')
 
         self.update_value('Y', 'Prompt', 'Y :')
         self.update_value('Y', 'Type', 'Numeric')
+        self.update_value('Y', 'REQUIRED','TRUE')
 
         self.update_value('Z', 'Prompt', 'Z :')
         self.update_value('Z', 'Type', 'Numeric')
+        self.update_value('Z', 'REQUIRED','TRUE')
 
         self.update_value('NOTES', 'Prompt', 'Note :')
         self.update_value('NOTES', 'Type', 'Note')
@@ -513,21 +601,26 @@ class CFG(blockdata):
         self.update_value('UNIT', 'Prompt', 'Unit :')
         self.update_value('UNIT', 'Type', 'Text')
         self.update_value('UNIT', 'Length', 6)
+        self.update_value('UNIT', 'REQUIRED','TRUE')
 
         self.update_value('ID', 'Prompt', 'ID :')
         self.update_value('ID', 'Type', 'Text')
         self.update_value('ID', 'Length', 6)
+        self.update_value('ID', 'REQUIRED','TRUE')
 
         self.update_value('SUFFIX', 'Prompt', 'Suffix :')
         self.update_value('SUFFIX', 'Type', 'Numeric')
+        self.update_value('SUFFIX', 'REQUIRED','TRUE')
 
         self.update_value('LEVEL', 'Prompt', 'Level :')
         self.update_value('LEVEL', 'Type', 'Menu')
         self.update_value('LEVEL', 'Length', 20)
+        self.update_value('LEVEL', 'REQUIRED','TRUE')
 
         self.update_value('CODE', 'Prompt', 'Code :')
         self.update_value('CODE', 'Type', 'Menu')
         self.update_value('CODE', 'Length', 20)
+        self.update_value('CODE', 'REQUIRED','TRUE')
 
         self.update_value('EXCAVATOR', 'Prompt', 'Excavator :')
         self.update_value('EXCAVATOR', 'Type', 'Menu')
@@ -538,12 +631,15 @@ class CFG(blockdata):
 
         self.update_value('X', 'Prompt', 'X :')
         self.update_value('X', 'Type', 'Numeric')
+        self.update_value('X', 'REQUIRED','TRUE')
 
         self.update_value('Y', 'Prompt', 'Y :')
         self.update_value('Y', 'Type', 'Numeric')
+        self.update_value('Y', 'REQUIRED','TRUE')
 
         self.update_value('Z', 'Prompt', 'Z :')
         self.update_value('Z', 'Type', 'Numeric')
+        self.update_value('Z', 'REQUIRED','TRUE')
 
         self.update_value('DATE', 'Prompt', 'Date :')
         self.update_value('DATE', 'Type', 'Text')
@@ -606,7 +702,8 @@ class CFG(blockdata):
                 # uppercase the link fields
                 for link_field_name in f.link_fields:
                     if link_field_name not in field_names:
-                        self.errors.append(f"Warning: The field {field_name} is set to link to {link_field_name} but the field {link_field_name} does not exist in the CFG.")
+                        self.errors.append(f"Error: The field {field_name} is set to link to {link_field_name} but the field {link_field_name} does not exist in the CFG.")
+                        self.has_errors = True
             self.put(field_name, f)
 
             for field_option in ['UNIQUE','CARRY','INCREMENT','REQUIRED','SORTED']:
@@ -689,7 +786,7 @@ class totalstation(object):
     rotate_destination = []
 
     def __init__(self, make = None, model = None):
-        self.make = make if make else 'Manual'
+        self.make = make if make else 'Manual XYZ'
         self.model = model
         self.communication = 'Serial'
         self.comport = 'COM1'
@@ -709,7 +806,7 @@ class totalstation(object):
         self.vangle = None              # Decimal degrees
         self.sloped = 0
         self.suffix = 0
-        self.prism = 0
+        self.prism = prism()
         self.xyz_global = point()
         self.rotate_local = []
         self.rotate_global = []
@@ -787,11 +884,11 @@ class totalstation(object):
         return(txt)
 
     def prism_adjust(self):
-        if self.prism:
-            if self.xyz.z:
-                self.xyz.z -= self.prism
-            if self.xyz_global.z:
-                self.xyz_global.z -= self.prism
+        if self.prism.height is not None:
+            if self.xyz.z is not None:
+                self.xyz.z -= self.prism.height
+            if self.xyz_global.z is not None:
+                self.xyz_global.z -= self.prism.height
 
     def angle_between_points(self, p1, p2):
         return self.angle_between_xy_pairs(p1.x, p1.y, p2.x, p2.y)
@@ -826,7 +923,7 @@ class totalstation(object):
             return('')
 
     def decimal_degrees_to_sexa_pretty(self, angle):
-        if not angle is None:
+        if  angle is not None:
             sexa  = deci2sexa(angle)
             return(f'{sexa[1]}° {sexa[2]}\" {sexa[3]}\'')
         else:
@@ -853,7 +950,7 @@ class totalstation(object):
             pass
         elif self.make == 'Simulate':
             pass
-        elif self.make == 'Manual':
+        elif self.make in ['Manual XYZ', 'Manual VHD']:
             pass
 
     def take_shot(self):
@@ -878,9 +975,15 @@ class totalstation(object):
             self.edm_output(chr(17))
 
         elif self.make == 'Simulate':
-            self.xyz = point(round(random.uniform(1000, 1010), 3),
-                                round(random.uniform(1000, 1010), 3),
-                                round(random.uniform(0, 1), 3 ))
+            # Put the points into one of two units
+            if random.uniform(0,1) > 0.5:
+                self.xyz = point(round(random.uniform(1000, 1001), 3),
+                                    round(random.uniform(1000, 1001), 3),
+                                    round(random.uniform(0, 1), 3 ))
+            else:
+                self.xyz = point(round(random.uniform(2000, 2001), 3),
+                                    round(random.uniform(2000, 2001), 3),
+                                    round(random.uniform(0, 1), 3 ))
             self.make_global()
             self.vhd_from_xyz()
 
@@ -899,7 +1002,7 @@ class totalstation(object):
             self.fetch_point_leica()
 
     def make_global(self):
-        if self.xyz.x and self.xyz.y and self.xyz.z:
+        if self.xyz.x is not None and self.xyz.y is not None and self.xyz.z is not None:
             if self.make == 'Microscribe':
                 if len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
                     self.xyz_global = self.rotate_point(self.xyz)
@@ -907,7 +1010,7 @@ class totalstation(object):
                     self.xyz_global = self.xyz
                 self.round_xyz()
             else:
-                if self.location.x and self.location.y and self.location.z:
+                if self.location.x is not None and self.location.y is not None and self.location.z is not None:
                     self.xyz_global = point(self.xyz.x + self.location.x,
                                             self.xyz.y + self.location.y,
                                             self.xyz.z + self.location.z,)
@@ -1572,7 +1675,6 @@ class MainScreen(e5_MainScreen):
                 self.children[-1].children[0].children[0].action_previous.title = filename_only(self.cfg.filename)
 
     def take_shot(self, instance):
-        
         self.station.shot_type = instance.id
         self.station.clear_xyz()
         if self.station.make == 'Microscribe':
@@ -1581,31 +1683,39 @@ class MainScreen(e5_MainScreen):
                                             button_text = ['Cancel', 'Next'],
                                             call_back = self.have_shot,
                                             colors = self.colors)
-        elif self.station.make == 'Manual':
-            self.popup = edm_manual_xyz(call_back = self.have_shot_manual, colors = self.colors)
-
+        elif self.station.make in ['Manual XYZ', 'Manual VHD']:
+            self.popup = edm_manual(type = self.station.make, call_back = self.have_shot_manual, colors = self.colors)
         else:
             self.station.take_shot()
             self.popup = self.get_prism_height()
-
         self.popup.open()
 
 
     def have_shot_manual(self, instance):
         # check that next was pressed and get values
-        p = self.station.text_to_point(f'{self.popup.xcoord.text},{self.popup.ycoord.text},{self.popup.zcoord.text}')
-        if p:
-            self.station.xyz = p
-            self.station.make_global()
-            self.station.vhd_from_xyz()
-        else:
-            self.station.hangle = self.popup.hangle.text if isinstance(self.popup.hangle.text, int) or isinstance(self.popup.hangle.text, float) else ''
-            self.station.vangle = self.popup.vangle.text if isinstance(self.popup.vangle.text, int) or isinstance(self.popup.vangle.text, float) else ''
-            self.station.sloped = self.popup.sloped.text if isinstance(self.popup.sloped.text, int) or isinstance(self.popup.sloped.text, float) else ''
+        if self.popup.xcoord and self.popup.ycoord and self.popup.zcoord:
+            p = self.station.text_to_point(f'{self.popup.xcoord.text},{self.popup.ycoord.text},{self.popup.zcoord.text}')
+            if p:
+                self.station.xyz = p
+                self.station.make_global()
+                self.station.vhd_from_xyz()
+        elif self.popup.hangle and self.popup.vangle and self.popup.sloped:
+            try:
+                self.station.hangle = float(self.popup.hangle.text)
+                self.station.vangle = float(self.popup.vangle.text)
+                self.station.sloped = float(self.popup.sloped.text)
+            except ValueError:
+                self.station.xyz = point()
             self.station.vhd_to_xyz()
+            self.station.make_global()
+        self.station.pnt = None
         self.popup.dismiss()
-        self.popup = self.get_prism_height()
+        if self.station.xyz.x == None or self.station.xyz.y == None or self.station.xyz.z == None:
+            self.popup = e5_MessageBox('Recording error', '\nInvalid value(s) were given.  Point not recorded.', call_back = self.close_popup)
+        else:
+            self.popup = self.get_prism_height()
         self.popup.open()
+        self.popup_open = True
 
 
     def get_prism_height(self):
@@ -1614,11 +1724,13 @@ class MainScreen(e5_MainScreen):
             return(DataGridMenuList(title = "Select or Enter a Prism Height",
                                             menu_list = prism_names,
                                             menu_selected = '',
-                                            call_back = self.have_shot))
+                                            call_back = self.have_shot,
+                                            colors = self.colors))
         else:
             return(DataGridTextBox(title = 'Enter a Prism Height',
                                         call_back = self.have_shot,
-                                        button_text = ['Back','Next']))
+                                        button_text = ['Back','Next'],
+                                        colors = self.colors))
 
     def have_shot(self, instance):
         if self.station.make == 'Microscribe':
@@ -1631,26 +1743,46 @@ class MainScreen(e5_MainScreen):
                     p.z = p.z / 1000
                     self.station.xyz = p
                     self.station.make_global()
-        elif self.station.make in ['Leica']:
-            self.station.fetch_point()
-            self.station.make_global()
-        elif self.station.make in ['Simulate']:
-            pass
-        elif self.station.make in ['Manual']:
-            pass
-
+        else:
+            prism_name = instance.text
+            if prism_name == 'Add' or prism_name == 'Next':
+                try:
+                    self.station.prism = prism(None, float(self.popup.txt.text), None)
+                except ValueError:
+                    self.station.prism = prism()
+            else:
+                self.station.prism = self.data.get_prism(prism_name)
+            if self.station.prism.height is None:
+                self.popup.dismiss()
+                self.popup = e5_MessageBox('Error', '\nInvalid prism height provided.  Shot not recorded.', call_back = self.close_popup)
+                self.popup.open()
+                self.popup_open = True
+                return
+            else:
+                if self.station.make in ['Leica']:
+                    self.station.fetch_point()
+                    self.station.make_global()
+                elif self.station.make in ['Simulate']:
+                    self.station.pnt = None
+                elif self.station.make in ['Manual XYZ', 'Manual VHD']:
+                    self.station.pnt = None
+                self.station.prism_adjust()
         self.popup.dismiss()
 
         if self.station.xyz.x and self.station.xyz.y and self.station.xyz.z:
             if self.station.shot_type == 'measure':
                 txt = f'\nCoordinates:\n  X:  {self.station.xyz_global.x:.3f}\n  Y:  {self.station.xyz_global.y:.3f}\n  Z:  {self.station.xyz_global.z:.3f}'
+                unitname = self.data.point_in_unit(self.station.xyz_global)
+                if unitname:
+                    txt += f'\n\nThe point is in unit {unitname}.'
                 if self.station.make != 'Microscribe':
                     txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  Slope distance:  {self.station.sloped:.3f}' 
                     txt += f'\n  X:  {self.station.xyz.x:.3f}\n  Y:  {self.station.xyz.y:.3f}\n  Z:  {self.station.xyz.z:.3f}'
                     txt += f'\n\nStation coordinates:\n  X:  {self.station.location.x:.3f}\n  Y:  {self.station.location.y:.3f}\n  Z:  {self.station.location.z:.3f}'
                     if self.station.prism_constant:
                         txt += f'\n\nPrism constant :  {self.station.prism_constant} m'
-                    txt += f'\n\nData stream:\n  {self.station.pnt}'
+                    if self.station.pnt:
+                        txt += f'\n\nData stream:\n  {self.station.pnt}'
                 self.popup = e5_MessageBox('Measurement', txt,
                                         response_type = "OK",
                                         call_back = self.close_popup,
@@ -1667,6 +1799,8 @@ class MainScreen(e5_MainScreen):
             self.popup.open()
 
     def on_save(self):
+        ### check for duplicates
+        ### update linked fields
         self.update_info_label()
         self.make_backup()
         self.check_for_duplicate_xyz()
@@ -1693,7 +1827,7 @@ class MainScreen(e5_MainScreen):
                 next_to_last_record = self.data.db.table(self.data.table).all()[-2]
                 if 'X' in last_record.keys() and 'Y' in last_record.keys() and 'Z' in last_record.keys():
                     if last_record['X'] == next_to_last_record['X'] and last_record['Y'] == next_to_last_record['Y'] and last_record['Z'] == next_to_last_record['Z']:
-                        self.popup = e5_MessageBox(title = 'Warning', message = '\nThe last two recorded points have the exact same XYZ coordinates (%s, %s, %s).  Verify that the Microscribe is still properly recording points (green light is on).  If the red light is on, you need to re-initialize (Setup - Initialize Station) and re-shoot the last two points.' % (last_record['X'], last_record['Y'], last_record['Z']))
+                        self.popup = e5_MessageBox(title = 'Warning', message = f"\nThe last two recorded points have the exact same XYZ coordinates ({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  Verify that the Microscribe is still properly recording points (green light is on).  If the red light is on, you need to re-initialize (Setup - Initialize Station) and re-shoot the last two points.")
                         self.popup.open()
 
     def close_popup(self, instance):
@@ -1844,7 +1978,7 @@ class MainScreen(e5_MainScreen):
     def add_record(self):
         new_record = {}
         new_record = self.fill_default_fields(new_record)
-        if not self.station.shot_type == 'continue':
+        if self.station.shot_type != 'continue':
             new_record = self.find_unit_and_fill_fields(new_record)
             new_record = self.fill_carry_fields(new_record)
             new_record = self.fill_link_fields(new_record)
@@ -1853,7 +1987,7 @@ class MainScreen(e5_MainScreen):
             new_record = self.fill_button_defaults(new_record)
         else:
             new_record = self.fill_empty_with_last(new_record)
-            new_record['SUFFIX'] = int(self.get_last_value('SUFFIX')) + 1
+            new_record['SUFFIX'] = int(self.get_last_value('SUFFIX')) + 1  
             
         self.data.db.table(self.data.table).insert(new_record)
     
@@ -1891,7 +2025,7 @@ class MainScreen(e5_MainScreen):
                 if fieldname in new_record.keys():
                     try:
                         new_record[fieldname] = int(new_record[fieldname]) + 1
-                    except:
+                    except ValueError:
                         pass
                 else:
                     new_record[fieldname] = '1'
@@ -1960,7 +2094,7 @@ class MainScreen(e5_MainScreen):
             elif field == 'LOCALZ':
                 new_record['LOCALZ'] = self.station.xyz.z
             elif field == 'PRISM':
-                new_record['PRISM'] = self.station.prism
+                new_record['PRISM'] = self.station.prism.height if self.station.prism else 0.0
             elif field == 'DATE':
                 new_record['DATE'] = '%s' % datetime.now().replace(microsecond=0)
         return(new_record)
@@ -2155,7 +2289,7 @@ class record_button(e5_button):
     def set_angle(self):
         angle = self.get_angle()
         if not angle is None:
-            if self.station.make =='Manual':
+            if self.station.make in ['Manual XYZ', 'Manual VHD']:
                 self.popup = e5_MessageBox('Set horizonal angle', f'\nAim at {self.datum1.datum.name} and set the horizontal angle to {self.station.decimal_degrees_to_sexastr(angle)}.',
                                             call_back = self.now_take_shot, colors = self.colors)
                 self.popup.open()
@@ -2184,8 +2318,8 @@ class record_button(e5_button):
                                             call_back = self.microscribe,
                                             colors = self.colors)
             self.popup.open()
-        elif self.station.make == 'Manual':
-            self.popup = edm_manual_xyz(call_back = self.have_shot_manual, colors = self.colors)
+        elif self.station.make in ['Manual XYZ', 'Manual VHD']:
+            self.popup = edm_manual(call_back = self.have_shot_manual, colors = self.colors)
             self.popup.open()
 
     def have_shot_manual(self, instance):
@@ -2771,11 +2905,11 @@ class EditLastRecordScreen(e5_RecordEditScreen):
 
     def on_pre_enter(self):
         if self.data.table is not None and self.e5_cfg is not None:
-            try:
-                last = self.data.db.table(self.data.table).all()[-1]
-                self.doc_id = last.doc_id
-            except:
-                self.doc_id = None
+            self.reset_doc_ids()
+            self.doc_id = self.doc_ids[-1] if self.doc_ids else None
+        else:
+            self.doc_ids = []
+            self.doc_id = None
         self.put_data_in_frame()
 
     def on_enter(self):
@@ -2812,9 +2946,6 @@ class EditUnitsScreen(e5_DatagridScreen):
 class EditDatumsScreen(e5_DatagridScreen):
     pass
 
-class SpinnerOptions(SpinnerOption):
-    def __init__(self, **kwargs):
-        super(SpinnerOptions, self).__init__(**kwargs)
 
 class station_setting(GridLayout):
     label = ObjectProperty(None)
@@ -2940,7 +3071,7 @@ class StationConfigurationScreen(Screen):
 
     def build_screen(self):
         self.station_type = station_setting(label_text = 'Station type',
-                                            spinner_values = ("Leica", "Wild", "Topcon", "Microscribe", "Manual", "Simulate"),
+                                            spinner_values = ("Leica", "Wild", "Topcon", "Microscribe", "Manual XYZ", "Manual VHD", "Simulate"),
                                             call_back = self.toggle_buttons,
                                             id = 'station_type',
                                             colors = self.colors,
