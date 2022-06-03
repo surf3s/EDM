@@ -19,10 +19,7 @@
 #   when you delete records one by one, the last one does not show as deleted (even though it is)
 #   could make menus work better with keyboard (at least with tab)
 #   there is no error checking on duplicates in datagrid edits
-#   round z to 3 digits after adjusting pole height
 #   when editing pole height after shot, offer to update Z
-#   offset x y and z by doing subtraction and addition in the field!
-#   remember the filter field and default to this each time
 #   Easy import of csv data from edm-mobile and edmwin
 
 
@@ -76,10 +73,12 @@ except:
 import os 
 import random
 import datetime
+import csv
 from math import sqrt
 from math import pi
 from math import cos
 from math import sin
+from math import acos
 
 import re
 import string
@@ -134,6 +133,21 @@ class point:
         self.y = y
         self.z = z
 
+    def __str__(self):
+        return(f'X : {round(self.x, 3)}, Y : {round(self.y, 3)}, Z : {round(self.z, 3)}')
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.x == other.x and self.y == other.y and self.x == other.z
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def is_none(self):
+        return(self.x is None and self.y is None and self.y is None)
+
 class datum:
     def __init__(self, name = None, x = None, y = None, z = None, notes = ''):
         self.name = name if name else None
@@ -145,11 +159,42 @@ class datum:
     def as_point(self):
         return(point(self.x, self.y, self.z))
 
+    def __str__(self):
+        return(f'Datum: {self.name} of X : {round(self.x, 3)}, Y : {round(self.y, 3)}, Z : {round(self.z, 3)}')
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.x == other.x and self.y == other.y and self.x == other.z and self.name == other.name and self.notes == other.notes
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def is_none(self):
+        return(self.name is None and self.x is None and self.y is None and self.z is None and self.notes is None)
+
+
 class prism:
     def __init__(self, name = None, height = None, offset = None):
         self.name = name
         self.height = height
         self.offset = offset
+
+    def __str__(self):
+        return(f'Prism {self.name} with hieght of {round(self.height, 3)} and offset of {round(self.offset, 3)}')
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self.name == other.name and self.height == other.height and self.offset == other.offset
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def is_none(self):
+        return(self.name is None and self.height is None and self.offset is None)
 
     def valid(self):
         if self.name == '':
@@ -176,6 +221,24 @@ class unit:
         self.radius = radius
         self.centerx = centerx
         self.centery = centery
+
+    def __str__(self):
+        if not self.radius:
+            return(f'Unit {self.name} with limits ({self.minx},{self.miny})-({self.maxx},{self.maxy})')
+        else:
+            return(f'Unit {self.name} centered on ({self.centerx},{self.centery}) with a radius of {self.radius}')
+
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return (self.name == other.name and self.minx == other.minx and self.miny == other.miny and self.maxx == other.maxx and self.maxy == other.maxy and self.centerx == other.centerx and self.centery == other.centery and self.radius == other.radius)
+        else:
+            return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def is_none(self):
+        return(self.name is None and self.minx is None and self.miny is None and self.maxx is None and self.maxy is None and self.radius is None and self.centerx is None and self.centery is None)
 
     def valid(self):
         if self.name == '':
@@ -886,17 +949,29 @@ class totalstation(object):
     def prism_adjust(self):
         if self.prism.height is not None:
             if self.xyz.z is not None:
-                self.xyz.z -= self.prism.height
+                self.xyz.z = round(self.xyz.z - self.prism.height, 3)
             if self.xyz_global.z is not None:
-                self.xyz_global.z -= self.prism.height
+                self.xyz_global.z = round(self.xyz_global.z - self.prism.height, 3)
 
     def angle_between_points(self, p1, p2):
         return self.angle_between_xy_pairs(p1.x, p1.y, p2.x, p2.y)
 
     def angle_between_xy_pairs(self, x1, y1, x2, y2):
-        # angle is from p1 to p2
+        # angle is from xy1 to xy2
         # result is in decimal degrees
-        return(r2d(bear(x1, y1, x2, y2)))
+        # angle is clockwise survey angle with positive y = 90
+
+        # Subtract point 1 from 2 to make 2 relative to the origin
+        p = self.subtract_points(point(x2, y2, 0), point(x1, y1, 0))
+
+        # Get the angle between the Y axis and this point
+        cos_of_angle = self.dot_product(point(0, 1, 0), self.normalize_vector(p))
+        angle = r2d(acos(cos_of_angle))
+        
+        if p.x < 0:
+            angle = 360 - angle
+
+        return(angle)
 
     def parseangle(self, hangle):
         hangle = str(hangle)
@@ -1047,7 +1122,7 @@ class totalstation(object):
     def send(self, text):
         if self.serialcom.is_open:
             self.serialcom.write(text)
-            print(text)
+            #print(text)
             #sleep(0.1) 
 
     def receive(self):
@@ -1894,7 +1969,7 @@ class MainScreen(e5_MainScreen):
 
     def show_import_csv(self):
         self.popup = e5_PopUpMenu(title = "Load which kind of data",
-                                        menu_list = ['Datums','Prisms','Units'],
+                                        menu_list = ['Points','Datums','Prisms','Units'],
                                         menu_selected = '',
                                         call_back = self.select_csv_file,
                                         colors = self.colors)
@@ -1920,46 +1995,62 @@ class MainScreen(e5_MainScreen):
                             start_path = start_path,
                             button_color = self.colors.button_color,
                             button_background = self.colors.button_background,
-                            filters = ['*.csv','*.CSV'])
+                            filters = ['*.csv','*.CSV','*.txt','*.TXT'])
         self.popup = Popup(title = "Select CSV file to import",
                             content = content,
                             size_hint = (0.9, 0.9))
         self.popup.open()
 
     def load_csv(self, path, filename):
-        csv_file = os.path.join(path, filename[0])
+        ### This routine does not properly import Units.  The unitfields need to be put into a separate table
+        ### Need to write the routine to import actual data
+        csv_filename = os.path.join(path, filename[0])
         errors = ''
         record_count = 0
         self.popup.dismiss()
         try:
-            if os.path.isfile(csv_file):
-                with open(csv_file) as f:
-                    firstline = True
-                    for line in f:
-                        if firstline:
-                            fields = line.upper().split(',')
-                            if self.csv_data_type == 'Datums':
-                                if len(fields) < 4:
-                                    errors = '\nThis CSV file seems to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  The first row in the file should contain these field names separated by commas.  The first line was read as "%s".' % line
-                                if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
-                                    errors = '\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name, X, Y and Z.  The first line was read as "%s".' % line
-                            if errors:
-                                break
-                            firstline = False
+            data = []
+            with open(csv_filename, newline='') as csvfile:
+                reader = csv.DictReader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
+                for row in reader:
+                    data.append(row)
+            fields = [field.upper() for field in reader.fieldnames]
+            if self.csv_data_type == 'Datums':
+                if len(fields) < 4:
+                    errors = f'\nThis CSV file seems to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  The first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
+                if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
+                    errors = f'\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name, X, Y and Z.  The fields read were {fields}.' 
+            if self.csv_data_type == 'Prisms':
+                if len(fields) < 2:
+                    errors = f'\nThis CSV file seems to have fewer than two fields.  To import prisms requires a Name and height and optionally an offset field.  The first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
+                if 'NAME' not in fields or 'HEIGHT' not in fields:
+                    errors = f'\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name and Height.  The fields read were {fields}.' 
+            if self.csv_data_type == 'Units':
+                if len(fields) < 5:
+                    errors = f'\nThis CSV file seems to have fewer than five fields.  To import units requires a Unit, Minx, Miny, Maxx, Maxy field.  The first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
+                if 'UNIT' not in fields or 'MINX' not in fields or 'MINY' not in fields or 'MAXX' not in fields or 'MAXY' not in fields:
+                    errors = f'\nThis CSV file must include a first row of field names (comma delimited) and must include at least fields called Unit, Minx, Miny, Maxx, Maxy.  The fields read were {fields}.' 
+            if not errors:
+                for item in data:
+                    insert_record = {}
+                    for key, value in item.items():
+                        if key.upper() == "UNIT" and self.csv_data_type == "Units":
+                            insert_record['NAME'] = value
                         else:
-                            data = line.split(',')
-                            insert_record = {}
-                            for field in range(len(fields)):
-                                insert_record[fields[field]] = data[field]
-                            if self.csv_data_type == 'Datums':
-                                if self.data.get_datum(insert_record['NAME']) is not None:
-                                    self.data.delete_datum(insert_record['NAME'])
-                                self.data.db.table('datums').insert(insert_record)
-                            if self.csv_data_type == 'Units':
-                                self.data.db.table('units').insert(insert_record)
-                            if self.csv_data_type == 'Prisms':
-                                self.data.db.table('prisms').insert(insert_record)
-                            record_count += 1
+                            insert_record[key.upper()] = value
+                    if self.csv_data_type == 'Datums':
+                        if not self.data.get_datum(insert_record['NAME']).is_none():
+                            self.data.delete_datum(insert_record['NAME'])
+                        self.data.db.table('datums').insert(insert_record)
+                    if self.csv_data_type == 'Units':
+                        if not self.data.get_unit(insert_record['NAME']).is_none():
+                            self.data.delete_unit(insert_record['NAME'])
+                        self.data.db.table('units').insert(insert_record)
+                    if self.csv_data_type == 'Prisms':
+                        if not self.data.get_prism(insert_record['NAME']).is_none():
+                            self.data.delete_prism(insert_record['NAME'])
+                        self.data.db.table('prisms').insert(insert_record)
+                    record_count += 1
 
         except Exception as ex:
             template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -2125,7 +2216,7 @@ class RecordDatumsScreen(Screen):
 
         self.content = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
-                                size_hint_x = .8,
+                                size_hint_x = width_calculator(.9, 400),
                                 pos_hint={'center_x': .5},
 #                                id = 'content',
                                 padding = 20,
@@ -2146,14 +2237,14 @@ class RecordDatumsScreen(Screen):
         self.results = e5_label('', colors = self.colors)
         self.content.add_widget(self.results)
 
-        self.content.add_widget(e5_side_by_side_buttons(text = ['Save','Back'],
-                                                id = ['save','cancel'],
-                                                call_back = [self.check_for_duplicate, self.cancel],
-                                                selected = [True, True],
+        self.content.add_widget(e5_side_by_side_buttons(text = ['Back', 'Save'],
+                                                id = ['cancel', 'save'],
+                                                call_back = [self.cancel, self.check_for_duplicate],
+                                                selected = [False, False],
                                                 colors = self.colors))
 
     def check_for_duplicate(self, instance):
-        if self.data.get_datum(self.datum_name.txt.text) is not None:
+        if self.data.get_datum(self.datum_name.txt.text).name is not None:
             message = '\nOverwrite existing datum %s?' % self.datum_name.txt.text
             self.popup = e5_MessageBox('Overwrite?', message,
                                         response_type = "YESNO",
@@ -2273,6 +2364,7 @@ class record_button(e5_button):
         self.datum2 = datum2
         self.datum3 = datum3
         self.data = data
+        self.default_prism = prism()
 
     def record_datum(self, instance):
         self.set_angle()
@@ -2343,10 +2435,11 @@ class record_button(e5_button):
         if len(prism_names) > 0 :
             return(DataGridMenuList(title = "Select or Enter a Prism Height",
                                             menu_list = prism_names,
-                                            menu_selected = '',
+                                            menu_selected = self.default_prism.name if self.default_prism.name else '',
                                             call_back = self.have_shot))
         else:
             return(DataGridTextBox(title = 'Enter a Prism Height',
+                                        text = str(self.default_prism.height) if self.default_prism.height else '',
                                         call_back = self.have_shot,
                                         button_text = ['Back','Next']))
         
@@ -2385,7 +2478,8 @@ class record_button(e5_button):
             prism_height = float(self.popup.result)
         except ValueError:
             prism_height = 0
-        self.station.prism = prism_height
+        self.station.prism = prism(None, prism_height, None)
+        self.default_prism = self.station.prism
         self.station.prism_adjust()
         if self.station.xyz.x and self.station.xyz.y and self.station.xyz.z:
             if self.setup_type == 'verify' or self.setup_type == 'record_new':
@@ -2678,7 +2772,7 @@ class InitializeStationScreen(Screen):
 
         self.content = BoxLayout(orientation = 'vertical',
                                 size_hint_y = .9,
-                                size_hint_x = width_calculator(.9, 400),
+                                #size_hint_x = width_calculator(.9, 200),
                                 pos_hint = {'center_x': .5, 'center_y': .5},
 #                                id = 'content',
                                 padding = 5,
@@ -2795,28 +2889,33 @@ class InitializeStationScreen(Screen):
                 actual_distance = self.station.distance(self.setup_widgets.datum1.datum.as_point(), self.setup_widgets.datum2.datum.as_point())
                 error_distance = abs(measured_distance - actual_distance)
 
-                #Call calculate_angle(0, 0, currentxp, currentyp + firstyp, measuredangle)
-                p = self.setup_widgets.recorder[1].result.xyz
-                p.y = p.y + self.setup_widgets.recorder[0].result.y
+                # The following code is ported from EDM-Mobile (and EDMWin).
+                # I can't remember exactly how this works, but it does work.
+                # And I remember the hot, weekend day at Carsac when Harold
+                # and I first figured out how to do this.
+
+                # Workout what the measured angle would be from datum1 to datum2
+                y = -1 * self.setup_widgets.recorder[0].result.xyz.y
+                y = y + self.setup_widgets.recorder[1].result.xyz.y
+                p = point(self.setup_widgets.recorder[1].result.xyz.x, y, 0)
                 measured_angle = self.station.angle_between_points(point(0,0,0), p)
-                # calc angle between datum1 and datum2
+
+                # Calculate the actual angle between datum1 and datum2
                 defined_angle = self.station.angle_between_points(self.setup_widgets.datum1.datum.as_point(), self.setup_widgets.datum2.datum.as_point())
                 
                 # get the difference between these two angles
                 angle_difference = defined_angle - measured_angle
 
-                #self.new_station.x = firstyp * sinangle + datum1x
-                #currentstationy = firstyp * cosangle + datum1y
-                #currentstationz = ((datum1z - firstzp) + (datum2z - currentzp)) / 2
-                self.new_station = point(round(self.setup_widgets.datum1.y * sin(d2r(angle_difference)) + self.setup_widgets.datum1.datum.x,3),
-                                        round(self.setup_widgets.datum1.y * cos(d2r(angle_difference)) + self.setup_widgets.datum1.datum.y,3),
-                                        round((self.setup_widgets.datum1.datum.z - self.setup_widgets.recorder[0].result.xyz.z) + (self.setup_widgets.datum2.datum.z - self.setup_widgets.recorder[1].result.xyz.z),3))
+                # Based on this, compute the new datum.
+                self.new_station = point(round(-1 * self.setup_widgets.recorder[0].result.xyz.y * sin(d2r(angle_difference)) + self.setup_widgets.datum1.datum.x, 3),
+                                        round(-1 * self.setup_widgets.recorder[0].result.xyz.y * cos(d2r(angle_difference)) + self.setup_widgets.datum1.datum.y, 3),
+                                        round(((self.setup_widgets.datum1.datum.z - self.setup_widgets.recorder[0].result.xyz.z) + (self.setup_widgets.datum2.datum.z - self.setup_widgets.recorder[1].result.xyz.z)) / 2,3))
 
-
+                # Workout what angle needs to be uploaded to the station
                 self.foresight = self.station.angle_between_points(self.new_station, self.setup_widgets.datum2.datum.as_point())
                 txt = f'\nThe measured distance between {self.setup_widgets.datum1.datum.name} and {self.setup_widgets.datum2.datum.name} was {round(measured_distance,3)} m.  The distance based on the datum definitions should be {round(actual_distance,3)} m.  The error is {round(error_distance,3)} m.\n'
                 txt += f'\nIf the setup as measured is accepted, the new station coordinates will be \nX : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
-                txt += f'\nAn angle of {self.station.decimal_degrees_to_sexastr(self.foresight)} will be uploaded (do not turn the station until this angle is set).'
+                txt += f'\nAn angle of {self.station.decimal_degrees_to_sexa_pretty(self.foresight)} will be uploaded (do not turn the station until this angle is set).'
                 self.foresight = self.station.decimal_degrees_to_dddmmss(self.foresight)
 
         elif self.setup_type.text == 'Three datum shift':
@@ -3063,7 +3162,7 @@ class StationConfigurationScreen(Screen):
         self.clear_widgets()
         self.layout = GridLayout(cols = 1,
                                  spacing = 5,
-                                 size_hint_x = width_calculator(.9, 800),
+                                 size_hint_x = width_calculator(.9, 400),
                                  size_hint_y = .9,
                                  pos_hint = {'center_x': .5, 'center_y': .5})
         self.add_widget(self.layout)

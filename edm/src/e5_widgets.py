@@ -81,7 +81,7 @@ class e5_PopUpMenu(Popup):
 
 class db_filter(Popup):
 
-    def __init__(self, fields = [], call_back = None, colors = None, **kwargs):
+    def __init__(self, default_field = '', fields = [], call_back = None, colors = None, **kwargs):
         super(db_filter, self).__init__(**kwargs)
 
         spinner_dropdown_button = SpinnerOptions
@@ -90,7 +90,7 @@ class db_filter(Popup):
 
         pop_content = GridLayout(cols = 1, spacing = 5, padding = 5)
         field_value = GridLayout(cols = 2, spacing = 5, padding = 5)
-        self.fields_dropdown = Spinner(text = "", values = fields, 
+        self.fields_dropdown = Spinner(text = default_field, values = fields, 
                                     size_hint = (.5, None),
                                     option_cls = spinner_dropdown_button)
         field_value.add_widget(self.fields_dropdown)
@@ -181,8 +181,15 @@ class e5_textinput(TextInput):
         super(e5_textinput, self).__init__(**kwargs)
         if 'id' in kwargs:
             self.id = kwargs.get('id')
+            if self.id in ['X','Y','Z'] and __program__ == 'EDM':
+                self.bind(on_text_validate = self.do_coordinate_math)
 
-
+    def do_coordinate_math(self, instance):
+        try:
+            self.text = str(eval(instance.text))
+        except:
+            pass
+        
 class e5_label(Label):
     id = ObjectProperty('')
     def __init__(self, text, popup = False, colors = None, **kwargs):
@@ -780,7 +787,7 @@ class e5_SettingsScreen(Screen):
     def build_screen(self):
         self.clear_widgets()
         layout = GridLayout(cols = 1,
-                            #size_hint_x = width_calculator(.9, 800),
+                            #size_hint_x = width_calculator(.9, 600),
                             #size_hint_y = .9,
                             spacing = 5,
                             padding = 5,
@@ -819,7 +826,7 @@ class e5_SettingsScreen(Screen):
                         value_track_color = self.colors.button_background)
         backups.add_widget(slide)
         slide.bind(value = self.update_backup_interval)
-        backups.add_widget(e5_label('Use incremental backups?', colors = self.colors))
+        backups.add_widget(e5_label('Use incremental\nbackups?', colors = self.colors))
         backups_switch = Switch(active = self.ini.incremental_backups)
         backups_switch.bind(active = self.incremental_backups)
         backups.add_widget(backups_switch)
@@ -858,7 +865,7 @@ class e5_SettingsScreen(Screen):
         layout.add_widget(button_font_size)
 
         settings_layout = GridLayout(cols = 1,
-                                    size_hint_x = width_calculator(.9, 800),
+                                    size_hint_x = width_calculator(.9, 400),
                                     size_hint_y = .9,
                                     spacing = 5,
                                     pos_hint = {'center_x': .5, 'center_y': .5})
@@ -869,7 +876,8 @@ class e5_SettingsScreen(Screen):
 
         self.back_button = e5_button('Back', selected = True,
                                              call_back = self.go_back,
-                                             colors = self.colors)
+                                             colors = self.colors,
+                                             size_hint_x = width_calculator(.9, 600))
         settings_layout.add_widget(self.back_button)
         self.add_widget(settings_layout)
 
@@ -1114,6 +1122,7 @@ class e5_RecordEditScreen(Screen):
                                                             colors = self.colors))
 
         self.add_widget(self.layout)
+        self.filter_field = 'Unit-ID'
 
     def reset_doc_ids(self):
         self.doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()]
@@ -1125,7 +1134,8 @@ class e5_RecordEditScreen(Screen):
             self.last_record(None)
             #self.update_record_counter_label()
         else:
-            self.popup = db_filter(fields = ['doc_id','Unit-ID'] + self.e5_cfg.fields(), colors = self.colors, call_back = self.apply_filter)
+            self.popup = db_filter(default_field = self.filter_field, fields = ['doc_id','Unit-ID'] + self.e5_cfg.fields(),
+                                    colors = self.colors, call_back = self.apply_filter)
             self.popup.open()
 
     def get_matching_doc_ids(self, filter_field, filter_value):
@@ -1134,9 +1144,9 @@ class e5_RecordEditScreen(Screen):
             matches = self.data.db.table(self.data.table).get(doc_id = filter_value)
         elif filter_field == 'Unit-ID':
             for record in self.data.db.table(self.data.table):
-                if f"{str(record['UNIT']).lower()}-{str(record['ID']).lower()}" == filter_value.lower():
-                    matches.append(record.doc_id)
-                    break
+                if "UNIT" in record.keys() and "ID" in record.keys():
+                    if f"{str(record['UNIT']).lower()}-{str(record['ID']).lower()}" == filter_value.lower():
+                        matches.append(record.doc_id)
         else:
             for record in self.data.db.table(self.data.table):
                 if record[filter_field].lower() == filter_value.lower():
@@ -1144,10 +1154,10 @@ class e5_RecordEditScreen(Screen):
         return(matches)
 
     def apply_filter(self, instance):
-        filter_field = self.popup.fields_dropdown.text
+        self.filter_field = self.popup.fields_dropdown.text
         filter_value = self.popup.value_input.text
-        if filter_value and filter_field:
-            self.doc_ids = self.get_matching_doc_ids(filter_field, filter_value)
+        if filter_value and self.filter_field:
+            self.doc_ids = self.get_matching_doc_ids(self.filter_field, filter_value)
             if self.doc_ids:
                 self.first_record(None)
             else:
@@ -1466,7 +1476,7 @@ class e5_MessageBox(Popup):
         elif response_type == 'YESNO':
             popup_contents.add_widget(e5_side_by_side_buttons(text = ['Yes', 'No'],
                                                 call_back = call_back,
-                                                selected = [True, True],
+                                                selected = [False, False],
                                                 button_height = .2,
                                                 colors = colors))
         elif response_type == 'YESNOCANCEL':
@@ -1883,6 +1893,7 @@ class DataGridLabelAndField(BoxLayout):
                 self.txt.font_size = colors.text_font_size 
         self.add_widget(label)
         self.add_widget(self.txt)
+
 
 
 class DataGridDeletePanel(GridLayout):
