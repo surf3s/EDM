@@ -1,0 +1,8 @@
+"unit","id","minx","miny","maxx","maxy","centerx","centery","radius","LEVEL","SUBCONTEXT","CODE","EXCAVATOR","BUCKETVOL","NOTES"
+"16/116","192942",998.5,996.5,1007.5,1002.5,0,0,0,"10","","MICROMORPH","MW",0,""
+"drill","8",0,0,0,0,0,0,0,"","","drill","",0,"2.00 m depth"
+"P_WEN","4",0,0,0,0,0,0,0,"","","TOPO","MW",0,""
+"Planum","2",0,0,0,0,0,0,0,"","","TOPO","crew",0,""
+"ranis","FGOID",0,0,0,0,0,0,0,"unknown","None","old_nail","crew",0,""
+"Ranis ","122710",0,0,0,0,0,0,0,"","","","",0,""
+"Sampl","1",0,0,0,0,0,0,0,"","","","",0,""
