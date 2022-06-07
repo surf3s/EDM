@@ -52,7 +52,7 @@ class SpinnerOptions(SpinnerOption):
 
 class e5_PopUpMenu(Popup):
     
-    def __init__(self, title, menu_list, menu_selected = '', call_back = None, colors = None, **kwargs):
+    def __init__(self, title, menu_list, message = '', menu_selected = '', call_back = None, colors = None, **kwargs):
         super(e5_PopUpMenu, self).__init__(**kwargs)
         
         pop_content = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
@@ -60,6 +60,11 @@ class e5_PopUpMenu(Popup):
         ncols = int(Window.width / 200)
         if ncols < 1:
             ncols = 1
+
+        if message:
+            label = e5_scrollview_label(message, popup = True, colors = colors)
+            label.size_hint = (1, .2)
+            pop_content.add_widget(label)
 
         menu = e5_scrollview_menu(menu_list, menu_selected,
                                                  widget_id = 'menu',
@@ -511,10 +516,16 @@ class e5_MainScreen(Screen):
         self.ini.update_value(__program__,'ScreenHeight', Window.size[1])
         self.ini.save()
 
+    def open_popup(self):
+        self.popup_open = False
+        self.popup.open()
+
     def dismiss_popup(self, *args):
         self.popup_open = False
-        self.popup.dismiss()
-        self.parent.current = 'MainScreen'
+        if self.popup:
+            self.popup.dismiss()
+        if self.parent:
+            self.parent.current = 'MainScreen'
 
     def save_record(self):
         valid = self.cfg.validate_current_record()
@@ -949,6 +960,8 @@ class e5_LogScreen(e5_InfoScreen):
             with open(self.logger.handlers[0].baseFilename,'r') as f:
                 content = f.readlines()
             self.content.text += ''.join(list(reversed(content))[0:150])
+        except AttributeError:
+            self.content.text = '\nThe logger has not been initialized.'
         except:
             self.content.text = "\nAn error occurred when reading the log file '%s'." % (self.logger.handlers[0].baseFilename)
         self.content.color = self.colors.text_color
@@ -1125,7 +1138,7 @@ class e5_RecordEditScreen(Screen):
         self.filter_field = 'Unit-ID'
 
     def reset_doc_ids(self):
-        self.doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()]
+        self.doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()] if self.data.db else []
 
     def filter(self, instance):
         if instance.text == 'Clear Filter':
@@ -1177,7 +1190,8 @@ class e5_RecordEditScreen(Screen):
             self.data_fields.add_widget(DataGridLabelAndField(col = col,
                                                                 colors = self.colors,
                                                                 note_field = (field_type == 'NOTE')))
-        self.first_field_widget = self.get_widget_by_id(self.data_fields, self.e5_cfg.fields()[0])
+        if self.e5_cfg.fields(): ### not a great way to do this - fix later
+            self.first_field_widget = self.get_widget_by_id(self.data_fields, self.e5_cfg.fields()[0])
 
     def first_record(self, value):
         if self.doc_ids:
@@ -1986,10 +2000,11 @@ class DataGridWidget(TabbedPanel):
         return(datatable.nrows if datatable else 0)
 
     def reload_data(self):
-        self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
-        if self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable'):
-            self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable').datatable_widget = self
-        #self.populate_panels()
+        if 'panel1' in locals():
+            self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
+            if self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable'):
+                self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable').datatable_widget = self
+            #self.populate_panels()
 
     #def load_data(self, data, fields):
     #    self.data = data
@@ -1997,16 +2012,17 @@ class DataGridWidget(TabbedPanel):
     #    self.populate_panels()
 
     def populate_panels(self):
-        self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
-        self.panel2.populate(data = self.data, fields = self.fields, colors = self.colors)
-        self.panel3.populate(colors = self.colors)
-        self.panel4.populate(addnew = self.addnew,
-                             data = self.data,
-                             fields = self.fields,
-                             colors = self.colors,
-                             call_back = self.addnew_record)
-        if self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable'):
-            self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable').datatable_widget = self
+        if 'panel1' in locals():
+            self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
+            self.panel2.populate(data = self.data, fields = self.fields, colors = self.colors)
+            self.panel3.populate(colors = self.colors)
+            self.panel4.populate(addnew = self.addnew,
+                                data = self.data,
+                                fields = self.fields,
+                                colors = self.colors,
+                                call_back = self.addnew_record)
+            if self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable'):
+                self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable').datatable_widget = self
 
     def open_panel1(self):
         if self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable'):

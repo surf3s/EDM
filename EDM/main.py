@@ -172,7 +172,7 @@ class datum:
         return not self.__eq__(other)
 
     def is_none(self):
-        return(self.name is None and self.x is None and self.y is None and self.z is None and self.notes is None)
+        return(self.name is None and self.x is None and self.y is None and self.z is None and self.notes == '')
 
 
 class prism:
@@ -1615,9 +1615,9 @@ class MainScreen(e5_MainScreen):
                                     station = self.station))
 
         sm.add_widget(e5_LogScreen(name = 'LogScreen',
-#                                id = 'log_screen',
-                                colors = self.colors,
-                                logger = logger))
+    #                                id = 'log_screen',
+                                    colors = self.colors,
+                                    logger = logger if 'logger' in globals() else None))
 
         sm.add_widget(e5_CFGScreen(name = 'CFGScreen',
 #                                id = 'cfg_screen',
@@ -1744,10 +1744,12 @@ class MainScreen(e5_MainScreen):
                 self.event = Clock.schedule_once(self.show_popup_message, 1)
 
     def update_title(self):
-        self.children[-1].children[0].children[0].action_previous.title = 'EDM'
-        if self.cfg is not None:
-            if self.cfg.filename:
-                self.children[-1].children[0].children[0].action_previous.title = filename_only(self.cfg.filename)
+        for widget in self.walk():
+            if hasattr(widget, 'action_previous'):
+                widget.action_previous.title = 'EDM'
+                if self.cfg is not None:
+                    if self.cfg.filename:
+                        widget.action_previous.title = filename_only(self.cfg.filename)
 
     def take_shot(self, instance):
         self.station.shot_type = instance.id
@@ -1864,7 +1866,7 @@ class MainScreen(e5_MainScreen):
                                         colors = self.colors)
                 self.popup.open()
             else:
-                self.add_record()
+                self.add_point_record()
                 ### self.station.prism = self.data.prisms.get(value.text).height 
                 self.data.db.table(self.data.table).on_save = self.on_save
                 self.data.db.table(self.data.table).on_cancel = self.on_cancel
@@ -1968,7 +1970,10 @@ class MainScreen(e5_MainScreen):
         sm.get_screen('EditLastRecordScreen').data_table = self.data.table
 
     def show_import_csv(self):
-        self.popup = e5_PopUpMenu(title = "Load which kind of data",
+        instructions = 'EDM can import data from EDM-Mobile, EDMWin, EDM itself, or user prepared data files.  The two import formats are CSV and JSON.  CSV files should have a csv or txt extension.  JSON files should have a json extension.'
+        instructions += ' See our web site for more information on exporting data from EDM-Mobile and EDMWin.  The JSON option is for easy importing from EDM data files.'
+        instructions += ' Importing points from JSON files is not yet available. IMPORT: Imported data will overwrite existing data in the case of duplicates.'
+        self.popup = e5_PopUpMenu(title = "Load which kind of data", message = instructions,
                                         menu_list = ['Points','Datums','Prisms','Units'],
                                         menu_selected = '',
                                         call_back = self.select_csv_file,
@@ -1976,7 +1981,7 @@ class MainScreen(e5_MainScreen):
         self.popup.open()
 
     def show_csv_datatype(self):
-        self.popup = e5_PopUpMenu(title = "Export which kind of data",
+        self.popup = e5_PopUpMenu(title = "Export which kind of data", message = '',
                                         menu_list = ['Points','Datums','Prisms','Units'],
                                         menu_selected = '',
                                         call_back = self.show_save_csvs,
@@ -1995,67 +2000,110 @@ class MainScreen(e5_MainScreen):
                             start_path = start_path,
                             button_color = self.colors.button_color,
                             button_background = self.colors.button_background,
-                            filters = ['*.csv','*.CSV','*.txt','*.TXT'])
-        self.popup = Popup(title = "Select CSV file to import",
+                            filters = ['*.csv','*.CSV','*.txt','*.TXT','*.json','*.JSON'])
+        self.popup = Popup(title = "Select CSV or JSON file to import from",
                             content = content,
                             size_hint = (0.9, 0.9))
         self.popup.open()
 
+    def read_csv_file(self, full_filename):
+        data = []
+        with open(full_filename, newline='') as csvfile:
+            reader = csv.DictReader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
+            for row in reader:
+                data.append(row)
+        fields = [field.upper() for field in reader.fieldnames]
+        return(fields, data)
+
+    def read_json_table(self, full_filename, data_type):
+        data = []
+        if data_type.upper() in ['DATUMS','UNITS','PRISMS']:
+            data = TinyDB(full_filename).table(data_type.lower()).all()
+        fields = data[0].keys() if data else []
+        return(fields, data)
+
+    def check_import_fields_against_cfg_fields(self, fields):
+        cfg_fields = self.cfg.fields()
+        missing_fields = [field for field in fields if not field in cfg_fields]
+        missing_fields = [field for field in missing_fields if not field in ['RECNO','TIME']]
+        if missing_fields:
+            return(f"The following field(s) are present in the import data but not in the current CFG: {', '.join(missing_fields)}. Importing these data could cause the loss of data.  Please add these missing fields to the CFG before importing these data.")
+        else:
+            return("")
+
+    def get_unique_key(self, data_record):
+        unique_key = []
+        for field in self.cfg.unique_together:
+            unique_key.append("%s" % data_record[field])
+        return(",".join(unique_key))
+
+    def check_unique_together(self, data_record):
+        if self.cfg.unique_together and len(self.data.db.table(self.data.table)) > 1:
+            unique_key = self.get_unique_key(data_record)
+            for doc_id in self.data.doc_ids():
+                if unique_key == self.get_unique_key(self.data.db.table(self.data.table).get(doc_id = doc_id)):
+                    return(doc_id)
+        return('')
+        
+    def error_check_import(self, fields):
+        errors = ''
+        if self.csv_data_type == 'Datums':
+            if len(fields) < 4:
+                errors = f'\nThese data seem to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  If this is a CSV file, the first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
+            if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
+                errors = f'\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and must include a field called Name, X, Y and Z.  The fields read were {fields}.' 
+        if self.csv_data_type == 'Prisms':
+            if len(fields) < 2:
+                errors = f'\nThese data seem to have fewer than two fields.  To import prisms requires a Name and height and optionally an offset field.  If this is a csv file, the first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
+            if 'NAME' not in fields or 'HEIGHT' not in fields:
+                errors = f'\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and must include a field called Name and Height.  The fields read were {fields}.' 
+        if self.csv_data_type == 'Units':
+            if len(fields) < 5:
+                errors = f'\nThese data seem to have fewer than five fields.  To import units requires a Unit, Minx, Miny, Maxx, Maxy field.  If this is a CSV file, the first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
+            if 'UNIT' not in fields or 'MINX' not in fields or 'MINY' not in fields or 'MAXX' not in fields or 'MAXY' not in fields:
+                errors = f'\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and must include at least fields called Unit, Minx, Miny, Maxx, Maxy.  The fields read were {fields}.' 
+        if self.csv_data_type == 'Points':
+            errors = self.check_import_fields_against_cfg_fields(fields)
+        return(errors)
+
+    def import_these(self, data):
+        record_count = 0
+        for item in data:
+            insert_record = {}
+            for key, value in item.items():
+                if key.upper() == "UNIT" and self.csv_data_type == "Units":
+                    insert_record['NAME'] = value
+                else:
+                    insert_record[key.upper()] = value
+            if self.csv_data_type in ['Datums','Prisms','Units']:
+                if insert_record['NAME'].strip():
+                    if len(self.data.get_by_name(self.csv_data_type.lower(), insert_record['NAME'])) > 0:
+                        self.data.delete_by_name(self.csv_data_type.lower(), insert_record['NAME'])
+                    self.data.db.table(self.csv_data_type.lower()).insert(insert_record)
+            if self.csv_data_type == 'Points':
+                duplicate_doc_id = self.check_unique_together(insert_record)
+                self.data.db.table(self.data.table).insert(insert_record)
+                if not duplicate_doc_id == '':
+                    data.db.table(self.data.table).remove(doc_ids = [duplicate_doc_id])
+            record_count += 1
+        return(record_count)
+
     def load_csv(self, path, filename):
         ### This routine does not properly import Units.  The unitfields need to be put into a separate table
         ### Need to write the routine to import actual data
-        csv_filename = os.path.join(path, filename[0])
-        errors = ''
-        record_count = 0
-        self.popup.dismiss()
-        try:
-            data = []
-            with open(csv_filename, newline='') as csvfile:
-                reader = csv.DictReader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
-                for row in reader:
-                    data.append(row)
-            fields = [field.upper() for field in reader.fieldnames]
-            if self.csv_data_type == 'Datums':
-                if len(fields) < 4:
-                    errors = f'\nThis CSV file seems to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  The first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
-                if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
-                    errors = f'\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name, X, Y and Z.  The fields read were {fields}.' 
-            if self.csv_data_type == 'Prisms':
-                if len(fields) < 2:
-                    errors = f'\nThis CSV file seems to have fewer than two fields.  To import prisms requires a Name and height and optionally an offset field.  The first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
-                if 'NAME' not in fields or 'HEIGHT' not in fields:
-                    errors = f'\nThis CSV file must include a first row of field names (comma delimited) and must include a field called Name and Height.  The fields read were {fields}.' 
-            if self.csv_data_type == 'Units':
-                if len(fields) < 5:
-                    errors = f'\nThis CSV file seems to have fewer than five fields.  To import units requires a Unit, Minx, Miny, Maxx, Maxy field.  The first row in the file should contain these field names separated by commas.  The fieldnames read were {fields}.'
-                if 'UNIT' not in fields or 'MINX' not in fields or 'MINY' not in fields or 'MAXX' not in fields or 'MAXY' not in fields:
-                    errors = f'\nThis CSV file must include a first row of field names (comma delimited) and must include at least fields called Unit, Minx, Miny, Maxx, Maxy.  The fields read were {fields}.' 
-            if not errors:
-                for item in data:
-                    insert_record = {}
-                    for key, value in item.items():
-                        if key.upper() == "UNIT" and self.csv_data_type == "Units":
-                            insert_record['NAME'] = value
-                        else:
-                            insert_record[key.upper()] = value
-                    if self.csv_data_type == 'Datums':
-                        if not self.data.get_datum(insert_record['NAME']).is_none():
-                            self.data.delete_datum(insert_record['NAME'])
-                        self.data.db.table('datums').insert(insert_record)
-                    if self.csv_data_type == 'Units':
-                        if not self.data.get_unit(insert_record['NAME']).is_none():
-                            self.data.delete_unit(insert_record['NAME'])
-                        self.data.db.table('units').insert(insert_record)
-                    if self.csv_data_type == 'Prisms':
-                        if not self.data.get_prism(insert_record['NAME']).is_none():
-                            self.data.delete_prism(insert_record['NAME'])
-                        self.data.db.table('prisms').insert(insert_record)
-                    record_count += 1
+        full_filename = os.path.join(path, filename[0])
+        self.dismiss_popup()
 
-        except Exception as ex:
-            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-            error = template.format(type(ex).__name__, ex.args)
-            logging.exception(error)
+        if '.csv' in full_filename.lower() or '.txt' in full_filename.lower():
+            fields, data = self.read_csv_file(full_filename)
+        else:
+            fields, data = self.read_json_table(full_filename, self.csv_data_type)
+
+        errors = self.error_check_import(fields)
+
+        if not errors:
+            record_count = self.import_these(data)
+
         if errors:
             message = errors
         else:
@@ -2064,9 +2112,10 @@ class MainScreen(e5_MainScreen):
                                 response_type = "OK",
                                 call_back = self.close_popup,
                                 colors = self.colors)
-        self.popup.open()
+        self.open_popup()
+        return(errors)
 
-    def add_record(self):
+    def add_point_record(self):
         new_record = {}
         new_record = self.fill_default_fields(new_record)
         if self.station.shot_type != 'continue':
