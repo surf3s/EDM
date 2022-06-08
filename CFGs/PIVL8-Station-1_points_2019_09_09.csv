@@ -1,0 +1,6 @@
+"UNIT","ID","SUFFIX","LEVEL","SUBLEVEL","CODE","EXCAVATOR","PRISM","NOTES","X","Y","Z","DATE","LOCALX","LOCALY","LOCALZ"
+"BLOCK2","2",0,"","","SILEX","",0,"Here is a really long note that I made up to test the program. It has at least a few lines of text.  And that's about it",0.001,0.001,0.001,"2019-08-21 11:19:05",0.001,0.001,0.001
+"BLOCK2","RPSYG",0,"","","NOTE","",0,"Another note.  Edited by Shannon.",0.006,0.006,0.006,"2019-08-21 11:39:56",0.006,0.006,0.006
+"BLOCK2","HGCKX",0,"","","NOTE","",0,"This is a note on somehting cool I found.",0.006,0.006,0.006,"2019-08-21 11:40:33",0.006,0.006,0.006
+"","",,"","","","",,"",0.001,0.002,0.003,"2019-09-09 11:31:56",0.001,0.002,0.003
+"BLOCK2","3",0,"8","","SILEX","",0,"",0.002,0.004,0.005,"2019-09-09 11:32:21",0.002,0.004,0.005

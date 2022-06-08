@@ -10,3 +10,5 @@ venv/
 *.json
 test.cfg
 test2.cfg
+src_unused/
+.tox/
