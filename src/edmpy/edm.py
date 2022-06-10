@@ -131,6 +131,12 @@ class point:
     def is_none(self):
         return(self.x is None and self.y is None and self.y is None)
 
+    def round(self):
+        self.x = round(self.x, 3)
+        self.y = round(self.y, 3)
+        self.z = round(self.z, 3)
+        return(self)
+
 
 class datum:
     def __init__(self, name = None, x = None, y = None, z = None, notes = ''):
@@ -2532,11 +2538,23 @@ class record_button(e5_button):
         if self.station.make in ['Leica']:
             self.station.fetch_point()
             self.station.make_global()
-        try:
-            prism_height = float(self.popup.result)
-        except ValueError:
-            prism_height = 0
-        self.station.prism = prism(None, prism_height, None)
+
+        prism_name = instance.text
+        if prism_name == 'Add' or prism_name == 'Next':
+            try:
+                self.station.prism = prism(None, float(self.popup.txt.text), None)
+            except ValueError:
+                self.station.prism = prism()
+        else:
+            self.station.prism = self.data.get_prism(prism_name)
+
+        # try:
+        #    if instance:
+        #        self.station.prism = self.data.get_prism(instance.txt)
+        #    else:
+        #        self.station.prism = prism(None, float(self.popup.result), None)
+        # except ValueError:
+        #    self.station.prism = prism(None, 0.0, None)
         self.default_prism = self.station.prism
         self.station.prism_adjust()
         if self.station.xyz.x and self.station.xyz.y and self.station.xyz.z:
@@ -2728,7 +2746,7 @@ class setups(ScrollView):
             self.scrollbox.add_widget(self.recorder[0])
 
         elif setup_type == "Record two datums":
-            instructions.text = "\nSelect two datums to record. EDM will use triangulation to compute the station's XYZ coordinates."
+            instructions.text = "\nSelect two datums to record. EDM will use triangulation to compute the station's XYZ coordinates.  Always record datum one first and then datum two.  When you record datum one, the horizontal angle will be set to 0.0.  When you accept the setup, the horizontal angle will be reset correctly on datum 2."
             self.scrollbox.add_widget(instructions)
 
             self.datum1 = datum_selector(text = 'Select\ndatum\none',
@@ -2903,7 +2921,10 @@ class InitializeStationScreen(Screen):
         error_message = ''
 
         if self.setup_type.text == 'Horizontal Angle Only':
-            pass
+            if self.station.location.is_none() is True:
+                txt = '\nThe location of the station has not been set.'
+            else:
+                txt = f'\nThe location of the station is at {str(self.station.location)}.  All measured points will be relative to that point and the horizontal angle uploaded here.'
 
         elif self.setup_type.text == 'Over a datum':
             if self.setup_widgets.over_datum.datum is None:
@@ -2924,9 +2945,9 @@ class InitializeStationScreen(Screen):
             elif self.setup_widgets.recorder[0].result.xyz is None:
                 error_message = '\nRecord the datum before accepting the setup.'
             else:
-                self.new_station = self.station.subtract_points(self.setup_widgets.datum2.datum, self.setup_widgets.recorder[0].result.xyz)
-                datum2 = self.station.add_points(self.setup_widgets.datum1.datum, self.setup_widgets.recorder[0].result.xyz)
-                station_error = self.station.subtract_points(self.setup_widgets.datum2.datum, datum2)
+                self.new_station = self.station.subtract_points(self.setup_widgets.datum2.datum, self.setup_widgets.recorder[0].result.xyz).round()
+                datum2 = self.station.add_points(self.setup_widgets.datum1.datum, self.setup_widgets.recorder[0].result.xyz).round()
+                station_error = self.station.subtract_points(self.setup_widgets.datum2.datum, datum2).round()
                 txt = f'\n{self.setup_widgets.datum2.datum.name} recorded as \nX : {datum2.x}\nY : {datum2.y}\nZ : {datum2.z}\n'
                 txt += f'\nThe error in this measurement is \nX : {station_error.x}\nY : {station_error.y}\nZ : {station_error.z}\n'
                 txt += '(Note that Z will be off by the station height in most setups)\n'
@@ -3053,7 +3074,8 @@ class InitializeStationScreen(Screen):
         self.popup.dismiss()
         if self.foresight:
             self.station.set_horizontal_angle(self.foresight)
-        self.station.location = self.new_station
+        if self.new_station.is_none() is False:
+            self.station.location = self.new_station
         self.ini.update_value('SETUPS', 'LASTSETUP_TYPE', self.setup_type.text)
         self.ini.save()
         self.parent.current = 'MainScreen'
@@ -3142,6 +3164,7 @@ class station_setting(GridLayout):
                                 option_cls = spinner_dropdown_button)
         if label_text == 'Port Number':
             comport = GridLayout(cols = 2, spacing = 5)
+            comport.bind(minimum_height = comport.setter('height'))
             comport.add_widget(self.spinner)
             comport.add_widget(e5_button('Scan', colors = colors, call_back = self.scanner))
             self.add_widget(comport)
