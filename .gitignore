@@ -15,3 +15,5 @@ src_unused/
 .coverage
 __pycache__/
 edm.egg-info
+CFGs_originals/
+test*.cfg
