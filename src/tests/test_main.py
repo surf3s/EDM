@@ -1,9 +1,9 @@
-from edm.edm import MainScreen
-from edm.edm import totalstation
-from edm.edm import point
-from edm.edm import datum
-from edm.edm import prism
-from edm.edm import unit
+from edmpy.edm import MainScreen
+from edmpy.edm import totalstation
+from edmpy.edm import point
+from edmpy.edm import datum
+from edmpy.edm import prism
+from edmpy.edm import unit
 
 import unittest
 

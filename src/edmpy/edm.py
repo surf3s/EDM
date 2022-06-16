@@ -1,3 +1,8 @@
+# redo after E5 changes
+#   record edit screen - delete pre_enter and enter conditions because these are now in e5_widgets
+#   db - delete all is now in DB library
+
+
 # EDM by Shannon McPherron
 #
 #   This is an alpha release.  I am still working on bugs and I am still implementing some features.
