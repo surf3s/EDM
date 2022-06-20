@@ -19,8 +19,8 @@ from kivy.uix.slider import Slider
 from kivy.uix.behaviors.focus import FocusBehavior
 from kivy.uix.spinner import Spinner, SpinnerOption
 
-from edmpy.lib.constants import BLACK, WHITE, SCROLLBAR_WIDTH, GOOGLE_COLORS, SPLASH_HELP, __program__
-from edmpy.lib.colorscheme import ColorScheme, make_rgb
+from edmpy.lib.constants import SPLASH_HELP
+from edmpy.lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS
 from edmpy.lib.misc import platform_name, locate_file
 import ntpath
 import os
@@ -28,6 +28,9 @@ from shutil import copyfile
 from datetime import datetime
 from tinydb import Query, where
 import re
+
+SCROLLBAR_WIDTH = 5
+__program__ = 'EDM'
 
 
 def width_calculator(fraction_size = .8, maximum_width = 800):
@@ -310,12 +313,12 @@ class e5_scrollview_menu(ScrollView):
         # return([widget.text for widget in self.scroll_menu.children])
 
     def make_scroll_menu_item_visible(self):
-        if self.menu_selected_widget:
+        if self.menu_selected_widget is not None:
             self.scroll_to(self.menu_selected_widget)
 
     def move_scroll_menu_item(self, ascii_code):
         menu_list = self.scroll_menu_list()
-        if self.menu_selected_widget:
+        if self.menu_selected_widget is not None:
             index_no = menu_list.index(self.menu_selected_widget.text)
         else:
             index_no = 0
@@ -372,7 +375,7 @@ class e5_scrollview_label(ScrollView):
                         color = self.colors.text_color if not popup else self.colors.popup_text_color,
                         id = widget_id + '_label', popup = popup,
                         text_size = (self.width, None))
-        if colors:
+        if colors is not None:
             if colors.text_font_size:
                 info.font_size = colors.text_font_size
 
@@ -492,8 +495,9 @@ class e5_MainScreen(Screen):
 
     def get_widget_by_id(self, id):
         for widget in self.walk():
-            if widget.id == id:
-                return(widget)
+            if hasattr(widget, 'id'):
+                if widget.id == id:
+                    return(widget)
         return(None)
 
     def get_info(self):
@@ -631,7 +635,7 @@ class e5_MainScreen(Screen):
                                         call_back = [self.delete_last_record, self.close_popup],
                                         colors = self.colors)
         else:
-            self.popup = e5_MessageBox('Delete Last Record', 'No records in table to delete.',
+            self.popup = e5_MessageBox('Delete Last Record', '\nNo records in table to delete.',
                                         call_back = self.close_popup,
                                         colors = self.colors)
         self.popup.open()
@@ -829,7 +833,7 @@ class e5_SettingsScreen(Screen):
         layout.add_widget(colorscheme)
 
         backups = GridLayout(cols = 2, size_hint_y = .3, spacing = 5, padding = 5)
-        self.backup_label = e5_label('Auto-backup after\nevery %s\nrecords entered.' % self.ini.backup_interval,
+        self.backup_label = e5_label(f'Auto-backup after\n{self.ini.backup_interval} records.',
                                         colors = self.colors)
         backups.add_widget(self.backup_label)
         slide = Slider(min = 0, max = 200, step = 5,
@@ -1043,9 +1047,9 @@ class e5_SaveDialog(BoxLayout):
         self.txt.bind(minimum_height = self.txt.setter('height'))
         content.add_widget(self.txt)
 
-        content.add_widget(e5_side_by_side_buttons(text = ['Save', 'Cancel'],
-                                                    id = ['save', 'cancel'],
-                                                    call_back = [self.does_file_exist, self.cancel],
+        content.add_widget(e5_side_by_side_buttons(text = ['Cancel', 'Save'],
+                                                    id = ['cancel', 'save'],
+                                                    call_back = [self.cancel, self.does_file_exist],
                                                     selected = [True, True],
                                                     colors = self.colors))
 
@@ -1139,9 +1143,25 @@ class e5_RecordEditScreen(Screen):
 
         self.add_widget(self.layout)
         self.filter_field = 'Unit-ID'
+        self.loading = True
+
+    def on_pre_enter(self):
+        self.loading = True
+        if self.data.table is not None and self.e5_cfg is not None:
+            self.reset_doc_ids()
+            self.doc_id = self.doc_ids[-1] if self.doc_ids else None
+        else:
+            self.doc_ids = []
+            self.doc_id = None
+        self.put_data_in_frame()
+
+    def on_enter(self):
+        if self.first_field_widget:
+            self.first_field_widget.focus = True
+        self.loading = False
 
     def reset_doc_ids(self):
-        self.doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()] if self.data.db else []
+        self.doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()] if self.data.db is not None else []
 
     def filter(self, instance):
         if instance.text == 'Clear Filter':
@@ -1360,7 +1380,7 @@ class e5_RecordEditScreen(Screen):
         self.parent.current = 'MainScreen'
 
     def show_menu(self, instance, ValueError):
-        if instance.focus:
+        if instance.focus and not self.loading:
             cfg_field = self.e5_cfg.get(instance.id)
             if cfg_field:
                 self.popup_field_widget = instance
@@ -1853,7 +1873,7 @@ class DataGridTable(BoxLayout):
 class DataGridGridPanel(BoxLayout):
 
     def populate_data(self, tb, tb_fields, colors = None):
-        if tb and tb_fields:
+        if tb is not None and tb_fields is not None:
             self.colors = colors if colors else ColorScheme()
             self.tb = tb
             self.sort_key = None
@@ -1878,7 +1898,7 @@ class DataGridGridPanel(BoxLayout):
 class DataGridCasePanel(BoxLayout):
 
     def populate(self, data, fields, colors = None):
-        if data and fields:
+        if data is not None and fields is not None:
             self.colors = colors if colors else ColorScheme()
             self.edit_list.bind(minimum_height = self.edit_list.setter('height'))
             self.edit_list.clear_widgets()
@@ -1936,7 +1956,7 @@ class DataGridDeletePanel(GridLayout):
                                         selected = True,
                                         call_back = call_back, colors = self.colors))
         else:
-            self.add_widget(e5_scrollview_label('\nHighlight a record in the grid view by clicking on its doc_id, and then delete that record here.',
+            self.add_widget(e5_scrollview_label('\nHighlight a record in the grid view (data tab) by clicking on its doc_id, and then delete that record here.',
                                                  popup = False, colors = self.colors))
 
 
@@ -1959,6 +1979,10 @@ class DataGridAddNewPanel(GridLayout):
                                             call_back = call_back, colors = self.colors)
                 self.add_widget(self.button)
                 self.call_back = call_back
+            else:
+                self.clear_widgets()
+                self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled in E5 because it would bipass conditions and error checking (but it is enabled in EDM which is why it appears in this list of tabs).',
+                                                    popup = False, colors = self.colors))
 
     def next_field(self, instance):
         if instance.get_focus_next() == self.button:
@@ -2016,7 +2040,7 @@ class DataGridWidget(TabbedPanel):
     def reload_data(self):
         # This next conditional is to avoid an exception in unit testing
         if hasattr(self, 'panel1'):
-            self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
+            self.panel1.populate_data(tb = self.data, tb_fields = self.cfg, colors = self.colors)
             if self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable'):
                 self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable').datatable_widget = self
         # self.populate_panels()
@@ -2029,7 +2053,7 @@ class DataGridWidget(TabbedPanel):
     def populate_panels(self):
         # This next conditional is to avoid an exception in unit testing
         if hasattr(self, 'panel1'):
-            self.panel1.populate_data(tb = self.data, tb_fields = self.fields, colors = self.colors)
+            self.panel1.populate_data(tb = self.data, tb_fields = self.cfg, colors = self.colors)
             self.panel2.populate(data = self.data, fields = self.fields, colors = self.colors)
             self.panel3.populate(colors = self.colors)
             self.panel4.populate(addnew = self.addnew,
@@ -2067,7 +2091,7 @@ class DataGridWidget(TabbedPanel):
 
     def open_panel3(self):
         datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
-        if datatable:
+        if datatable is not None:
             if datatable.datagrid_doc_id:
                 data_record = self.data.get(doc_id = int(datatable.datagrid_doc_id))
                 if data_record:
@@ -2079,7 +2103,7 @@ class DataGridWidget(TabbedPanel):
                                             colors = self.colors)
 
     def open_panel4(self):
-        if self.fields:
+        if self.fields is not None:
             self.textboxes_will_update_db = False
             cfg_fields = self.fields.fields()
             # TODO this seems like a bug - not sure why edit_panel is being cleared here
@@ -2151,7 +2175,7 @@ class DataGridWidget(TabbedPanel):
     def update_db(self, instance, value):
         if self.textboxes_will_update_db:
             datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
-            if datatable:
+            if datatable is not None:
                 update = {instance.id: value}
                 is_valid = self.cfg.validate_datafield(update, self.data)
                 if is_valid is True:
@@ -2172,7 +2196,7 @@ class DataGridWidget(TabbedPanel):
     def delete_record2(self, value):
         self.close_popup(value)
         datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
-        if datatable:
+        if datatable is not None:
             doc_id = int(datatable.datagrid_doc_id)
             self.data.remove(doc_ids = [doc_id])
             datatable.datagrid_doc_id = None

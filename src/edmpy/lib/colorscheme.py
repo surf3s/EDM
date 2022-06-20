@@ -1,6 +1,28 @@
-from edmpy.lib.constants import GOOGLE_COLORS
 from kivy.core.window import Window
 from edmpy.lib.misc import platform_name
+
+BLACK = 0x000000
+WHITE = 0xFFFFFF
+
+# Color from Google material design
+# https://material.io/design/color/the-color-system.html#tools-for-picking-colors
+GOOGLE_COLORS = {'red': [0xFF8A80, BLACK, 0xFF1744, WHITE],
+                                'pink': [0xFF80AB, BLACK, 0xF50057, WHITE],
+                                'purple': [0xEA80FC, BLACK, 0xD500F9, WHITE],
+                                'deep purple': [0xB388FF, BLACK, 0x651FFF, WHITE],
+                                'indigo': [0x8C9EFF, BLACK, 0x3D5AFE, WHITE],
+                                'blue': [0x82B1FF, BLACK, 0x2979FF, WHITE],
+                                'light blue': [0x80D8FF, BLACK, 0x00B0FF, BLACK],
+                                'cyan': [0x84FFFF, BLACK, 0x00E5FF, BLACK],
+                                'teal': [0xA7FFEB, BLACK, 0x1DE9B6, BLACK],
+                                'green': [0xB9F6CA, BLACK, 0x00E676, BLACK],
+                                'light green': [0xCCFF90, BLACK, 0x76FF03, BLACK],
+                                'lime': [0xF4FF81, BLACK, 0xC6FF00, BLACK],
+                                'yellow': [0xFFFF8D, BLACK, 0xFFEA00, BLACK],
+                                'amber': [0xFFE57F, BLACK, 0xFFC400, BLACK],
+                                'orange': [0xFFD180, BLACK, 0xFF9100, BLACK],
+                                'deep orange': [0xFF9E80, BLACK, 0xFF3D00, WHITE],
+                                'brown': [0x8D6E63, WHITE, 0x6D4C41, WHITE]}
 
 
 def make_rgb(hex_color):

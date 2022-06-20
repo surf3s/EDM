@@ -1,4 +1,5 @@
 from tinydb import TinyDB, where
+from typing import Dict
 
 
 class dbs:
@@ -7,7 +8,7 @@ class dbs:
     filename = None
     db_name = 'data'
     table = '_default'
-    new_data = False
+    new_data = {}  # type: Dict[str, bool]
 
     def __init__(self, filename = None):
         if filename:
@@ -18,7 +19,7 @@ class dbs:
             self.filename = filename
         try:
             self.db = TinyDB(self.filename)
-            self.new_data = True
+            self.new_data[self.table] = True
         except FileNotFoundError:
             self.db = None
             self.filename = ''
@@ -59,7 +60,7 @@ class dbs:
 
     def save(self, data_record):
         self.db.table(self.table).insert(data_record)
-        self.new_data = True
+        self.new_data[self.table] = True
         return(True)
 
     # def __len__(self):
@@ -76,11 +77,14 @@ class dbs:
 
     def delete(self, doc_id):
         self.db.table(self.table).remove(doc_ids = [doc_id])
-        self.new_data = True
+        self.new_data[self.table] = True
 
-    def delete_all(self):
-        self.db.table(self.table).purge()
-        self.new_data = True
+    def delete_all(self, table_name = None):
+        if self.db:
+            if table_name is None:
+                self.db.drop_tables()
+            else:
+                self.db.table(table_name).truncate()
 
     def get_unitid(self, name):
         unit, idno = name.split('-')
