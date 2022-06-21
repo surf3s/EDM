@@ -1498,11 +1498,12 @@ class totalstation(object):
     # Sokkia functions
 
     def launch_point_sokkia(self):
-        self.send(chr(17))
+        self.send(chr(17).encode())
 
     def set_horizontal_angle_sokkia(self, angle):
         # need to send to station in format ddd.mmss
-        self.send("/Dc " + angle.encode() + "\r\n")
+        set_angle_command = "/Dc " + angle + "\r\n"
+        self.send(set_angle_command.encode())
         # delay(5)
         self.clear_com()
 
@@ -3457,7 +3458,7 @@ class StationConfigurationScreen(Screen):
 
     def build_screen(self):
         self.station_type = station_setting(label_text = 'Station type',
-                                            spinner_values = ("Leica", "Wild", "Topcon", "Microscribe", "Manual XYZ", "Manual VHD", "Simulate"),
+                                            spinner_values = ("Leica", "Wild", "Topcon", "Sokkia", "Microscribe", "Manual XYZ", "Manual VHD", "Simulate"),
                                             call_back = self.toggle_buttons,
                                             id = 'station_type',
                                             colors = self.colors,
