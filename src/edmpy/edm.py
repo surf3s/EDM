@@ -34,6 +34,7 @@ __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
 
 # Region Imports
+from kivy.core.clipboard import Clipboard
 from kivy.graphics import Color, Rectangle
 from kivy.app import App
 from kivy.factory import Factory
@@ -80,8 +81,8 @@ import logging
 # My libraries for this project
 from edmpy.lib.blockdata import blockdata
 from edmpy.lib.dbs import dbs
-from edmpy.lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_InfoScreen
-from edmpy.lib.e5_widgets import edm_manual, DataGridTextBox, width_calculator, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen
+from edmpy.lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput, e5_scrollview_label
+from edmpy.lib.e5_widgets import edm_manual, DataGridTextBox, width_calculator, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen
 from edmpy.lib.e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
 from edmpy.lib.e5_widgets import DataGridLabelAndField
 from edmpy.lib.colorscheme import ColorScheme
@@ -897,6 +898,8 @@ class totalstation(object):
         self.rotate_global = []
         self.last_setup_type = ''
         self.shot_type = ''
+        self.event = None
+        self.io = ''
         self.open()
 
     def text_to_point(self, txt):
@@ -1040,15 +1043,34 @@ class totalstation(object):
 
     def set_horizontal_angle(self, angle):
         if self.make == 'TOPCON':
-            pass
+            self.set_horizontal_angle_topcon(angle)
         elif self.make in ['WILD', 'Leica']:
             self.set_horizontal_angle_leica(angle)
         elif self.make == 'SOKKIA':
-            pass
+            self.set_horizontal_angle_sokkia(angle)
         elif self.make == 'Simulate':
             pass
         elif self.make in ['Manual XYZ', 'Manual VHD']:
             pass
+
+    def set_horizontal_angle_nikon(self, angle):
+        # need to send to station in format dddmmss
+        self.send("!HAN" + angle.encode())
+        # delay(1)
+        self.clear_com()
+
+    def launch_point_simulate(self):
+        # Put the points into one of two units
+        if random.uniform(0, 1) > 0.5:
+            self.xyz = point(round(random.uniform(1000, 1001), 3),
+                                round(random.uniform(1000, 1001), 3),
+                                round(random.uniform(0, 1), 3))
+        else:
+            self.xyz = point(round(random.uniform(2000, 2001), 3),
+                                round(random.uniform(2000, 2001), 3),
+                                round(random.uniform(0, 1), 3))
+        self.make_global()
+        self.vhd_from_xyz()
 
     def take_shot(self):
 
@@ -1056,46 +1078,29 @@ class totalstation(object):
         self.clear_com()
 
         if self.make == 'TOPCON':
-            self.clear_com()
-            self.send("Z34")   # Slope angle mode
-            self.receive()
-            # delay(0.5)
+            self.launch_point_topcon()
 
-            self.send("C")     # Take the shot
-            self.receive()
-            # delay(0.5)
-
-        elif self.make == "WILD" or self.make == "Leica":
+        elif self.make in ['WILD', 'Leica']:
             self.launch_point_leica()
 
         elif self.make == "SOKKIA":
-            self.send(chr(17))
+            self.launch_point_sokkia()
 
         elif self.make == 'Simulate':
-            # Put the points into one of two units
-            if random.uniform(0, 1) > 0.5:
-                self.xyz = point(round(random.uniform(1000, 1001), 3),
-                                    round(random.uniform(1000, 1001), 3),
-                                    round(random.uniform(0, 1), 3))
-            else:
-                self.xyz = point(round(random.uniform(2000, 2001), 3),
-                                    round(random.uniform(2000, 2001), 3),
-                                    round(random.uniform(0, 1), 3))
-            self.make_global()
-            self.vhd_from_xyz()
+            self.launch_point_simulate()
 
         else:
             pass
+
+    def fetch_point(self):
+        if self.make in ['WILD', 'Leica']:
+            self.fetch_point_leica()
 
     def vhd_from_xyz(self):
         self.hangle = self.angle_between_xy_pairs(self.location.x, self.location.y, self.xyz.x, self.xyz.y)
         level_distance = sqrt((self.xyz.x - self.location.x)**2 + (self.xyz.y - self.location.y)**2)
         self.sloped = self.distance(self.location, self.xyz)
         self.vangle = self.angle_between_xy_pairs(0, 0, level_distance, self.xyz.z)
-
-    def fetch_point(self):
-        if self.make in ['WILD', 'Leica']:
-            self.fetch_point_leica()
 
     def make_global(self):
         if self.xyz.x is not None and self.xyz.y is not None and self.xyz.z is not None:
@@ -1140,19 +1145,44 @@ class totalstation(object):
             ports.append([{'port': port, 'desc': desc}])
         return(ports)
 
-    def send(self, text):
+    def clear_io(self):
+        self.io = ''
+
+    def trim_io(self, length = 1024):
+        self.io = self.io[:length]
+
+    def add_to_io(self, data):
+        self.io = self.io + data
+        self.trim_io()
+
+    def data_waiting(self):
         if self.serialcom.is_open:
-            self.serialcom.write(text)
-            # print(text)
+            if self.serialcom.in_waiting > 0:
+                return(True)
+        return(False)
+
+    def send(self, data):
+        if self.serialcom.is_open:
+            self.serialcom.write(data)
+            self.add_to_io('Sent -> ' + data.decode())
+            # print(data)
             # sleep(0.1)
 
     def receive(self):
         if self.serialcom.is_open:
-            return(self.serialcom.readline().decode())
+            data = self.serialcom.read_until().decode()
+            # data = self.serialcom.readline().decode()
+            if data:
+                if self.event is not None:  # This is for Topcon where the COM has to be monitored
+                    self.event.cancel()
+                    self.event = None
+                self.add_to_io('Received <- ' + data)
+            return(data)
 
     def close(self):
         if self.serialcom.is_open:
             self.serialcom.close()
+            self.clear_io()
 
     def open(self):
         self.close()
@@ -1169,7 +1199,19 @@ class totalstation(object):
                 self.serialcom.stopbits = int(self.stopbits)
                 self.serialcom.bytesize = int(self.databits)
                 self.serialcom.timeout = 30
-                self.serialcom.open()
+                try:
+                    self.serialcom.open()
+                    self.clear_io()
+                    return(True)
+                except OSError:
+                    pass
+        return(False)
+
+    def settings_pretty(self):
+        if self.baudrate and self.comport and self.parity and self.databits and self.stopbits:
+            return(f"{self.comport}:{self.baudrate},{self.parity},{self.databits},{self.stopbits}")
+        else:
+            return("Incomplete Settings")
 
     def clear_com(self):
         if self.serialcom.is_open:
@@ -1188,6 +1230,18 @@ class totalstation(object):
 
     def decdeg_to_radians(self, angle):
         return(angle / 360.0 * (2.0 * pi))
+
+    def vhd_to_xyz(self):
+        if self.vangle is not None and self.hangle is not None and self.sloped is not None:
+            # angle_decdeg = self.dms_to_decdeg(self.vangle)
+            z = self.sloped * cos(self.decdeg_to_radians(self.vangle))
+            actual_distance = sqrt(self.sloped**2 - z**2)
+
+            # angle_decdeg = self.dms_to_decdeg(self.hangle)
+            angle_decdeg = 450 - self.hangle
+            x = cos(self.decdeg_to_radians(angle_decdeg)) * actual_distance
+            y = sin(self.decdeg_to_radians(angle_decdeg)) * actual_distance
+            self.xyz = point(x, y, z)
 
     # The following functions are needed by the rotation function at the end of this list.
     # Note too that all of the dependent routines are self written
@@ -1396,6 +1450,21 @@ class totalstation(object):
 
     # Function specific to Topcon #
 
+    def launch_point_topcon(self):
+        self.send("Z34")   # Slope angle mode
+        self.receive()
+        # delay(0.5)
+
+        self.send("C")     # Take the shot
+        self.receive()
+        # delay(0.5)
+        self.event1 = Clock.schedule_interval(self.check_receive_buffer, .2)
+
+    def check_receive_buffer(self):
+        # need code here to check for a completed shot
+        # and then acknowledge back
+        pass
+
     def make_bcc_topcon(self, itext):
         # Dim b As Integer = 0
         # Dim i As Integer
@@ -1414,14 +1483,56 @@ class totalstation(object):
         bcc = "000" + str(b).strip()
         return(bcc[-3])
 
-    def horizontal_topcon(self):
-        self.send("Z10")
-        return(self.receive())
+    def set_horizontal_angle_topcon(self, angle):
+        # angle should be in dddmmss
+        self.send("J+" + angle + "d")
+        self.receive()
+        # delay(1)
+        self.clear_com()
 
     def initialize_topcon(self):
         self.send("ST0")
 
     # end Topcon
+
+    # Sokkia functions
+
+    def launch_point_sokkia(self):
+        self.send(chr(17))
+
+    def set_horizontal_angle_sokkia(self, angle):
+        # need to send to station in format ddd.mmss
+        self.send("/Dc " + angle.encode() + "\r\n")
+        # delay(5)
+        self.clear_com()
+
+    def fetch_point_sokkia(self):
+        self.pnt = self.receive()
+        if self.pnt:
+            self.parce_sokkia()
+            self.vhd_to_xyz()
+
+    def parce_sokkia(self):
+        if self.pnt:
+            vhd = self.pnt.strip().split(" ")
+            if len(vhd) == 3:
+                try:
+                    self.sloped = float(vhd[0]) / 1000.0
+                except ValueError:
+                    self.sloped = None
+            if vhd[1][0] != 'E':
+                self.vangle = Angle(f'{vhd[1][:3]}d{vhd[1][3:5]}m{vhd[1][5:7]}').d
+            else:
+                self.vangle = None
+            if vhd[2][0] != 'E':
+                self.hangle = Angle(f'{vhd[1][:3]}d{vhd[1][3:5]}m{vhd[1][5:7]}').d
+            else:
+                self.hangle = None
+
+    def initialize_sokkia(self):
+        pass
+
+    # end Sokkia
 
     # Leica functions ###
 
@@ -1452,18 +1563,6 @@ class totalstation(object):
         if self.pnt:
             self.parce_leica()
             self.vhd_to_xyz()
-
-    def vhd_to_xyz(self):
-        if self.vangle is not None and self.hangle is not None and self.sloped is not None:
-            # angle_decdeg = self.dms_to_decdeg(self.vangle)
-            z = self.sloped * cos(self.decdeg_to_radians(self.vangle))
-            actual_distance = sqrt(self.sloped**2 - z**2)
-
-            # angle_decdeg = self.dms_to_decdeg(self.hangle)
-            angle_decdeg = 450 - self.hangle
-            x = cos(self.decdeg_to_radians(angle_decdeg)) * actual_distance
-            y = sin(self.decdeg_to_radians(angle_decdeg)) * actual_distance
-            self.xyz = point(x, y, z)
 
     def parce_leica(self):
         if self.pnt:
@@ -1523,6 +1622,100 @@ class totalstation(object):
     # ## Leica geocom functions ###
 
 # endregion
+
+
+class ComTestScreen(Screen):
+    def __init__(self, station = None, cfg = None, colors = None, **kwargs):
+        super(ComTestScreen, self).__init__(**kwargs)
+
+        self.colors = colors if colors else ColorScheme()
+        self.station = station
+        self.cfg = cfg
+
+        self.clear_widgets()
+        self.layout = GridLayout(cols = 1,
+                                 spacing = 5,
+                                 size_hint_x = width_calculator(.9, 400),
+                                 size_hint_y = .9,
+                                 pos_hint = {'center_x': .5, 'center_y': .5})
+        self.add_widget(self.layout)
+        self.build_screen()
+
+    def current_settings_pretty(self):
+        txt = 'The current settings are:\n' + self.station.make + '\n' + self.station.settings_pretty()
+        txt += '\nThe COM port is '
+        txt += 'Open' if self.station.serialcom.is_open else 'Close'
+        return(txt)
+
+    def on_enter(self):
+        sm.get_screen('StationConfigurationScreen').call_back = 'MainScreen'
+        self.current_settings.text = self.current_settings_pretty()
+        self.station.clear_io()
+        self.event = Clock.schedule_interval(self.check_io, .2)
+
+    def check_io(self, dt):
+        if self.station.data_waiting():
+            self.station.receive()
+        if self.station.io != '' and self.station.io != self.io.scrolling_label.text:
+            self.io.scrolling_label.text = self.station.io
+
+    def build_screen(self):
+
+        self.settings = GridLayout(cols = 2, spacing = 5, padding = 5, size_hint = (.2, None))
+        self.current_settings = e5_label(self.current_settings_pretty(), colors = self.colors, size_hint = (0.75, None))
+        self.settings.add_widget(self.current_settings)
+        self.change_settings = e5_button("Change Settings", call_back = self.settings_change, colors = self.colors)
+        self.settings.add_widget(self.change_settings)
+        self.layout.add_widget(self.settings)
+
+        self.horizontal_angle = GridLayout(cols = 2, spacing = 5, padding = 5, size_hint = (.2, None))
+        self.leftside = GridLayout(cols = 1, spacing = 5, padding = 5)
+        self.leftside.add_widget(e5_label('Enter angle as ddd.mmss', colors = self.colors))
+        self.hangle_input = e5_textinput(write_tab = False)
+        self.hangle_input.bind(minimum_height = self.hangle_input.setter('height'))
+        self.leftside.add_widget(self.hangle_input)
+        self.horizontal_angle.add_widget(self.leftside)
+        self.set_angle = e5_button("Set H-angle", call_back = self.set_hangle, colors = self.colors)
+        self.horizontal_angle.add_widget(self.set_angle)
+        self.layout.add_widget(self.horizontal_angle)
+
+        self.record = GridLayout(cols = 1, spacing = 5, padding = 5, size_hint = (.2, None))
+        self.measure = e5_button("Record Point", call_back = self.record_point, colors = self.colors)
+        self.record.add_widget(self.measure)
+        self.layout.add_widget(self.record)
+
+        self.io = e5_scrollview_label('Set an angle or record a point and the communication to the station will appear here.  If nothing is received at all, then it might be a COM port number issue.  If what is received is unreadable, then there is a problem with the speed, parity, data bits, and stop bits.  If everything looks fine, but the angle does not change or a point is not taken, then likely Shannon needs to have a look.  Email the results here to him.', popup = False, colors = self.colors)
+        self.layout.add_widget(self.io)
+
+        self.layout.add_widget(e5_side_by_side_buttons(text = ['Clear', 'Copy', 'Close'],
+                                                        id = ['clear', 'copy', 'close'],
+                                                        call_back = [self.clear_io, self.copy_io, self.close],
+                                                        selected = [False, False, False],
+                                                        colors = self.colors))
+
+    def clear_io(self, instance):
+        self.station.clear_io()
+        self.io.scrolling_label.text = ''
+
+    def copy_io(self, instance):
+        Clipboard.copy(self.io.scrolling_label.text)
+
+    def set_hangle(self, instance):
+        if self.hangle_input.text:
+            self.station.set_horizontal_angle(self.hangle_input.text)
+            # self.io.scrolling_label.text = self.station.io
+
+    def settings_change(self, instance):
+        sm.get_screen('StationConfigurationScreen').call_back = 'ComTestScreen'
+        self.event.cancel()
+        self.parent.current = 'StationConfigurationScreen'
+
+    def record_point(self, instance):
+        self.station.take_shot()
+
+    def close(self, instance):
+        self.event.cancel()
+        self.parent.current = 'MainScreen'
 
 
 class MainScreen(e5_MainScreen):
@@ -1656,6 +1849,11 @@ class MainScreen(e5_MainScreen):
         sm.add_widget(e5_SettingsScreen(name = 'EDMSettingsScreen',
                                         colors = self.colors,
                                         ini = self.ini,
+                                        cfg = self.cfg))
+
+        sm.add_widget(ComTestScreen(name = 'ComTestScreen',
+                                        colors = self.colors,
+                                        station = self.station,
                                         cfg = self.cfg))
 
     def reset_screens(self):
@@ -3245,6 +3443,7 @@ class StationConfigurationScreen(Screen):
         self.station = station
         self.colors = colors
         self.ini = ini
+        self.call_back = 'MainScreen'
 
     def on_enter(self):
         self.clear_widgets()
@@ -3334,24 +3533,31 @@ class StationConfigurationScreen(Screen):
     def update_ini(self, instance):
         self.station.make = self.station_type.spinner.text
         self.ini.update_value(__program__, 'STATION', self.station_type.spinner.text)
+
         self.station.stopbits = self.stop_bits.spinner.text
         self.ini.update_value(__program__, 'STOPBITS', self.stop_bits.spinner.text)
+
         self.station.baudrate = self.baud_rate.spinner.text
         self.ini.update_value(__program__, 'BAUDRATE', self.baud_rate.spinner.text)
+
         self.station.databits = self.data_bits.spinner.text
         self.ini.update_value(__program__, 'DATABITS', self.data_bits.spinner.text)
+
         self.station.comport = self.comports.spinner.text
         self.ini.update_value(__program__, 'COMPORT', self.comports.spinner.text)
+
         self.station.parity = self.parity.spinner.text
         self.ini.update_value(__program__, 'PARITY', self.parity.spinner.text)
+
         self.station.communications = self.communications.spinner.text
         self.ini.update_value(__program__, 'COMMUNICATIONS', self.communications.spinner.text)
+
         self.ini.save()
         self.station.open()
         self.close_screen(None)
 
     def close_screen(self, value):
-        self.parent.current = 'MainScreen'
+        self.parent.current = self.call_back
 
 # Region Help Screens
 

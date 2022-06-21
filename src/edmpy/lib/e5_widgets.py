@@ -365,25 +365,26 @@ class e5_scrollview_label(ScrollView):
     def __init__(self, text, widget_id = '', popup = False, colors = None, **kwargs):
         super(e5_scrollview_label, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
+        self.text = text
         scrollbox = GridLayout(cols = 1,
                                 size_hint_y = None,
                                 spacing = 5)
         scrollbox.bind(minimum_height = scrollbox.setter('height'))
 
-        info = e5_label(text = text, markup = True,
-                        size_hint_y = None,
-                        color = self.colors.text_color if not popup else self.colors.popup_text_color,
-                        id = widget_id + '_label', popup = popup,
-                        text_size = (self.width, None))
+        self.scrolling_label = e5_label(text = self.text, markup = True,
+                                        size_hint_y = None,
+                                        color = self.colors.text_color if not popup else self.colors.popup_text_color,
+                                        id = widget_id + '_label', popup = popup,
+                                        text_size = (self.width, None))
         if colors is not None:
             if colors.text_font_size:
-                info.font_size = colors.text_font_size
+                self.scrolling_label.font_size = colors.text_font_size
 
-        info.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
-        info.bind(width=lambda instance, value: setattr(instance, 'text_size', (value * .95, None)))
+        self.scrolling_label.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
+        self.scrolling_label.bind(width=lambda instance, value: setattr(instance, 'text_size', (value * .95, None)))
 
         # info.bind(texture_size=lambda *x: info.setter('height')(info, info.texture_size[1]))
-        scrollbox.add_widget(info)
+        scrollbox.add_widget(self.scrolling_label)
 
         self.bar_width = SCROLLBAR_WIDTH
         self.size_hint = (1, 1)

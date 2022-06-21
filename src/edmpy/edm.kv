@@ -123,6 +123,11 @@
                         color: SUBMENU_COLOR
                         minimum_width: '140sp'
                     ActionButton:
+                        text: 'Test COM'
+                        on_press: app.root.current = 'ComTestScreen'
+                        color: SUBMENU_COLOR
+                        minimum_width: '140sp'
+                    ActionButton:
                         text: 'Initialize Station'
                         on_press: app.root.current = 'InitializeStationScreen'
                         color: SUBMENU_COLOR
@@ -177,10 +182,10 @@
         TextInput:
             size_hint: 1, None
             height: self.minimum_height
-            readonly: True        
+            readonly: True
             text: filechooser.path
             background_color: (0,0,0,0)
-            foreground_color: (1,1,1,.8)            
+            foreground_color: (1,1,1,.8)
         FileChooserListView:
             id: filechooser
             filters: root.filters
@@ -211,7 +216,7 @@
     halign: "center"
     valign: "middle"
     height: '30dp'
-    background_disabled_normal: '' 
+    background_disabled_normal: ''
     disabled_color: (1, 1, 1, 1)
     color: (1, 1, 1, 1)
     canvas.before:
@@ -250,7 +255,7 @@
     halign: "center"
     valign: "middle"
     # This setting determines if text wraps in the grid cell box
-    text_size: self.size 
+    text_size: self.size
     size_hint: 1, 1
     #height: 60
     #width: 400
