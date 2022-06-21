@@ -193,10 +193,11 @@ class e5_textinput(TextInput):
                 self.bind(on_text_validate = self.do_coordinate_math)
 
     def do_coordinate_math(self, instance):
-        try:
-            self.text = str(eval(instance.text))
-        except (DivisionByZero, NameError):
-            pass
+        if instance.text:
+            try:
+                self.text = str(eval(instance.text))
+            except (DivisionByZero, NameError):
+                pass
 
 
 class e5_label(Label):
@@ -930,7 +931,7 @@ class e5_SettingsScreen(Screen):
         self.ini.update(self.colors, self.cfg)
         self.parent.current = 'MainScreen'
 
-
+# Add a copy button to these screens
 class e5_InfoScreen(Screen):
     content = ObjectProperty(None)
     back_button = ObjectProperty(None)

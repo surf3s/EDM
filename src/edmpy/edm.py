@@ -124,6 +124,9 @@ class point:
     def __str__(self):
         return(f'X : {round(self.x, 3)}, Y : {round(self.y, 3)}, Z : {round(self.z, 3)}')
 
+    def __repr__(self):
+        return(f'X : {round(self.x, 3)}, Y : {round(self.y, 3)}, Z : {round(self.z, 3)}')
+
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.x == other.x and self.y == other.y and self.x == other.z
@@ -157,6 +160,9 @@ class datum:
     def __str__(self):
         return(f'Datum: {self.name} of X : {round(self.x, 3)}, Y : {round(self.y, 3)}, Z : {round(self.z, 3)}')
 
+    def __repr__(self):
+        return(f'Datum: {self.name} of X : {round(self.x, 3)}, Y : {round(self.y, 3)}, Z : {round(self.z, 3)}')
+
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.x == other.x and self.y == other.y and self.x == other.z and self.name == other.name and self.notes == other.notes
@@ -177,6 +183,9 @@ class prism:
         self.offset = offset
 
     def __str__(self):
+        return(f'Prism {self.name} with hieght of {round(self.height, 3)} and offset of {round(self.offset, 3)}')
+
+    def __repr__(self):
         return(f'Prism {self.name} with hieght of {round(self.height, 3)} and offset of {round(self.offset, 3)}')
 
     def __eq__(self, other):
@@ -219,6 +228,12 @@ class unit:
         self.centery = centery
 
     def __str__(self):
+        if not self.radius:
+            return(f'Unit {self.name} with limits ({self.minx},{self.miny})-({self.maxx},{self.maxy})')
+        else:
+            return(f'Unit {self.name} centered on ({self.centerx},{self.centery}) with a radius of {self.radius}')
+
+    def __repr__(self):
         if not self.radius:
             return(f'Unit {self.name} with limits ({self.minx},{self.miny})-({self.maxx},{self.maxy})')
         else:
@@ -272,6 +287,8 @@ class DB(dbs):
             self.new_data['units'] = True
             self.datums = self.db.table('datums')
             self.new_data['datums'] = True
+            logger = logging.getLogger(__name__)
+            logger.info('Database ' + filename + ' opened.')
             return(True)
         except FileNotFoundError:
             return(False)
@@ -810,13 +827,15 @@ class CFG(blockdata):
         if os.path.isfile(self.filename):
             self.blocks = self.read_blocks()
             errors = self.validate()
-            if errors == []:
+            if errors is False:     # This is bad.  Errors returned are not dealt with when starting program
                 self.save()
             else:
                 return(errors)
         else:
             self.filename = 'default.cfg'
             self.build_default()
+        logger = logging.getLogger(__name__)
+        logger.info('CFG ' + self.filename + ' opened.')
 
     def status(self):
         txt = '\nCFG file is %s\n' % self.filename
@@ -1028,6 +1047,9 @@ class totalstation(object):
             return(f'{sexa[1]}° {sexa[2]}\" {sexa[3]}\'')
         else:
             return('')
+
+    def vhd_to_sexa_pretty_compact(self):
+        return(f"hangle : {self.decimal_degrees_to_sexa_pretty(self.hangle)}, vangle : {self.decimal_degrees_to_sexa_pretty(self.vangle)}, sloped : {round(self.sloped, 3) if self.sloped else ''}")
 
     def add_points(self, p1, p2):
         return point(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z)
@@ -1730,6 +1752,8 @@ class MainScreen(e5_MainScreen):
         super(MainScreen, self).__init__(**kwargs)
 
         self.user_data_dir = user_data_dir
+        self.setup_logger()
+
         self.colors = ColorScheme()
         self.ini = INI()
         self.cfg = CFG()
@@ -1758,6 +1782,16 @@ class MainScreen(e5_MainScreen):
         self.add_widget(self.layout)
         self.add_screens()
         restore_window_size_position(__program__, self.ini)
+
+    def setup_logger(self):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt = '%Y-%m-%d %H:%M:%S')
+        fh = logging.FileHandler(os.path.join(self.user_data_dir, __program__ + '.log'))
+        fh.setLevel(logging.INFO)
+        fh.setFormatter(formatter)
+        logger.addHandler(fh)
+        logger.info(__program__ + ' started, logger initialized, and application built.')
 
     def add_screens(self):
         sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen',
@@ -1823,7 +1857,7 @@ class MainScreen(e5_MainScreen):
 
         sm.add_widget(e5_LogScreen(name = 'LogScreen',
                                             colors = self.colors,
-                                            logger = logger if 'logger' in globals() else None))
+                                            logger = logging.getLogger(__name__)))
 
         sm.add_widget(e5_CFGScreen(name = 'CFGScreen',
                                             colors = self.colors,
@@ -2080,10 +2114,15 @@ class MainScreen(e5_MainScreen):
     def on_save(self):
         # TODO check for duplicates
         # TODO update linked fields
+        self.log_the_shot()
         self.update_info_label()
         self.make_backup()
         self.check_for_duplicate_xyz()
         return([])
+
+    def log_the_shot(self):
+        logger = logging.getLogger(__name__)
+        logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} from {self.station.location} ')
 
     def on_cancel(self):
         if self.data.db is not None:
@@ -2091,14 +2130,18 @@ class MainScreen(e5_MainScreen):
             if last_record != []:
                 self.data.db.table(self.data.table).remove(doc_ids = [last_record.doc_id])
 
-    def update_info_label(self):
+    def get_last_squid(self):
         unit = self.get_last_value('UNIT')
         idno = self.get_last_value('ID')
         suffix = self.get_last_value('SUFFIX')
         if unit is not None and idno is not None and suffix is not None:
-            self.info.text = '%s-%s(%s)' % (unit, idno, suffix)
+            return(f'{unit}-{idno}({suffix})')
         else:
-            self.info = 'EDM'
+            return('')
+
+    def update_info_label(self):
+        last_squid = self.get_last_squid()
+        self.info.text = last_squid if last_squid else 'EDM'
 
     def check_for_duplicate_xyz(self):
         if self.station.make == 'Microscribe' and self.data.db:
@@ -2466,6 +2509,8 @@ class MainScreen(e5_MainScreen):
         return(None)
 
     def exit_program(self):
+        logger = logging.getLogger(__name__)
+        logger.info(__program__ + ' exited.')
         self.save_window_location()
         App.get_running_app().stop()
 
@@ -3240,19 +3285,25 @@ class InitializeStationScreen(Screen):
 
     def set_and_close(self, instance):
         if self.setup_type:
+
+            logger = logging.getLogger(__name__)
+
             if self.setup_type.text == 'Horizontal Angle Only':
                 pass
 
             elif self.setup_type.text == 'Over a datum':
                 self.ini.update_value('SETUPS', 'OVERDATUM', self.setup_widgets.over_datum.datum.name)
+                logger.info(f'Setup over {self.setup_widgets.over_datum.datum}')
 
             elif self.setup_type.text == 'Over a datum + Record a datum':
                 self.ini.update_value('SETUPS', 'OVERDATUM', self.setup_widgets.datum1.datum.name)
                 self.ini.update_value('SETUPS', 'RECORDDATUM', self.setup_widgets.datum2.datum.name)
+                logger.info(f'Setup over {self.setup_widgets.datum1.datum} and recorded {self.setup_widgets.datum2.datum}')
 
             elif self.setup_type.text == 'Record two datums':
                 self.ini.update_value('SETUPS', '2DATUMS_DATUM_1', self.setup_widgets.datum1.datum.name)
                 self.ini.update_value('SETUPS', '2DATUMS_DATUM_2', self.setup_widgets.datum2.datum.name)
+                logger.info(f'Setup 2-point using {self.setup_widgets.datum1.datum} and {self.setup_widgets.datum2.datum}')
 
             elif self.setup_type.text == 'Three datum shift':
                 self.station.rotate_local = [self.setup_widgets.recorder[0].result.xyz,
@@ -3273,12 +3324,16 @@ class InitializeStationScreen(Screen):
                 self.ini.update_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1', self.setup_widgets.datum1.datum.name)
                 self.ini.update_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2', self.setup_widgets.datum2.datum.name)
                 self.ini.update_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3', self.setup_widgets.datum3.datum.name)
+                logger.info(f'Setup 3 datum shift using {self.setup_widgets.datum1.datum}, {self.setup_widgets.datum2.datum}, and {self.setup_widgets.datum3.datum}')
+                logger.info(f'Recorded values were respectively {self.setup_widgets.recorder[0].result.xyz}, {self.setup_widgets.recorder[1].result.xyz}, and {self.setup_widgets.recorder[2].result.xyz}')
 
         self.popup.dismiss()
         if self.foresight:
             self.station.set_horizontal_angle(self.foresight)
+            logger.info(f'Horizontal angle set to {self.foresight}')
         if self.new_station.is_none() is False:
             self.station.location = self.new_station
+            logger.info('Station location set to ' + self.station.location)
         self.ini.update_value('SETUPS', 'LASTSETUP_TYPE', self.setup_type.text)
         self.ini.save()
         self.parent.current = 'MainScreen'
@@ -3590,6 +3645,8 @@ class StatusScreen(e5_InfoScreen):
         txt += self.ini.status() if self.ini else 'An INI file is not available.\n\n'
         txt += self.station.status() if self.station else 'Total station information is not available.\n\n'
         txt += '\nThe default user path is %s.\n' % self.ini.get_value(__program__, "APP_PATH")
+        logger = logging.getLogger(__name__)
+        txt += f'\nThe log is written to {logger.handlers[0].baseFilename}\n'
         txt += '\nThe operating system is %s.\n' % platform_name()
         txt += '\nPython build is %s.\n' % (python_version())
         txt += '\nLibraries installed include Kivy %s and TinyDB %s.\n' % (__kivy_version__, __tinydb_version__)
@@ -3613,28 +3670,17 @@ class EDMApp(App):
         super(EDMApp, self).__init__(**kwargs)
 
         self.app_path = self.user_data_dir
-        self.setup_logger()
-
-    def setup_logger(self):
-        logger.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        fh = logging.FileHandler(os.path.join(self.app_path, __program__ + '.log'))
-        fh.setLevel(logging.INFO)
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
 
     def build(self):
         sm.add_widget(MainScreen(user_data_dir = self.user_data_dir, name = 'MainScreen'))
         sm.current = 'MainScreen'
         # Window.borderless = True
         self.title = __program__ + " " + __version__
-        logger.info(__program__ + ' started, logger initialized, and application built.')
-        # sm.get_screen('MainScreen').build_mainscreen()
         return(sm)
 
 
 Factory.register(__program__, cls=EDMApp)
 
+
 if __name__ == '__main__':
-    logger = logging.getLogger(__program__)
     EDMApp().run()

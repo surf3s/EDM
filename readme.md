@@ -5,4 +5,13 @@ This is an Alpha version which I am making public so that some colleagues can te
 
 If you want to work with the source code rather than the Windows distributable provided here (see Windows folder), you will need to clone this repository, setup a virtual environment, and install the required packages (pip -r requirements.txt).  I don't advise doing this unless you are keen.  Rather, if you give me some time, I will turn this program into a Python package on PyPi so that it can be easily installed and updated with pip install edmpy.
 
+## Update (June 21, 2022)
+
+Changes include:
+1. Fix a number of bugs (some of them important)
+2. Added a screen called Test COM to help test serial connections to the total station
+3. Started adding support for Sokkia.  I need someone who can help me debug this.
+
+Note that support currently only exists for Microscribes and Leica total stations.  Sokkia, Topcon and perhaps Nikon will come as I find people to work with.
+
 ![Tests](https://github.com/surf3s/EDM/actions/workflows/tests.yaml/badge.svg)
