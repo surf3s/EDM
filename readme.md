@@ -3,13 +3,13 @@ The Python version of EDM-Mobile and EDMWin.
 
 This is an Alpha version which I am making public so that some colleagues can test the program.  For me, Alpha means there are bugs and unfinished features.  The core functionality should be there (i.e. setup the total station, record and edit points, and export the data).  However, it is strongly recommended that you use this version with caution and that you have an alternative plan should it not work (e.g. EDM-Mobile or EDMWin).  What I am looking for here is feedback.  Note that I will be pushing bug and feature fixes to this site throughout the summer.  My hope is that I can reach Beta version by the end of the summer (i.e. I can find no bugs).
 
-If you want to work with the source code rather than the Windows distributable provided here (see Windows folder), you can clone this repository, setup a virtual environment, and install the required packages (pip -r requirements.txt).  I don't advise doing this for now unless you are keen in part because I will be making modifications a lot through the summer of 2022.  
+If you want to work with the source code rather than the Windows distributable provided here (see Windows folder), you can clone this repository, setup a virtual environment, and install the required packages (pip -r requirements.txt).  I don't advise doing this for now unless you are keen in part because I will be making modifications a lot through the summer of 2022.
 
 #### Installation
 
 ##### Windows
 
-A Windows exe file can be found in the folder [Windows](https://github.com/surf3s/EDM/tree/master/EDM/Windows).  Download this file, place it in a folder where you want to start your data entry, and launch the program.
+A Windows exe file can be found in the folder [Windows](https://github.com/surf3s/EDM/tree/master/Windows/dist).  Download this file, place it in a folder where you want to start your data entry, and launch the program.
 
 I have tested EDM thus far only on my own Windows 10 computer.  One user has reported that it runs on a Microsoft tablet running Windows 11.  I doubt it works on Windows 7 and it almost certainly does not work on Windows XP, but you really, really should not be using computers with either of those operating systems.
 
