@@ -1,15 +1,7 @@
-# redo after E5 changes
-#   record edit screen - delete pre_enter and enter conditions because these are now in e5_widgets
-#   db - delete all is now in DB library
-
-
 # EDM by Shannon McPherron
 #
 #   This is an alpha release.  I am still working on bugs and I am still implementing some features.
 #   It should be backwards compatible with EDM-Mobile and EDMWin (but there are still some issues).
-
-# ToDo
-#   Make copy and paste work
 
 #   A text field can be linked to another table. [future feature]
 #   Think through making a field link to a database table (unique value is a table record)
@@ -358,13 +350,6 @@ class DB(dbs):
 
     def names(self, table_name):
         return([row['NAME'] for row in self.db.table(table_name) if 'NAME' in row] if self.db is not None and table_name is not None else [])
-
-    def delete_all(self, table_name = None):
-        if self.db:
-            if table_name is None:
-                self.db.drop_tables()
-            else:
-                self.db.table(table_name).truncate()
 
     def export_csv(self):
         pass
@@ -2122,7 +2107,7 @@ class MainScreen(e5_MainScreen):
 
     def log_the_shot(self):
         logger = logging.getLogger(__name__)
-        logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} from {self.station.location} ')
+        logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} with prism height {self.station.prism.height} from {self.station.location} ')
 
     def on_cancel(self):
         if self.data.db is not None:
@@ -2180,9 +2165,9 @@ class MainScreen(e5_MainScreen):
         self.data.open(os.path.join(path, filename.split('.')[0] + '.json'))
         self.open_db()
         self.set_new_data_to_true()
-        self.ini.update(self.colors, self.cfg)
         self.cfg.filename = os.path.join(path, filename)
         self.cfg.save()
+        self.ini.update(self.colors, self.cfg)
         self.dismiss_popup()
         self.build_mainscreen()
         self.reset_screens()
@@ -3081,6 +3066,8 @@ class setups(ScrollView):
     def set_hangle(self, instance):
         if self.hangle:
             self.station.set_horizontal_angle(self.hangle.text)
+            logger = logging.getLogger(__name__)
+            logger.info(f'Horizontal angle set to {self.hangle.text}')
 
 
 class InitializeStationScreen(Screen):
@@ -3333,42 +3320,18 @@ class InitializeStationScreen(Screen):
             logger.info(f'Horizontal angle set to {self.foresight}')
         if self.new_station.is_none() is False:
             self.station.location = self.new_station
-            logger.info('Station location set to ' + self.station.location)
+            logger.info('Station location set to ' + str(self.station.location))
         self.ini.update_value('SETUPS', 'LASTSETUP_TYPE', self.setup_type.text)
         self.ini.save()
         self.parent.current = 'MainScreen'
 
 
 class EditLastRecordScreen(e5_RecordEditScreen):
-
-    def on_pre_enter(self):
-        if self.data.table is not None and self.e5_cfg is not None:
-            self.reset_doc_ids()
-            self.doc_id = self.doc_ids[-1] if self.doc_ids else None
-        else:
-            self.doc_ids = []
-            self.doc_id = None
-        self.put_data_in_frame()
-
-    def on_enter(self):
-        if self.first_field_widget:
-            self.first_field_widget.focus = True
+    pass
 
 
 class EditPointScreen(e5_RecordEditScreen):
-
-    def on_pre_enter(self):
-        if self.data.table is not None and self.e5_cfg is not None:
-            try:
-                last = self.data.db.table(self.data.table).all()[-1]
-                self.doc_id = last.doc_id
-            except IndexError:
-                self.doc_id = None
-        self.put_data_in_frame()
-
-    def on_enter(self):
-        if self.first_field_widget:
-            self.first_field_widget.focus = True
+    pass
 
 
 class EditDatumScreen(Screen):
@@ -3621,7 +3584,7 @@ class StationConfigurationScreen(Screen):
 class AboutScreen(e5_InfoScreen):
     def on_pre_enter(self):
         self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + __version__ + ' Alpha\nApple Pie\n\n'
-        self.content.text += 'Build using Python 3.6, Kivy 1.10.1 and TinyDB 3.11.1\n\n'
+        self.content.text += 'Built using Python 3.8, Kivy 2.0 and TinyDB 4.0\n\n'
         self.content.text += 'An OldStoneAge.Com Production\n\n' + __date__
         self.content.halign = 'center'
         self.content.valign = 'middle'

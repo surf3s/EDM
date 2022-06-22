@@ -1,4 +1,5 @@
 from decimal import DivisionByZero
+from kivy.core.clipboard import Clipboard
 from kivy.clock import Clock
 from kivy.uix.textinput import TextInput
 from kivy.uix.label import Label
@@ -931,7 +932,7 @@ class e5_SettingsScreen(Screen):
         self.ini.update(self.colors, self.cfg)
         self.parent.current = 'MainScreen'
 
-# Add a copy button to these screens
+
 class e5_InfoScreen(Screen):
     content = ObjectProperty(None)
     back_button = ObjectProperty(None)
@@ -941,10 +942,11 @@ class e5_InfoScreen(Screen):
         self.colors = colors if colors else ColorScheme()
         layout = GridLayout(cols = 1, size_hint_y = 1, spacing = 5, padding = 5)
         layout.add_widget(e5_scrollview_label(text = '', widget_id = 'content', colors = self.colors))
-        layout.add_widget(e5_button('Back',
-                                    id = 'back_button',
-                                    selected = True, call_back = self.go_back,
-                                    colors = self.colors))
+        layout.add_widget(e5_side_by_side_buttons(['Back', 'Copy'],
+                                                    id = ['back_button', 'copy_button'],
+                                                    selected = [False, False],
+                                                    call_back = [self.go_back, self.copy],
+                                                    colors = self.colors))
         self.add_widget(layout)
         for widget in self.walk():
             if hasattr(widget, 'id'):
@@ -955,6 +957,9 @@ class e5_InfoScreen(Screen):
 
     def go_back(self, *args):
         self.parent.current = 'MainScreen'
+
+    def copy(self, instance):
+        Clipboard.copy(self.content.text)
 
 
 class e5_LogScreen(e5_InfoScreen):

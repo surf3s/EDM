@@ -80,7 +80,7 @@ class dbs:
         self.new_data[self.table] = True
 
     def delete_all(self, table_name = None):
-        if self.db:
+        if self.db is not None:
             if table_name is None:
                 self.db.drop_tables()
             else:

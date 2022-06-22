@@ -16,3 +16,5 @@ edm.egg-info
 CFGs_originals/
 test*.cfg
 edmpy.egg*
+*.whl
+*.gz
