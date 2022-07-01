@@ -36,15 +36,24 @@ python -m edmpy
 ```
 
 ##### Update (June 21, 2022)
-
-Changes include:
 1. Fix a number of bugs (some of them important)
 2. Added a screen called Test COM to help test serial connections to the total station
 3. Started adding support for Sokkia.  I need someone who can help me debug this.
 4. Made the logging actual log something useful.
 5. Create a PyPi project called edm-py so that Linux and MacOS users can easily install the program
 
+##### Update (July 1, 2022)
+1. Tweaked the default CFG to carry unit and increment ID
+2. Changed how increment works a bit (should work properly now)
+3. Disabled multitouch to disable red dot on right mouse click
+4. Check to see if mdf or sdf file is specified (from EDMWin and EDM-Mobile).
+5. Change to json format and give warning
+6. Check to see if json file can be found
+7.   If not, new empty file is created and warning given
+8.  Prism height - whether menu or manual - carries between shots
+9.  Prism height menu - works better with keyboard (enter key and arrow keys)
+10. A number of issues with using the program before opening a CFG fixed
+
 
 Note that support currently only exists for Microscribes and Leica total stations.  Sokkia, Topcon and perhaps Nikon will come as I find people to work with.
 
-![Tests](https://github.com/surf3s/EDM/actions/workflows/tests.yaml/badge.svg)
