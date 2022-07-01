@@ -19,3 +19,6 @@ edmpy.egg*
 edm_arch.egg*
 *.whl
 *.gz
+.pypirc
+CFGs/HF_2022.mdb
+CFGs/HF_2022.CFG

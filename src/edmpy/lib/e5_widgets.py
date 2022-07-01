@@ -20,7 +20,7 @@ from kivy.uix.slider import Slider
 from kivy.uix.behaviors.focus import FocusBehavior
 from kivy.uix.spinner import Spinner, SpinnerOption
 
-from edmpy.lib.constants import SPLASH_HELP
+from edmpy.lib.constants import __SPLASH_HELP__
 from edmpy.lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS
 from edmpy.lib.misc import platform_name, locate_file
 import ntpath
@@ -39,6 +39,13 @@ def width_calculator(fraction_size = .8, maximum_width = 800):
         return(maximum_width / Window.size[0])
     else:
         return(fraction_size)
+
+
+def height_calculator(desired_size):
+    ratio = desired_size / Window.size[1]
+    if ratio > .9:
+        ratio = .9
+    return(ratio)
 
 
 def set_color(popup, colors):
@@ -168,7 +175,7 @@ class edm_manual(Popup):
         pop_content.add_widget(buttons)
         self.content = pop_content
         self.title = 'Manual Input'
-        self.size_hint = (.9, .32)
+        self.size_hint = (.9, height_calculator(280))
         self.auto_dismiss = True
 
     def on_open(self):
@@ -211,6 +218,14 @@ class e5_label(Label):
         if colors:
             if colors.text_font_size:
                 self.font_size = colors.text_font_size
+
+
+class e5_label_wrapped(e5_label):
+    def __init__(self, text, popup = False, colors = None, **kwargs):
+        super(e5_label_wrapped, self).__init__(text, popup = False, colors = None, **kwargs)
+        self.size_hint = (1, None)
+        self.bind(width=lambda *x: self.setter('text_size')(self, (self.width, None)),
+                                texture_size=lambda *x: self.setter('height')(self, self.texture_size[1]))
 
 
 class e5_side_by_side_buttons(GridLayout):
@@ -403,10 +418,9 @@ class e5_MainScreen(Screen):
     text_color = (0, 0, 0, 1)
 
     def setup_program(self):
+        warnings, errors = [], []
         self.ini.open(os.path.join(self.user_data_dir, __program__ + '.ini'))
-
         if not self.ini.first_time:
-
             if self.ini.get_value(__program__, 'ColorScheme'):
                 self.colors.set_to(self.ini.get_value(__program__, 'ColorScheme'))
             if self.ini.get_value(__program__, 'DarkMode').upper() == 'TRUE':
@@ -422,27 +436,13 @@ class e5_MainScreen(Screen):
             if self.ini.get_value(__program__, "CFG"):
                 self.cfg.open(self.ini.get_value(__program__, "CFG"))
                 if self.cfg.filename:
-                    found_db = False
-                    if self.cfg.get_value(__program__, 'DATABASE'):
-                        found_db = self.data.open(self.cfg.get_value(__program__, 'DATABASE'))
-                    if not found_db:
-                        database = os.path.split(self.cfg.filename)[1]
-                        if "." in database:
-                            database = database.split('.')[0]
-                        database = database + '.json'
-                        self.data.open(os.path.join(self.cfg.path, database))
-                    if self.cfg.get_value(__program__, 'TABLE'):
-                        self.data.table = self.cfg.get_value(__program__, 'TABLE')
-                    else:
-                        self.data.table = '_default'
-                    self.cfg.update_value(__program__, 'DATABASE', self.data.filename)
-                    self.cfg.update_value(__program__, 'TABLE', self.data.table)
-                    self.cfg.save()
+                    warnings, errors = self.open_db()
             self.ini.update(self.colors, self.cfg)
             self.ini.save()
         self.colors.set_colormode()
         self.colors.need_redraw = False
         self.ini.update_value(__program__, 'APP_PATH', os.path.abspath(os.path.dirname(__file__)) if platform_name() == 'Windows' else self.user_data_dir)
+        return(warnings, errors)
 
     def get_path(self):
         if self.ini.get_value(__program__, "CFG"):
@@ -461,21 +461,49 @@ class e5_MainScreen(Screen):
             return(files)
 
     def open_db(self):
+        warnings = []
+        errors = []
         database = locate_file(self.cfg.get_value(__program__, 'DATABASE'), self.cfg.path)
         if not database:
             database = os.path.split(self.cfg.filename)[1]
             if "." in database:
                 database = database.split('.')[0]
             database = os.path.join(self.cfg.path, database + '.json')
-        self.data.open(database)
-        if self.cfg.get_value(__program__, 'TABLE'):
-            self.data.table = self.cfg.get_value(__program__, 'TABLE')
+            warning = f"Could not locate the data file {self.cfg.get_value(__program__, 'DATABASE')} as specified in the CFG file.  EDM looked in the specified location and also in "
+            warning += f"in the same folder as the CFG file {self.cfg.path}.  A new empty data file was created as {database}.  If this is not correct, leave the program and alter the CFG file "
+            warning += "and/or move the data file to the correct location."
+            warnings.append(warning)
+        if database.lower().endswith('.mdb') or database.lower().endswith('.sdf'):
+            database = database[:-4] + '.json'
+            warning = 'EDM does not accept the mdb and sdf data files that were used with EDMWin and EDM-Mobile.  A new, empty json format file has been opened in this case.  '
+            warning += f'The filename is {database}.  '
+            warning += 'JSON files are human readable ASCII files.  To move your data from the old format to this program, follow the directions found on the EDM GitHub site '
+            warning += 'https://github.com/surf3s/EDM/tree/master/Import_from_EDM-Mobile or https://github.com/surf3s/EDM/tree/master/Import_from_EDMWin.  Basically you need to '
+            warning += 'create csv files that can be imported into this program.  EDM-Mobile will create them for you.  With EDMWin you need to create them youself.  '
+            warning += 'Alternatively, you can hand enter items like datums, units, and prisms using the various menu options under Edit.'
+            warnings.append(warning)
+        if not self.data.valid_format(database):
+            error = f'The file {database} does not load as a valid json file.  If the wrong file has been loaded, edit the CFG file to point to the correct database.  If the file is '
+            error += 'the correct one, then it appears that it has become corrupted.  Open the file in any text editor and assess the situation.  A json file is a human readable '
+            error += 'file format, and you should be able to see your data.  If you need more help fixing the problem, you can contact me.'
+            errors.append(error)
         else:
-            self.data.table = '_default'
-        self.cfg.update_value(__program__, 'DATABASE', self.data.filename)
-        self.cfg.update_value(__program__, 'TABLE', self.data.table)
-        self.cfg.save()
-        self.data.new_data[self.data.table] = True
+            self.data.open(database)
+            if self.cfg.get_value(__program__, 'TABLE'):
+                self.data.table = self.cfg.get_value(__program__, 'TABLE')
+            else:
+                self.data.table = '_default'
+            self.cfg.update_value(__program__, 'DATABASE', self.data.filename)
+            self.cfg.update_value(__program__, 'TABLE', self.data.table)
+            self.cfg.save()
+            self.data.new_data[self.data.table] = True
+        return((warnings, errors))
+
+    def warnings_and_errors_popup(self, warnings, errors):
+        message_txt = '\n'
+        message_txt += ',\n\n'.join(['Warning: ' + warning for warning in warnings])
+        message_txt += ',\n\n'.join(['Error: ' + error for error in errors])
+        return(e5_MessageBox('Warnings and errors', message_txt, colors = self.colors))
 
     def show_popup_message(self, dt):
         self.event.cancel()
@@ -491,7 +519,7 @@ class e5_MainScreen(Screen):
             message_text = message_text + '\n\n'.join(self.cfg.errors)
         else:
             title = __program__
-            message_text = SPLASH_HELP
+            message_text = __SPLASH_HELP__
         self.popup = e5_MessageBox(title, message_text, call_back = self.close_popup, colors = self.colors)
         self.popup.open()
         self.popup_open = True
@@ -1580,12 +1608,13 @@ class DataGridMenuList(Popup):
                 self.txt.font_size = colors.text_font_size
         new_item_left.add_widget(self.txt)
         new_item.add_widget(new_item_left)
-        new_item.add_widget(e5_button('Add',
-                                            id = 'add_button',
-                                            selected = True,
-                                            call_back = call_back,
-                                            button_height = .15,
-                                            colors = colors))
+        self.add_button = e5_button('Add',
+                                    id = 'add_button',
+                                    selected = True,
+                                    call_back = call_back,
+                                    button_height = .15,
+                                    colors = colors)
+        new_item.add_widget(self.add_button)
         # new_item.bind(minimum_height = new_item.setter('height'))
         pop_content.add_widget(new_item)
 
@@ -1593,14 +1622,15 @@ class DataGridMenuList(Popup):
         if ncols < 1:
             ncols = 1
 
+        self.menu = None
         if menu_list:
-            menu = e5_scrollview_menu(menu_list, menu_selected,
+            self.menu = e5_scrollview_menu(menu_list, menu_selected,
                                                     widget_id = 'menu',
                                                     call_back = [call_back],
                                                     ncols = ncols,
                                                     colors = colors)
-            pop_content.add_widget(menu)
-            menu.make_scroll_menu_item_visible()
+            pop_content.add_widget(self.menu)
+            self.menu.make_scroll_menu_item_visible()
 
         pop_content.add_widget(e5_button('Back', selected = True,
                                                  call_back = self.dismiss,
@@ -1611,10 +1641,26 @@ class DataGridMenuList(Popup):
         self.title = title
         self.size_hint = (.9, .9 if menu_list else .33)
         self.auto_dismiss = True
+        self.call_back = call_back
 
     def on_open(self):
         self.txt.focus = True
         self.txt.select_all()
+        Window.bind(on_key_down = self._on_keyboard_down)
+
+    def _on_keyboard_down(self, *args):
+        ascii_code = args[1]
+        if ascii_code == 13 and self.txt.focus and self.txt.text != "":
+            self.call_back(self.add_button)
+        elif ascii_code == 13:
+            if self.menu:
+                if self.menu.scroll_menu_get_selected():
+                    self.call_back(self.menu.scroll_menu_get_selected())
+        elif self.menu:
+            self.menu.move_scroll_menu_item(ascii_code)
+
+    def on_dismiss(self):
+        Window.unbind(on_key_down = self._on_keyboard_down)
 
 
 class DataGridTextInput(TextInput):
@@ -1916,6 +1962,21 @@ class DataGridCasePanel(BoxLayout):
 
     def next_field(self, instance):
         pass
+
+
+class DataGridLabelAndToggle(BoxLayout):
+
+    def __init__(self, col, active = False, colors = None, popup = False, **kwargs):
+        super(DataGridLabelAndToggle, self).__init__(**kwargs)
+        self.colors = colors if colors is not None else ColorScheme()
+        self.size_hint = (0.9, None)
+        self.bind(minimum_height = self.setter('height'))
+        self.spacing = 10
+        label = e5_label(text = col, id = '__label', colors = self.colors, popup = popup)
+        label.bind(texture_size = label.setter('size'))
+        self.check = Switch(active = active, size_hint = (0.75, None))
+        self.add_widget(label)
+        self.add_widget(self.check)
 
 
 class DataGridLabelAndField(BoxLayout):

@@ -1,3 +1,15 @@
+# Changes version 1.0.21
+#   Tweaked the default CFG to carry unit and increment ID
+#   Changed how increment works a bit (should work properly now)
+#   Disabled multitouch to disable red dot on right mouse click
+#   Check to see if mdf or sdf file is specified (from EDMWin and EDM-Mobile).
+#       Correct to json and give warning
+#   Check to see if json file can be found
+#       If not, new empty file is created and warning given
+#   Prism height - whether menu or manual - carries between shots
+#   Prism height menu - works better with keyboard (enter key and arrow keys)
+#   A number of issues with using the program before opening a CFG fixed
+
 # EDM by Shannon McPherron
 #
 #   This is an alpha release.  I am still working on bugs and I am still implementing some features.
@@ -18,14 +30,17 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.20'
+__version__ = '1.0.21'
 __date__ = 'June, 2022'
 __program__ = 'EDM'
-__DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATE', 'PRISM', 'ID']
+__DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
+from edmpy.lib.constants import __SPLASH_HELP__
 
 # Region Imports
+from kivy.config import Config
+
 from kivy.core.clipboard import Clipboard
 from kivy.graphics import Color, Rectangle
 from kivy.app import App
@@ -271,17 +286,20 @@ class DB(dbs):
 
     def open(self, filename):
         try:
-            self.db = TinyDB(filename)
-            self.filename = filename
-            self.prisms = self.db.table('prisms')
-            self.new_data['prisms'] = True
-            self.units = self.db.table('units')
-            self.new_data['units'] = True
-            self.datums = self.db.table('datums')
-            self.new_data['datums'] = True
-            logger = logging.getLogger(__name__)
-            logger.info('Database ' + filename + ' opened.')
-            return(True)
+            if self.valid_format(filename):
+                self.db = TinyDB(filename)
+                self.filename = filename
+                self.prisms = self.db.table('prisms')
+                self.new_data['prisms'] = True
+                self.units = self.db.table('units')
+                self.new_data['units'] = True
+                self.datums = self.db.table('datums')
+                self.new_data['datums'] = True
+                logger = logging.getLogger(__name__)
+                logger.info('Database ' + filename + ' opened.')
+                return(True)
+            else:
+                return(False)
         except FileNotFoundError:
             return(False)
 
@@ -377,7 +395,7 @@ class DB(dbs):
         return(None)
 
     def get_link_fields(self, name = None, value = None):
-        if name is not None and value is not None and self.db:
+        if name is not None and value is not None and self.db is not None:
             q = Query()
             r = self.db.table(name).search(q[name].matches('^' + value + '$', re.IGNORECASE))
             if r is not []:
@@ -654,11 +672,13 @@ class CFG(blockdata):
         self.update_value('UNIT', 'Type', 'Text')
         self.update_value('UNIT', 'Length', 6)
         self.update_value('UNIT', 'REQUIRED', 'TRUE')
+        self.update_value('UNIT', 'CARRY', 'TRUE')
 
         self.update_value('ID', 'Prompt', 'ID :')
         self.update_value('ID', 'Type', 'Text')
         self.update_value('ID', 'Length', 6)
         self.update_value('ID', 'REQUIRED', 'TRUE')
+        self.update_value('ID', 'INCREMENT', 'TRUE')
 
         self.update_value('SUFFIX', 'Prompt', 'Suffix :')
         self.update_value('SUFFIX', 'Type', 'Numeric')
@@ -1744,7 +1764,7 @@ class MainScreen(e5_MainScreen):
         self.cfg = CFG()
         self.data = DB()
 
-        self.setup_program()
+        self.warnings, self.errors = self.setup_program()
 
         self.station = totalstation(self.ini.get_value(__program__, 'STATION'))
         self.station.setup(self.ini, self.data)
@@ -1767,6 +1787,15 @@ class MainScreen(e5_MainScreen):
         self.add_widget(self.layout)
         self.add_screens()
         restore_window_size_position(__program__, self.ini)
+
+    def on_enter(self, *args):
+        if self.warnings or self.errors:
+            self.popup = self.warnings_and_errors_popup(self.warnings, self.errors)
+            self.popup.open()
+            self.errors, self.warnings = [], []
+        elif self.ini.first_time:
+            self.popup = e5_MessageBox('Welcome to EDM', __SPLASH_HELP__)
+            self.popup.open()
 
     def setup_logger(self):
         logger = logging.getLogger(__name__)
@@ -1973,20 +2002,32 @@ class MainScreen(e5_MainScreen):
                     if self.cfg.filename:
                         widget.action_previous.title = filename_only(self.cfg.filename)
 
+    def message_open_cfg_first(self):
+        message = '\nBefore you can do this, you need to open a CFG file (see option under File menu).  Opening a CFG file will also open your database. '
+        message += 'If you do not have a CFG file already, you can use a default one (see option under File menu).  Later you can alter the default CFG to '
+        message += 'add additional options specific to your work.'
+        return(e5_MessageBox('EDM', message))
+
+    def ready_to_use(self):
+        return(self.cfg is not None and self.data.filename != '')
+
     def take_shot(self, instance):
-        self.station.shot_type = instance.id
-        self.station.clear_xyz()
-        if self.station.make == 'Microscribe':
-            self.popup = DataGridTextBox(title = 'EDM', text = '<Microscribe>',
-                                            label = 'Waiting on...',
-                                            button_text = ['Cancel', 'Next'],
-                                            call_back = self.have_shot,
-                                            colors = self.colors)
-        elif self.station.make in ['Manual XYZ', 'Manual VHD']:
-            self.popup = edm_manual(type = self.station.make, call_back = self.have_shot_manual, colors = self.colors)
+        if not self.ready_to_use() and instance.id != 'measure':
+            self.popup = self.message_open_cfg_first()
         else:
-            self.station.take_shot()
-            self.popup = self.get_prism_height()
+            self.station.shot_type = instance.id
+            self.station.clear_xyz()
+            if self.station.make == 'Microscribe':
+                self.popup = DataGridTextBox(title = 'EDM', text = '<Microscribe>',
+                                                label = 'Waiting on...',
+                                                button_text = ['Cancel', 'Next'],
+                                                call_back = self.have_shot,
+                                                colors = self.colors)
+            elif self.station.make in ['Manual XYZ', 'Manual VHD']:
+                self.popup = edm_manual(type = self.station.make, call_back = self.have_shot_manual, colors = self.colors)
+            else:
+                self.station.take_shot()
+                self.popup = self.get_prism_height()
         self.popup.open()
 
     def have_shot_manual(self, instance):
@@ -2020,11 +2061,12 @@ class MainScreen(e5_MainScreen):
         if len(prism_names) > 0:
             return(DataGridMenuList(title = "Select or Enter a Prism Height",
                                             menu_list = prism_names,
-                                            menu_selected = '',
+                                            menu_selected = self.station.prism.name,
                                             call_back = self.have_shot,
                                             colors = self.colors))
         else:
             return(DataGridTextBox(title = 'Enter a Prism Height',
+                                        text = str(self.station.prism.height) if self.station.prism.height else '0',
                                         call_back = self.have_shot,
                                         button_text = ['Back', 'Next'],
                                         colors = self.colors))
@@ -2066,7 +2108,7 @@ class MainScreen(e5_MainScreen):
                 self.station.prism_adjust()
         self.popup.dismiss()
 
-        if self.station.xyz.x and self.station.xyz.y and self.station.xyz.z:
+        if self.station.xyz.x is not None and self.station.xyz.y is not None and self.station.xyz.z is not None:
             if self.station.shot_type == 'measure':
                 txt = f'\nCoordinates:\n  X:  {self.station.xyz_global.x:.3f}\n  Y:  {self.station.xyz_global.y:.3f}\n  Z:  {self.station.xyz_global.z:.3f}'
                 unitname = self.data.point_in_unit(self.station.xyz_global)
@@ -2129,7 +2171,7 @@ class MainScreen(e5_MainScreen):
         self.info.text = last_squid if last_squid else 'EDM'
 
     def check_for_duplicate_xyz(self):
-        if self.station.make == 'Microscribe' and self.data.db:
+        if self.station.make == 'Microscribe' and self.data.db is not None:
             if len(self.data.db.table(self.data.table)) > 1:
                 last_record = self.data.db.table(self.data.table).all()[-1]
                 next_to_last_record = self.data.db.table(self.data.table).all()[-2]
@@ -2196,15 +2238,20 @@ class MainScreen(e5_MainScreen):
         self.popup.open()
 
     def load_cfg(self, path, filename):
+        warnings, errors = [], []
         self.data.close()
         self.dismiss_popup()
         self.cfg.load(os.path.join(path, filename[0]))
         if self.cfg.filename:
-            self.open_db()
-            self.set_new_data_to_true()
+            warnings, errors = self.open_db()
+            if errors == []:
+                self.set_new_data_to_true()
         self.ini.update(self.colors, self.cfg)
         self.build_mainscreen()
         self.reset_screens()
+        if warnings or errors:
+            self.popup = self.warnings_and_errors_popup(warnings, errors)
+            self.popup.open()
 
     def reset_screen_defaults(self):
         sm.get_screen('EditPointScreen').e5_cfg = self.cfg
@@ -2213,22 +2260,28 @@ class MainScreen(e5_MainScreen):
         sm.get_screen('EditLastRecordScreen').data_table = self.data.table
 
     def show_import_csv(self):
-        instructions = 'EDM can import data from EDM-Mobile, EDMWin, EDM itself, or user prepared data files.  The two import formats are CSV and JSON.  CSV files should have a csv or txt extension.  JSON files should have a json extension.'
-        instructions += ' See our web site for more information on exporting data from EDM-Mobile and EDMWin.  The JSON option is for easy importing from EDM data files.'
-        instructions += ' Importing points from JSON files is not yet available. IMPORT: Imported data will overwrite existing data in the case of duplicates.'
-        self.popup = e5_PopUpMenu(title = "Load which kind of data", message = instructions,
-                                        menu_list = ['Points', 'Datums', 'Prisms', 'Units'],
-                                        menu_selected = '',
-                                        call_back = self.select_csv_file,
-                                        colors = self.colors)
+        if not self.ready_to_use():
+            self.popup = self.message_open_cfg_first()
+        else:
+            instructions = 'EDM can import data from EDM-Mobile, EDMWin, EDM itself, or user prepared data files.  The two import formats are CSV and JSON.  CSV files should have a csv or txt extension.  JSON files should have a json extension.'
+            instructions += ' See our web site for more information on exporting data from EDM-Mobile and EDMWin.  The JSON option is for easy importing from EDM data files.'
+            instructions += ' Importing points from JSON files is not yet available. IMPORT: Imported data will overwrite existing data in the case of duplicates.'
+            self.popup = e5_PopUpMenu(title = "Load which kind of data", message = instructions,
+                                            menu_list = ['Points', 'Datums', 'Prisms', 'Units'],
+                                            menu_selected = '',
+                                            call_back = self.select_csv_file,
+                                            colors = self.colors)
         self.popup.open()
 
     def show_csv_datatype(self):
-        self.popup = e5_PopUpMenu(title = "Export which kind of data", message = '',
-                                        menu_list = ['Points', 'Datums', 'Prisms', 'Units'],
-                                        menu_selected = '',
-                                        call_back = self.show_save_csvs,
-                                        colors = self.colors)
+        if not self.ready_to_use():
+            self.popup = self.message_open_cfg_first()
+        else:
+            self.popup = e5_PopUpMenu(title = "Export which kind of data", message = '',
+                                            menu_list = ['Points', 'Datums', 'Prisms', 'Units'],
+                                            menu_selected = '',
+                                            call_back = self.show_save_csvs,
+                                            colors = self.colors)
         self.popup.open()
 
     def select_csv_file(self, instance):
@@ -2407,19 +2460,16 @@ class MainScreen(e5_MainScreen):
         for fieldname in fieldnames:
             field = self.cfg.get(fieldname)
             if field.increment:
-                if fieldname in new_record.keys():
-                    try:
-                        new_record[fieldname] = int(new_record[fieldname]) + 1
-                    except ValueError:
-                        pass
-                else:
-                    new_record[fieldname] = '1'
+                try:
+                    new_record[fieldname] = int(new_record[fieldname]) + 1 if fieldname in new_record.keys() else int(self.get_last_value(fieldname)) + 1
+                except (ValueError, TypeError):
+                    pass
         return(new_record)
 
     def fill_carry_fields(self, new_record):
         fieldnames = self.cfg.fields()
         for fieldname in fieldnames:
-            if fieldname not in __DEFAULT_FIELDS__:
+            if fieldname not in __DEFAULT_FIELDS__ and fieldname not in new_record.keys():
                 field = self.cfg.get(fieldname)
                 if field.carry:
                     carry_value = self.get_last_value(fieldname)
@@ -3646,4 +3696,5 @@ Factory.register(__program__, cls=EDMApp)
 
 
 if __name__ == '__main__':
+    Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
     EDMApp().run()
