@@ -1,3 +1,8 @@
+# To do for next version
+#   Better prism update in prism field
+#   Do unitchecking after doing an offset shot on suffix 0 points
+#   On import, integers (like Suffix) are being converted to float values
+
 # Changes version 1.0.21
 #   Tweaked the default CFG to carry unit and increment ID
 #   Changed how increment works a bit (should work properly now)
@@ -30,8 +35,8 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.21'
-__date__ = 'June, 2022'
+__version__ = '1.0.22'
+__date__ = 'July, 2022'
 __program__ = 'EDM'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
@@ -2363,28 +2368,43 @@ class MainScreen(e5_MainScreen):
             errors = self.check_import_fields_against_cfg_fields(fields)
         return(errors)
 
+    def build_hash_unique_ids(self):
+        hash = {}
+        if self.data.db is not None:
+            for record in self.data.db.table(self.data.table):
+                hash[self.get_unique_key(record)] = record.doc_id
+        return(hash)
+
     def import_these(self, data):
         record_count = 0
+        replacements = 0
+        hash_unique_ids = self.build_hash_unique_ids()
         if self.data.db is not None:
             for item in data:
                 insert_record = {}
                 for key, value in item.items():
                     if key.upper() == "UNIT" and self.csv_data_type == "Units":
                         insert_record['NAME'] = value
+                    elif key.upper() == "DATE" and "TIME" in item:
+                        insert_record['DATE'] = value + " " + item['TIME']
                     else:
                         insert_record[key.upper()] = value
                 if self.csv_data_type in ['Datums', 'Prisms', 'Units']:
                     if insert_record['NAME'].strip():
                         if len(self.data.get_by_name(self.csv_data_type.lower(), insert_record['NAME'])) > 0:
                             self.data.delete_by_name(self.csv_data_type.lower(), insert_record['NAME'])
+                            replacements += 1
                         self.data.db.table(self.csv_data_type.lower()).insert(insert_record)
                 if self.csv_data_type == 'Points':
-                    duplicate_doc_id = self.check_unique_together(insert_record)
-                    self.data.db.table(self.data.table).insert(insert_record)
-                    if not duplicate_doc_id == '':
+                    new_docid = self.data.db.table(self.data.table).insert(insert_record)
+                    hash_key = self.get_unique_key(insert_record)
+                    if hash_key in hash_unique_ids:
+                        duplicate_doc_id = hash_unique_ids[hash_key]
                         self.data.db.table(self.data.table).remove(doc_ids = [duplicate_doc_id])
+                        replacements += 1
+                    hash_unique_ids[hash_key] = new_docid
                 record_count += 1
-        return(record_count)
+        return((record_count, replacements))
 
     def load_csv(self, path, filename):
         # TODO This routine does not properly import Units.  The unitfields need to be put into a separate table
@@ -2400,12 +2420,16 @@ class MainScreen(e5_MainScreen):
         errors = self.error_check_import(fields)
 
         if not errors:
-            record_count = self.import_these(data)
+            record_count, replacements = self.import_these(data)
 
         if errors:
             message = errors
         else:
-            message = '%s %s successfully imported.' % (record_count, self.csv_data_type)
+            if replacements == 0:
+                message = '%s %s successfully imported.' % (record_count, self.csv_data_type)
+            else:
+                message = '%s %s successfully imported.  Of these, %s updated an existing record.' % (record_count, self.csv_data_type, replacements)
+
         self.popup = e5_MessageBox('CSV Import', message,
                                     response_type = "OK",
                                     call_back = self.close_popup,

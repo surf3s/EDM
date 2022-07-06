@@ -47,13 +47,17 @@ python -m edmpy
 2. Changed how increment works a bit (should work properly now)
 3. Disabled multitouch to disable red dot on right mouse click
 4. Check to see if mdf or sdf file is specified (from EDMWin and EDM-Mobile).
-5. Change to json format and give warning
+5. Change to json format and give warning#$
 6. Check to see if json file can be found
 7.   If not, new empty file is created and warning given
 8.  Prism height - whether menu or manual - carries between shots
 9.  Prism height menu - works better with keyboard (enter key and arrow keys)
 10. A number of issues with using the program before opening a CFG fixed
 
+##### Update (July 6, 2022)
+1. Improvements in CSV file import
+2. Some misc. bug fixing
+3. Added CSV export to EDMWin (see oldstoneage.com website)
 
 Note that support currently only exists for Microscribes and Leica total stations.  Sokkia, Topcon and perhaps Nikon will come as I find people to work with.
 
