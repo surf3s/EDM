@@ -35,7 +35,7 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.22'
+__version__ = '1.0.23'
 __date__ = 'July, 2022'
 __program__ = 'EDM'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
@@ -1801,6 +1801,7 @@ class MainScreen(e5_MainScreen):
         elif self.ini.first_time:
             self.popup = e5_MessageBox('Welcome to EDM', __SPLASH_HELP__)
             self.popup.open()
+            self.ini.first_time = False
 
     def setup_logger(self):
         logger = logging.getLogger(__name__)
@@ -2762,9 +2763,12 @@ class record_button(e5_button):
                 self.popup = self.get_prism_height()
                 self.popup.open()
         else:
-            self.station.take_shot()
-            self.popup = self.get_prism_height()
-            self.popup.open()
+            if self.station.make in ['Microscribe', 'Manual XYZ', 'Manual VHD']:
+                self.wait_for_shot()
+            else:
+                self.station.take_shot()
+                self.popup = self.get_prism_height()
+                self.popup.open()
 
     def now_take_shot(self, instance):
         self.popup.dismiss()
@@ -2846,15 +2850,17 @@ class record_button(e5_button):
             self.station.fetch_point()
             self.station.make_global()
 
-        prism_name = instance.text
-        if prism_name == 'Add' or prism_name == 'Next':
-            try:
-                self.station.prism = prism(None, float(self.popup.txt.text), None)
-            except ValueError:
-                self.station.prism = prism()
+        if instance:
+            prism_name = instance.text
+            if prism_name == 'Add' or prism_name == 'Next':
+                try:
+                    self.station.prism = prism(None, float(self.popup.txt.text), None)
+                except ValueError:
+                    self.station.prism = prism()
+            else:
+                self.station.prism = self.data.get_prism(prism_name)
         else:
-            self.station.prism = self.data.get_prism(prism_name)
-
+            self.station.prism = prism(None, 0.0, None)
         # try:
         #    if instance:
         #        self.station.prism = self.data.get_prism(instance.txt)
@@ -2864,7 +2870,7 @@ class record_button(e5_button):
         #    self.station.prism = prism(None, 0.0, None)
         self.default_prism = self.station.prism
         self.station.prism_adjust()
-        if self.station.xyz.x and self.station.xyz.y and self.station.xyz.z:
+        if self.station.xyz.x is not None and self.station.xyz.y is not None and self.station.xyz.z is not None:
             if self.setup_type == 'verify' or self.setup_type == 'record_new':
                 self.result_label.text = self.station.point_pretty(self.station.xyz_global)
             else:

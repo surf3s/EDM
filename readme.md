@@ -22,6 +22,12 @@ pip install edm-arch --user
 python3 -m edmpy
 ```
 
+If you already have edm-arch installed, you can upgrade it as follows.
+
+```
+pip install --upgrade edm-arch
+```
+
 ##### Android
 
 I am not sure I will do an Android version or not.  I have look into how to connect a phone to a total station, and it doesn't look straightforward even with BlueTooth.  I will keep looking at this option.  Better will be to use a ChromeBook I think.
@@ -33,6 +39,12 @@ Currently untested, but normally......
 ```
 pip install edm-arch
 python -m edmpy
+```
+
+If you already have edm-arch installed, you can upgrade it as follows.
+
+```
+pip install --upgrade edm-arch
 ```
 
 ##### Update (June 21, 2022)
@@ -58,6 +70,11 @@ python -m edmpy
 1. Improvements in CSV file import
 2. Some misc. bug fixing
 3. Added CSV export to EDMWin (see oldstoneage.com website)
+
+##### Update (July 16, 2022)
+1. Microscribe setup asked for prism
+2. Manual XYZ or VDH didn't work for setups
+3. Welcome screen kept reappearing
 
 Note that support currently only exists for Microscribes and Leica total stations.  Sokkia, Topcon and perhaps Nikon will come as I find people to work with.
 
