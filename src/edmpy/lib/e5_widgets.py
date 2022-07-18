@@ -1347,7 +1347,7 @@ class e5_RecordEditScreen(Screen):
         unique_key = []
         data_record = self.data.db.table(self.data.table).get(doc_id = doc_id)
         for field in self.e5_cfg.unique_together:
-            unique_key.append("%s" % data_record[field])
+            unique_key.append("%s" % data_record[field] if field in data_record else '')
         return(",".join(unique_key))
 
     def check_unique_together(self):

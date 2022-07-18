@@ -403,7 +403,7 @@ class DB(dbs):
         if name is not None and value is not None and self.db is not None:
             q = Query()
             r = self.db.table(name).search(q[name].matches('^' + value + '$', re.IGNORECASE))
-            if r is not []:
+            if r != []:
                 return(r[0])
         return(None)
 
@@ -3726,5 +3726,5 @@ Factory.register(__program__, cls=EDMApp)
 
 
 if __name__ == '__main__':
-    Config.set('input', 'mouse', 'mouse,multitouch_on_demand')
+    Config.set('input', 'mouse', 'mouse,multitouch_on_demand')      # Removes red dot
     EDMApp().run()
