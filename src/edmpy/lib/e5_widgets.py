@@ -1886,6 +1886,14 @@ class DataGridTableData(RecycleView):
         self.popup.dismiss()
         if self.inputtype in ['MENU', 'BOOLEAN']:
             new_data = {self.field: instance.text if not instance.text == 'Add' else self.datatable_widget.popup_textbox.text}
+        elif self.inputtype == 'NUMERIC':
+            try:
+                if '.' in self.datatable_widget.popup_textbox.text:
+                    new_data = {self.field: float(self.datatable_widget.popup_textbox.text)}
+                else:
+                    new_data = {self.field: int(self.datatable_widget.popup_textbox.text)}
+            except ValueError:
+                new_data = {self.field: self.datatable_widget.popup_textbox.text}
         else:
             new_data = {self.field: self.datatable_widget.popup_textbox.text}
         is_valid = self.e5_cfg.validate_datafield(new_data, self.tb)
@@ -1895,7 +1903,7 @@ class DataGridTableData(RecycleView):
                 if hasattr(widget, 'id'):
                     if widget.id == 'datacell':
                         if widget.key == self.datagrid_doc_id and widget.field == self.field:
-                            widget.text = new_data[self.field]
+                            widget.text = str(new_data[self.field])
             self.datatable_widget.popup_scrollmenu = None
             self.datatable_widget.popup_textbox = None
         else:
@@ -2240,17 +2248,30 @@ class DataGridWidget(TabbedPanel):
             self.popup.open()
             self.popup_open = True
 
+    def get_field_type(self, fieldname):
+        f = self.cfg.get(fieldname)
+        return(f.inputtype)
+
     def update_db(self, instance, value):
         if self.textboxes_will_update_db:
             datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
             if datatable is not None:
-                update = {instance.id: value}
+                if self.get_field_type(instance.id) == 'NUMERIC':
+                    try:
+                        if '.' in value:
+                            update = {instance.id: float(value)}
+                        else:
+                            update = {instance.id: int(value)}
+                    except ValueError:
+                        update = {instance.id: value}
+                else:
+                    update = {instance.id: value}
                 is_valid = self.cfg.validate_datafield(update, self.data)
                 if is_valid is True:
+                    self.data.update(update, doc_ids = [int(datatable.datagrid_doc_id)])
                     for widget in datatable.datagrid_widget_row:
                         if widget.field == instance.id and widget.key == datatable.datagrid_doc_id:
-                            self.data.update(update, doc_ids = [int(datatable.datagrid_doc_id)])
-                            widget.text = value
+                            widget.text = str(value)
                             break
 
     def delete_record1(self, instance):

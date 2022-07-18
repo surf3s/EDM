@@ -35,7 +35,7 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.23'
+__version__ = '1.0.24'
 __date__ = 'July, 2022'
 __program__ = 'EDM'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
@@ -517,7 +517,7 @@ class CFG(blockdata):
         if data_to_insert and data_table and len(data_to_insert) == 1:
             for field, value in data_to_insert.items():
                 f = self.get(field)
-                if f.required and value.strip() == "":
+                if f.required and str(value).strip() == "":
                     error_message = f'\nThe field {field} is set to unique or required.  Enter a value to save this record.'
                     return(error_message)
                 if f.inputtype == 'NUMERIC':

@@ -76,5 +76,8 @@ pip install --upgrade edm-arch
 2. Manual XYZ or VDH didn't work for setups
 3. Welcome screen kept reappearing
 
+##### Update (July 18, 2022)
+1. Bugs in editing that converted numeric values to string values
+
 Note that support currently only exists for Microscribes and Leica total stations.  Sokkia, Topcon and perhaps Nikon will come as I find people to work with.
 
