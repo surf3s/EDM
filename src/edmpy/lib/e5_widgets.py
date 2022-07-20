@@ -1220,7 +1220,7 @@ class e5_RecordEditScreen(Screen):
                         matches.append(record.doc_id)
         else:
             for record in self.data.db.table(self.data.table):
-                if record[filter_field].lower() == filter_value.lower():
+                if str(record[filter_field]).lower() == filter_value.lower():
                     matches.append(record.doc_id)
         return(matches)
 
