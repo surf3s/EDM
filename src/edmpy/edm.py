@@ -854,6 +854,14 @@ class CFG(blockdata):
     def write_csvs(self, filename, table):
         try:
             cfg_fields = self.fields()
+
+            with open(filename, 'w', newline='') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames = cfg_fields, quoting = csv.QUOTE_NONNUMERIC)
+                writer.writeheader()
+                writer.writerows(table)
+
+            return
+
             f = open(filename, 'w')
             csv_row = ''
             for fieldname in cfg_fields:
