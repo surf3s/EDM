@@ -35,7 +35,7 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.25'
+__version__ = '1.0.26'
 __date__ = 'July, 2022'
 __program__ = 'EDM'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
@@ -2233,7 +2233,9 @@ class MainScreen(e5_MainScreen):
         if self.cfg.filename and self.cfg.path:
             start_path = self.cfg.path
         else:
-            start_path = self.ini.get_value('EDM', 'APP_PATH')
+            start_path = self.ini.get_value(__program__, 'APP_PATH')
+        if not os.path.exists(start_path):
+            start_path = os.path.abspath(os.path.dirname(__file__))
         content = e5_LoadDialog(load = self.load_cfg,
                                 cancel = self.dismiss_popup,
                                 start_path = start_path,
@@ -3712,10 +3714,13 @@ class EDMApp(App):
     def __init__(self, **kwargs):
         super(EDMApp, self).__init__(**kwargs)
 
-        self.app_path = self.user_data_dir
+        if platform_name() != 'Android':
+            self.app_path = os.path.abspath(os.path.dirname(__file__))
+        else:
+            self.app_path = self.user_data_dir
 
     def build(self):
-        sm.add_widget(MainScreen(user_data_dir = self.user_data_dir, name = 'MainScreen'))
+        sm.add_widget(MainScreen(user_data_dir = self.app_path, name = 'MainScreen'))
         sm.current = 'MainScreen'
         # Window.borderless = True
         self.title = __program__ + " " + __version__

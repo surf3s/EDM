@@ -79,5 +79,11 @@ pip install --upgrade edm-arch
 ##### Update (July 18, 2022)
 1. Bugs in editing that converted numeric values to string values
 
+##### Update (July 21, 2022)
+1. Bugs in datagrid
+2. Bugs in data filter in edit last record
+3. Bug in starting path that meant a first CFG could not be opened
+
+
 Note that support currently only exists for Microscribes and Leica total stations.  Sokkia, Topcon and perhaps Nikon will come as I find people to work with.
 

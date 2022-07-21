@@ -1777,7 +1777,7 @@ class DataGridTableData(RecycleView):
 
     datagrid_doc_id = None
     datagrid_background_color = None
-    datagrid_widget_row = []
+    # datagrid_widget_row = []
 
     datatable_widget = None
 
@@ -1828,26 +1828,35 @@ class DataGridTableData(RecycleView):
 
     def clear_highlight_row(self):
         if self.datagrid_doc_id:
-            for widget in self.get_editcell_row(self.datagrid_doc_id):
-                widget.background_color = self.datagrid_background_color
+            for record in self.data:
+                if record['key'] == self.datagrid_doc_id:
+                    if 'background_color' in record:
+                        del record['background_color']
+            self.refresh_from_data()
+            # for widget in self.get_editcell_row(self.datagrid_doc_id):
+            #    widget.background_color = self.datagrid_background_color
             self.datagrid_doc_id = ''
-            self.datagrid_widget_row = []
+            # self.datagrid_widget_row = []
 
     def set_highlight_row(self):
-        if self.datagrid_doc_id:
-            widget_row = self.get_editcell_row(self.datagrid_doc_id)
-            for widget in widget_row:
-                widget.background_color = self.colors.optionbutton_background
-            self.datagrid_widget_row = widget_row
+        # if self.datagrid_doc_id:
+        #    widget_row = self.get_editcell_row(self.datagrid_doc_id)
+        #    for widget in widget_row:
+        #        widget.background_color = self.colors.optionbutton_background
+        #   self.datagrid_widget_row = widget_row
+        for record in self.data:
+            if record['key'] == self.datagrid_doc_id:
+                record['background_color'] = self.colors.optionbutton_background
+        self.refresh_from_data()
 
-    def get_editcell_row(self, key):
-        row_widgets = []
-        for widget in self.walk():
-            if hasattr(widget, 'id'):
-                if widget.id == 'datacell':
-                    if widget.key == key:
-                        row_widgets.append(widget)
-        return(row_widgets)
+    # def get_editcell_row(self, key):
+    #    row_widgets = []
+    #    for widget in self.walk():
+    #        if hasattr(widget, 'id'):
+    #            if widget.id == 'datacell':
+    #                if widget.key == key:
+    #                    row_widgets.append(widget)
+    #    return(row_widgets)
 
     def get_editcell(self, key, field):
         for widget in self.walk():
@@ -1859,6 +1868,9 @@ class DataGridTableData(RecycleView):
 
     def editcell(self, key, field, db):
         # self.key = key
+        if field == 'doc_id' and self.datagrid_doc_id == key:
+            self.clear_highlight_row()
+            return
         self.clear_highlight_row()
         self.datagrid_doc_id = key
         editcell_widget = self.get_editcell(key, field)
@@ -1899,16 +1911,24 @@ class DataGridTableData(RecycleView):
         is_valid = self.e5_cfg.validate_datafield(new_data, self.tb)
         if is_valid is True:
             self.tb.update(new_data, doc_ids = [int(self.datagrid_doc_id)])
-            for widget in self.walk():
-                if hasattr(widget, 'id'):
-                    if widget.id == 'datacell':
-                        if widget.key == self.datagrid_doc_id and widget.field == self.field:
-                            widget.text = str(new_data[self.field])
+            self.update_recycle_data(self.datagrid_doc_id, self.field, new_data[self.field])
+            # for widget in self.walk():
+            #    if hasattr(widget, 'id'):
+            #        if widget.id == 'datacell':
+            #            if widget.key == self.datagrid_doc_id and widget.field == self.field:
+            #                widget.text = str(new_data[self.field])
             self.datatable_widget.popup_scrollmenu = None
             self.datatable_widget.popup_textbox = None
         else:
             self.popup = e5_MessageBox('Data error', is_valid)
             self.popup.open()
+
+    def update_recycle_data(self, doc_id, field, value):
+        for record in self.data:
+            if record['key'] == doc_id and record['field'] == field:
+                record['text'] = str(value)
+                self.refresh_from_data()
+                break
 
 
 class DataGridTable(BoxLayout):
@@ -1952,8 +1972,9 @@ class DataGridGridPanel(BoxLayout):
                 reformatted_row[field] = str(tb_row[field]) if field in tb_row else ''
             data.append(reformatted_row)
         data = sorted(data, key=lambda k: int(k['doc_id']), reverse = True)
-        self.add_widget(DataGridTable(list_dicts = data, column_names = self.column_names,
-                                        tb = self.tb, e5_cfg = self.tb_fields, colors = self.colors))
+        self.recycleview_box = DataGridTable(list_dicts = data, column_names = self.column_names,
+                                                tb = self.tb, e5_cfg = self.tb_fields, colors = self.colors)
+        self.add_widget(self.recycleview_box)
 
 
 class DataGridCasePanel(BoxLayout):
@@ -2057,8 +2078,12 @@ class DataGridAddNewPanel(GridLayout):
                 self.call_back = call_back
             else:
                 self.clear_widgets()
-                self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled in E5 because it would bipass conditions and error checking (but it is enabled in EDM which is why it appears in this list of tabs).',
-                                                    popup = False, colors = self.colors))
+                if __program__ == 'EDM':
+                    self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled for the main points table but is enabled for datums, units and prisms.',
+                                                        popup = False, colors = self.colors))
+                else:
+                    self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled in E5 because it would bipass conditions and error checking (but it is enabled in EDM which is why it appears in this list of tabs).',
+                                                        popup = False, colors = self.colors))
 
     def next_field(self, instance):
         if instance.get_focus_next() == self.button:
@@ -2148,7 +2173,7 @@ class DataGridWidget(TabbedPanel):
     def open_panel2(self):
         datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
         if datatable is not None:
-            if datatable.datagrid_doc_id is not None:
+            if datatable.datagrid_doc_id is not None and datatable.datagrid_doc_id != '':
                 data_record = self.data.get(doc_id = int(datatable.datagrid_doc_id))
                 for widget in self.ids.edit_panel.children[0].walk():
                     if hasattr(widget, 'id'):
@@ -2269,10 +2294,19 @@ class DataGridWidget(TabbedPanel):
                 is_valid = self.cfg.validate_datafield(update, self.data)
                 if is_valid is True:
                     self.data.update(update, doc_ids = [int(datatable.datagrid_doc_id)])
-                    for widget in datatable.datagrid_widget_row:
-                        if widget.field == instance.id and widget.key == datatable.datagrid_doc_id:
-                            widget.text = str(value)
-                            break
+                    self.update_datagrid(datatable.datagrid_doc_id, instance.id, value)
+                    # for widget in datatable.datagrid_widget_row:
+                    #     if widget.field == instance.id and widget.key == datatable.datagrid_doc_id:
+                    #         widget.text = str(value)
+                    #         break
+
+    def update_datagrid(self, doc_id, field, value):
+        datatable = self.get_widget_by_id(self.get_tab_by_name('Data').content, 'datatable')
+        for record in datatable.data:
+            if record['key'] == doc_id and record['field'] == field:
+                record['text'] = str(value)
+                self.get_tab_by_name('Data').content.recycleview_box.table_data.refresh_from_data()
+                break
 
     def delete_record1(self, instance):
         self.popup = e5_MessageBox('Delete record', '\nAre you sure you want to delete this record?',
@@ -2289,7 +2323,7 @@ class DataGridWidget(TabbedPanel):
             doc_id = int(datatable.datagrid_doc_id)
             self.data.remove(doc_ids = [doc_id])
             datatable.datagrid_doc_id = None
-            datatable.datagrid_widget_row = None
+            # datatable.datagrid_widget_row = None
             self.reload_data()
             self.panel3.populate(colors = self.colors)
             self.switch_to(self.get_tab_by_name('Data'))
