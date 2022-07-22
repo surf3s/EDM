@@ -852,16 +852,12 @@ class CFG(blockdata):
         return(txt)
 
     def write_csvs(self, filename, table):
+        # This routine could be shortened with Python libraries, however,
+        # It is written this way to ensure a proper CSV even if users
+        # change their CFG part way through data collection
+        # (meaning that the CFG and the JSON datafile do not perfectly match)
         try:
             cfg_fields = self.fields()
-
-            with open(filename, 'w', newline='') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames = cfg_fields, quoting = csv.QUOTE_NONNUMERIC)
-                writer.writeheader()
-                writer.writerows(table)
-
-            return
-
             f = open(filename, 'w')
             csv_row = ''
             for fieldname in cfg_fields:
