@@ -26,3 +26,6 @@ CFGs/KH 2021.CFG
 CFGs/KS2_2022.CFG
 CFGs/PIVL8-Station-1_points_2022_07_21.csv
 *.log
+CFGs/pivl8_edmwin_datums_rs.csv
+CFGs/PIVL8-Station-1_points_2022_08_07.csv
+CFGs/PIVL8-Station-1_station1.geojson

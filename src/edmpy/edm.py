@@ -15,6 +15,10 @@
 #   Prism height menu - works better with keyboard (enter key and arrow keys)
 #   A number of issues with using the program before opening a CFG fixed
 
+# Changes to version 1.0.26
+#   Changed the way saving works on editing last points
+#   Better setting focus on editing last points
+
 # EDM by Shannon McPherron
 #
 #   This is an alpha release.  I am still working on bugs and I am still implementing some features.
@@ -895,6 +899,68 @@ class CFG(blockdata):
             return(None)
         except OSError:
             return('\nCould not write data to %s.' % (filename))
+
+    def write_geojson(self, filename, table):
+        try:
+            cfg_fields = self.fields()
+            basename = os.path.basename(filename)
+            basename = os.path.splitext(basename)[0]
+            f = open(filename, 'w')
+            geojson_header = '{\n'
+            geojson_header += '"type": "FeatureCollection",\n'
+            geojson_header += '"name": "%s",\n' % basename
+            geojson_header += '"features": [\n'
+            f.write(geojson_header)
+            row_comma = ''
+            for row in table:
+                geojson_row = row_comma + '{ "type": "Feature", "properties": {'
+                comma = ' '
+                for fieldname in cfg_fields:
+                    if fieldname in row.keys():
+                        if row[fieldname] != '':
+                            geojson_row += comma + '"%s": ' % fieldname
+                            if self.get(fieldname).inputtype in ['NUMERIC', 'INSTRUMENT']:
+                                geojson_row += '%s' % row[fieldname]
+                            else:
+                                geojson_row += '"%s"' % row[fieldname]
+                            comma = ', '
+                geojson_row += ' },\n'
+                geojson_row += '"geometry": { "type": "Point", "coordinates": [ '
+                geojson_row += '%s , %s' % self.get_XY(row)
+                geojson_row += '] } }'
+                f.write(geojson_row)
+                row_comma = ',\n'
+            f.write('\n]\n}')
+            f.close()
+            return(None)
+        except:
+            return('\nCould not write data to %s.' % (filename))
+
+    def get_XY(self, row):
+        cfg_fields = self.fields()
+        if 'X' in cfg_fields and 'Y' in cfg_fields:
+            return((row['X'], row['Y']))
+        elif 'LATITUDE' in cfg_fields and 'LONGITUDE' in cfg_fields:
+            return((row['LONGITUDE'], row['LATITUDE']))
+        elif self.gps_field(row):
+            gps_data = self.gps_to_dict(self.gps_field(row))
+            return((gps_data['Lon'], gps_data['Lat']))
+        else:
+            return((0, 0))
+
+    def gps_field(self, row):
+        for fieldname in self.fields():
+            field = self.get(fieldname)
+            if field.inputtype in ['GPS']:
+                return(row[fieldname])
+        return('')
+
+    def gps_to_dict(self, delimited_data):
+        dict_data = {}
+        for item in delimited_data.split(','):
+            dict_item = item.split('=')
+            dict_data[dict_item[0].strip()] = dict_item[1].strip()
+        return(dict_data)
 
 
 class totalstation(object):
@@ -2149,8 +2215,6 @@ class MainScreen(e5_MainScreen):
             self.popup.open()
 
     def on_save(self):
-        # TODO check for duplicates
-        # TODO update linked fields
         self.log_the_shot()
         self.update_info_label()
         self.make_backup()

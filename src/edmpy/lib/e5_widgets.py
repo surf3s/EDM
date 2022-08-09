@@ -1195,6 +1195,12 @@ class e5_RecordEditScreen(Screen):
             self.first_field_widget.focus = True
         self.loading = False
 
+    def on_leave(self):
+        # This helps insure that saving on lost focus works properly
+        # There is an issue this addresses with building the screens
+        # at startup.
+        self.loading = True
+
     def reset_doc_ids(self):
         self.doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()] if self.data.db is not None else []
 
@@ -1243,13 +1249,18 @@ class e5_RecordEditScreen(Screen):
     def make_empty_frame(self):
         self.data_fields.bind(minimum_height = self.data_fields.setter('height'))
         self.data_fields.clear_widgets()
-        for col in self.e5_cfg.fields():
-            field_type = self.e5_cfg.get_value(col, 'TYPE')
-            self.data_fields.add_widget(DataGridLabelAndField(col = col,
-                                                                colors = self.colors,
-                                                                note_field = (field_type == 'NOTE')))
-        if self.e5_cfg.fields():  # TODO not a great way to do this - fix later
-            self.first_field_widget = self.get_widget_by_id(self.data_fields, self.e5_cfg.fields()[0])
+        fields = self.e5_cfg.fields()
+        self.first_field_widget = None
+        if fields:
+            first_field = True
+            for col in fields:
+                field_type = self.e5_cfg.get_value(col, 'TYPE')
+                widget = DataGridLabelAndField(col = col, colors = self.colors, note_field = (field_type == 'NOTE'))
+                self.data_fields.add_widget(widget)
+                if first_field:
+                    if field_type not in ['MENU', 'BOOLEAN']:
+                        self.first_field_widget = widget.txt
+                    first_field = False
 
     def first_record(self, value):
         if self.doc_ids:
@@ -1302,11 +1313,21 @@ class e5_RecordEditScreen(Screen):
                         if hasattr(widget, 'id'):
                             if widget.id == field:
                                 widget.text = '%s' % data_record[field] if field in data_record.keys() else ''
-                                widget.bind(text = self.update_db)
+                                # widget.bind(text = self.update_db)
                                 widget.bind(focus = self.show_menu)
                                 break
         self.can_update_data_table = True
         self.update_record_counter_label()
+
+    def check_numeric(self, instance, value):
+        cfg_field = self.e5_cfg.get(instance.id)
+        if cfg_field.inputtype in ['NUMERIC', 'INSTRUMENT']:
+            if not self.is_numeric(value):
+                return([f'{instance.id} is listed as a numeric field in the CFG file but the value {value} is not a valid number.'])
+            else:
+                return([])
+        else:
+            return([])
 
     def update_db(self, instance, value):
         if self.data.table and self.can_update_data_table:
@@ -1362,9 +1383,33 @@ class e5_RecordEditScreen(Screen):
                     break
         return(save_errors)
 
+    def check_numeric_fields(self):
+        save_errors = []
+        for field_name in self.e5_cfg.fields():
+            field = self.e5_cfg.get(field_name)
+            if field.inputtype in ['NUMERIC', 'INSTRUMENT']:
+                for widget in self.layout.walk():
+                    if hasattr(widget, 'id'):
+                        if widget.id == field_name:
+                            if not self.is_numeric(widget.text) and widget.text != '':
+                                save_errors.append('The field %s is marked as numeric but the value entered is not a valid number.' % field_name)
+        return(save_errors)
+
+    def check_bad_characters(self):
+        save_errors = []
+        for field_name in self.e5_cfg.fields():
+            for widget in self.layout.walk():
+                if hasattr(widget, 'id'):
+                    if widget.id == field_name:
+                        if "\"" in widget.text:
+                            save_errors.append('The field %s contains characters that are not recommended in a data file.  These include \" and \\.' % field_name)
+        return(save_errors)
+
     def save_record(self, instance):
         save_errors = self.check_required_fields()
         save_errors += self.check_unique_together()
+        save_errors += self.check_numeric_fields()
+        save_errors += self.check_bad_characters()
         if hasattr(self.data.db.table(self.data.table), 'on_save') and save_errors == []:
             save_errors += self.data.db.table(self.data.table).on_save()
         if not save_errors:
@@ -1426,10 +1471,13 @@ class e5_RecordEditScreen(Screen):
                     self.popup_scrollmenu = self.get_widget_by_id(self.popup, 'menu_scroll')
                     self.popup_textbox = self.get_widget_by_id(self.popup, 'new_item')
                     self.popup_addbutton = self.get_widget_by_id(self.popup, 'add_button')
+        elif not instance.focus and not self.loading:
+            self.update_db(instance, instance.text)
 
     def menu_selection(self, instance):
         self.popup.dismiss()
         self.popup_field_widget.text = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
+        self.update_db(self.popup_field_widget, self.popup_field_widget.text)
         if instance.id == 'add_button' and self.popup_field_widget.text.strip() != '':
             field = self.e5_cfg.get(self.popup_field_widget.id)
             if self.popup_field_widget.text not in field.menu:
