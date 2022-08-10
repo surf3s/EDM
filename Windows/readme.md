@@ -1,6 +1,6 @@
 # Windows distribution without installing Python
 
-The dist folder here contains a one file executable of the EDMpy program (edm.exe).  On Windows, download this file to a folder for the program, and it should run without the need to install Python or Python packages.  It works fine on my own Windows 10 computer and apparently works as well on Windows 11.
+The [dist folder](https://github.com/surf3s/EDM/tree/master/Windows/dist) here contains a one file executable of the EDMpy program [edm.exe](https://github.com/surf3s/EDM/raw/master/Windows/dist/edm.exe).  On Windows, download this file to a folder for the program, and it should run without the need to install Python or Python packages.  It works fine on my own Windows 10 computer and apparently works as well on Windows 11.
 
 At times the source code might get ahead of this executable, but I will do my best to update it when major changes occur.
 
