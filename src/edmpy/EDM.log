@@ -159,3 +159,7 @@
 2022-08-09 16:15:36 - INFO - CFG c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
 2022-08-09 16:15:36 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
 2022-08-09 16:16:34 - INFO - EDM exited.
+2022-08-09 16:48:55 - INFO - EDM started, logger initialized, and application built.
+2022-08-09 16:48:55 - INFO - CFG c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-09 16:48:55 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-09 18:10:13 - INFO - EDM exited.
