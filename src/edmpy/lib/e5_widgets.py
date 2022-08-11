@@ -441,7 +441,7 @@ class e5_MainScreen(Screen):
             self.ini.save()
         self.colors.set_colormode()
         self.colors.need_redraw = False
-        self.ini.update_value(__program__, 'APP_PATH', os.path.abspath(os.path.dirname(__file__)) if platform_name() == 'Windows' else self.user_data_dir)
+        self.ini.update_value(__program__, 'APP_PATH', self.user_data_dir)
         return(warnings, errors)
 
     def get_path(self):
@@ -683,7 +683,7 @@ class e5_MainScreen(Screen):
             message_text = '\nYou are asking to delete all of the records in the current database table. Are you sure you want to do this?'
             self.delete_table = self.data.table
         else:
-            message_text = '\nYou are asking to delete all of the records in the %s table. Are you sure you want to do this?' % table_name
+            message_text = f'\nYou are asking to delete all of the records in the {table_name} table. Are you sure you want to do this?'
             self.delete_table = table_name
         self.popup = e5_MessageBox('Delete All Records', message_text, response_type = "YESNO",
                                     call_back = [self.delete_all_records1, self.close_popup],
@@ -692,8 +692,9 @@ class e5_MainScreen(Screen):
         self.popup_open = True
 
     def delete_all_records1(self, value):
-        self.close_popup(value)
-        message_text = '\nThis is your last chance.  All records in the %s table will be deleted when you press Yes.' % self.delete_table
+        self.popup.dismiss()
+        self.popup_open = False
+        message_text = f'\nThis is your last chance.  All records in the {self.delete_table} table will be deleted when you press Yes.'
         self.popup = e5_MessageBox('Delete All Records', message_text, response_type = "YESNO",
                                     call_back = [self.delete_all_records2, self.close_popup],
                                     colors = self.colors)
@@ -703,7 +704,8 @@ class e5_MainScreen(Screen):
     def delete_all_records2(self, value):
         self.data.delete_all(self.delete_table)
         self.data.new_data[self.data.table] = True
-        self.close_popup(value)
+        self.popup.dismiss()
+        self.popup_open = False
 
     def show_save_csvs(self, *args):
         if self.cfg.filename and self.data.filename:
@@ -1351,6 +1353,7 @@ class e5_RecordEditScreen(Screen):
                                     widget.text = str(int(widget.text) + 1)
                                 except ValueError:
                                     pass
+                            self.update_db(widget, widget.text)
 
     def check_required_fields(self):
         save_errors = []

@@ -167,3 +167,59 @@
 2022-08-11 08:48:54 - INFO - CFG c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
 2022-08-11 08:48:54 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
 2022-08-11 08:48:59 - INFO - EDM exited.
+2022-08-11 16:05:13 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 16:07:00 - INFO - CFG c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:07:03 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:11:34 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 16:11:34 - INFO - CFG c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:11:34 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:11:48 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-2.json opened.
+2022-08-11 16:12:24 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:12:24 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:12:32 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-2.json opened.
+2022-08-11 16:12:52 - INFO - EDM exited.
+2022-08-11 16:12:59 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 16:12:59 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-2.json opened.
+2022-08-11 16:13:29 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:13:29 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:13:38 - INFO - EDM exited.
+2022-08-11 16:13:59 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 16:13:59 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:13:59 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:14:05 - INFO - EDM exited.
+2022-08-11 16:23:33 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 16:23:33 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:23:33 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:24:15 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-2.json opened.
+2022-08-11 16:24:53 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:24:53 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:25:08 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-2.json opened.
+2022-08-11 16:25:51 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 16:25:51 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-2.json opened.
+2022-08-11 16:25:58 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:25:58 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:26:05 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-2.json opened.
+2022-08-11 16:26:13 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:26:13 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:26:18 - INFO - EDM exited.
+2022-08-11 16:54:37 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 16:54:37 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 16:54:37 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 16:55:38 - INFO -  hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-11 16:56:47 - INFO -  hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-11 17:03:32 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 17:03:32 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 17:03:32 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 17:05:27 - INFO - EDM exited.
+2022-08-11 17:18:24 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 17:18:24 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 17:18:24 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 17:21:45 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 17:21:45 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 17:21:45 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 17:22:39 - INFO - BLOC08-31(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-11 17:57:03 - INFO - EDM exited.
+2022-08-11 17:57:12 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 17:57:12 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 17:57:12 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 18:00:50 - INFO - EDM exited.

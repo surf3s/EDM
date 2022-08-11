@@ -29,4 +29,6 @@ CFGs/PIVL8-Station-1_points_2022_07_21.csv
 CFGs/pivl8_edmwin_datums_rs.csv
 CFGs/PIVL8-Station-1_points_2022_08_07.csv
 CFGs/PIVL8-Station-1_station1.geojson
+CFGs/PIVL8-Station-2.CFG
 src/edmpy/EDM.log
+src/edmpy/EDM.ini

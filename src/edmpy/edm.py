@@ -39,7 +39,7 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.27'
+__version__ = '1.0.28'
 __date__ = 'August, 2022'
 __program__ = 'EDM'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
@@ -2298,7 +2298,7 @@ class MainScreen(e5_MainScreen):
             self.data.new_data[table_name] = True
 
     def show_load_cfg(self):
-        if self.cfg.filename and self.cfg.path:
+        if self.cfg.path:
             start_path = self.cfg.path
         else:
             start_path = self.ini.get_value(__program__, 'APP_PATH')
@@ -3795,7 +3795,7 @@ class EDMApp(App):
         return(sm)
 
 
-Factory.register(__program__, cls=EDMApp)
+Factory.register(__program__, cls = EDMApp)
 
 
 if __name__ == '__main__':
