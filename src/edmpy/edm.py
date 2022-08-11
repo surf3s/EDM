@@ -39,8 +39,8 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.26'
-__date__ = 'July, 2022'
+__version__ = '1.0.27'
+__date__ = 'August, 2022'
 __program__ = 'EDM'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
