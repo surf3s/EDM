@@ -1164,17 +1164,17 @@ class e5_RecordEditScreen(Screen):
                                                                          self.next_record, self.last_record],
                                                             selected = [True, True, True, True],
                                                             colors = self.colors))
-            back_and_filter = e5_side_by_side_buttons(text = ['Back', 'Filter'],
-                                                            id = ['back', 'filter'],
-                                                            call_back = [self.call_back, self.filter],
-                                                            selected = [True, True],
+            back_and_filter = e5_side_by_side_buttons(text = ['Back', 'Save', 'Filter'],
+                                                            id = ['back', 'save', 'filter'],
+                                                            call_back = [self.call_back, self.update_db, self.filter],
+                                                            selected = [True, True, True],
                                                             colors = self.colors)
             self.filter_button = back_and_filter.children[0]
             self.layout.add_widget(back_and_filter)
         else:
-            self.layout.add_widget(e5_side_by_side_buttons(text = ['Save', 'Cancel'],
-                                                            id = ['save', 'cancel'],
-                                                            call_back = [self.save_record, self.cancel_record],
+            self.layout.add_widget(e5_side_by_side_buttons(text = ['Cancel', 'Save'],
+                                                            id = ['cancel', 'save'],
+                                                            call_back = [self.cancel_record, self.save_record],
                                                             selected = [True, True],
                                                             colors = self.colors))
 
@@ -1196,6 +1196,7 @@ class e5_RecordEditScreen(Screen):
         if self.first_field_widget:
             self.first_field_widget.focus = True
         self.loading = False
+        self.changes_made = False
 
     def on_leave(self):
         # This helps insure that saving on lost focus works properly
@@ -1264,29 +1265,57 @@ class e5_RecordEditScreen(Screen):
                         self.first_field_widget = widget.txt
                     first_field = False
 
+    def leave_record_without_save(self, instance):
+        self.changes_made = False
+        self.close_popup(None)
+        self.continue_on_with(None)
+
+    def ask_about_saving(self):
+        self.popup = e5_MessageBox('Leave without saving', '\nLeave this record without saving changes?',
+                                    response_type = "YESNO",
+                                    call_back = [self.leave_record_without_save, self.close_popup],
+                                    colors = self.colors)
+        self.popup.open()
+
     def first_record(self, value):
         if self.doc_ids:
-            self.doc_id = self.doc_ids[0]
-            self.put_data_in_frame()
+            if self.changes_made:
+                self.continue_on_with = self.first_record
+                self.ask_about_saving()
+            else:
+                self.doc_id = self.doc_ids[0]
+                self.put_data_in_frame()
 
     def previous_record(self, value):
         if self.doc_ids:
-            current = self.doc_ids.index(self.doc_id)
-            new = max(current - 1, 0)
-            self.doc_id = self.doc_ids[new]
-            self.put_data_in_frame()
+            if self.changes_made:
+                self.continue_on_with = self.previous_record
+                self.ask_about_saving()
+            else:
+                current = self.doc_ids.index(self.doc_id)
+                new = max(current - 1, 0)
+                self.doc_id = self.doc_ids[new]
+                self.put_data_in_frame()
 
     def next_record(self, value):
         if self.doc_ids:
-            current = self.doc_ids.index(self.doc_id)
-            new = min(current + 1, len(self.doc_ids) - 1)
-            self.doc_id = self.doc_ids[new]
-            self.put_data_in_frame()
+            if self.changes_made:
+                self.continue_on_with = self.next_record
+                self.ask_about_saving()
+            else:
+                current = self.doc_ids.index(self.doc_id)
+                new = min(current + 1, len(self.doc_ids) - 1)
+                self.doc_id = self.doc_ids[new]
+                self.put_data_in_frame()
 
     def last_record(self, value):
         if self.doc_ids:
-            self.doc_id = self.doc_ids[-1]
-            self.put_data_in_frame()
+            if self.changes_made:
+                self.continue_on_with = self.last_record
+                self.ask_about_saving()
+            else:
+                self.doc_id = self.doc_ids[-1]
+                self.put_data_in_frame()
 
     def update_record_counter_label(self):
         if self.record_counter_label:
@@ -1315,11 +1344,15 @@ class e5_RecordEditScreen(Screen):
                         if hasattr(widget, 'id'):
                             if widget.id == field:
                                 widget.text = '%s' % data_record[field] if field in data_record.keys() else ''
-                                # widget.bind(text = self.update_db)
+                                widget.bind(text = self.flag_changes_made)
                                 widget.bind(focus = self.show_menu)
                                 break
         self.can_update_data_table = True
         self.update_record_counter_label()
+        self.changes_made = False
+
+    def flag_changes_made(self, instance, value):
+        self.changes_made = True
 
     def check_numeric(self, instance, value):
         cfg_field = self.e5_cfg.get(instance.id)
@@ -1331,12 +1364,17 @@ class e5_RecordEditScreen(Screen):
         else:
             return([])
 
-    def update_db(self, instance, value):
-        if self.data.table and self.can_update_data_table:
-            update = {instance.id: value}
-            self.data.db.table(self.data.table).update(update, doc_ids = [self.doc_id])
-            self.refresh_linked_fields(instance.id, value)
+    def update_db(self, *args):
+        if self.doc_id and self.data.table and self.e5_cfg and self.can_update_data_table:
+            for field in self.e5_cfg.fields():
+                for widget in self.layout.walk():
+                    if hasattr(widget, 'id'):
+                        if widget.id == field:
+                            update = {widget.id: widget.text}
+                            self.data.db.table(self.data.table).update(update, doc_ids = [self.doc_id])
+                            break
             self.data.new_data[self.data.table] = True
+            self.changes_made = False
 
     def refresh_linked_fields(self, fieldname, value):
         field = self.e5_cfg.get(fieldname)
@@ -1353,7 +1391,7 @@ class e5_RecordEditScreen(Screen):
                                     widget.text = str(int(widget.text) + 1)
                                 except ValueError:
                                     pass
-                            self.update_db(widget, widget.text)
+                            # self.update_db(widget, widget.text)
 
     def check_required_fields(self):
         save_errors = []
@@ -1367,9 +1405,17 @@ class e5_RecordEditScreen(Screen):
                                 save_errors.append('The field %s requires a value.' % field_name)
         return(save_errors)
 
-    def get_unique_key(self, doc_id):
+    def convert_widgets_to_record(self):
+        data_record = {}
+        for field_name in self.e5_cfg.fields():
+            for widget in self.layout.walk():
+                if hasattr(widget, 'id'):
+                    if widget.id == field_name:
+                        data_record[field_name] = widget.text
+        return(data_record)
+
+    def get_unique_key(self, data_record):
         unique_key = []
-        data_record = self.data.db.table(self.data.table).get(doc_id = doc_id)
         for field in self.e5_cfg.unique_together:
             unique_key.append("%s" % data_record[field] if field in data_record else '')
         return(",".join(unique_key))
@@ -1378,9 +1424,9 @@ class e5_RecordEditScreen(Screen):
         save_errors = []
         if self.e5_cfg.unique_together and len(self.data.db.table(self.data.table)) > 1:
             doc_ids = self.data.doc_ids()
-            unique_key = self.get_unique_key(doc_ids[-1])
+            unique_key = self.get_unique_key(self.convert_widgets_to_record())
             for doc_id in doc_ids[0:-1]:
-                if unique_key == self.get_unique_key(doc_id):
+                if unique_key == self.get_unique_key(self.data.db.table(self.data.table).get(doc_id = doc_id)):
                     save_errors.append("Based on the unique together field(s) %s, this record's unique key of %s duplicates the record with a doc_id of %s." %
                                         (",".join(self.e5_cfg.unique_together), unique_key, doc_id))
                     break
@@ -1416,9 +1462,10 @@ class e5_RecordEditScreen(Screen):
         if hasattr(self.data.db.table(self.data.table), 'on_save') and save_errors == []:
             save_errors += self.data.db.table(self.data.table).on_save()
         if not save_errors:
+            self.update_db()
             self.update_link_fields()
             self.data.new_data[self.data.table] = True
-            self.parent.current = 'MainScreen'
+            self.go_mainscreen()
         else:
             self.popup = e5_MessageBox('Save errors',
                                         '\nCorrect the following errors:\n  ' + '\n  '.join(save_errors),
@@ -1475,12 +1522,12 @@ class e5_RecordEditScreen(Screen):
                     self.popup_textbox = self.get_widget_by_id(self.popup, 'new_item')
                     self.popup_addbutton = self.get_widget_by_id(self.popup, 'add_button')
         elif not instance.focus and not self.loading:
-            self.update_db(instance, instance.text)
+            self.refresh_linked_fields(instance.id, instance.text)
 
     def menu_selection(self, instance):
         self.popup.dismiss()
         self.popup_field_widget.text = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
-        self.update_db(self.popup_field_widget, self.popup_field_widget.text)
+        self.refresh_linked_fields(instance.id, instance.text)
         if instance.id == 'add_button' and self.popup_field_widget.text.strip() != '':
             field = self.e5_cfg.get(self.popup_field_widget.id)
             if self.popup_field_widget.text not in field.menu:
@@ -1500,6 +1547,20 @@ class e5_RecordEditScreen(Screen):
         return(None)
 
     def call_back(self, value):
+        if self.changes_made:
+            self.popup = e5_MessageBox('Leave without saving', '\nLeave this record without saving changes?',
+                                        response_type = "YESNO",
+                                        call_back = [self.back_without_save, self.close_popup],
+                                        colors = self.colors)
+            self.popup.open()
+        else:
+            self.go_mainscreen()
+
+    def back_without_save(self, instance):
+        self.close_popup(instance)
+        self.go_mainscreen()
+
+    def go_mainscreen(self, *args):
         self.parent.current = 'MainScreen'
 
 

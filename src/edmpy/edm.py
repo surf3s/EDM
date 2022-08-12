@@ -1872,6 +1872,7 @@ class MainScreen(e5_MainScreen):
             self.popup = e5_MessageBox('Welcome to EDM', __SPLASH_HELP__)
             self.popup.open()
             self.ini.first_time = False
+        self.update_info_label()
 
     def setup_logger(self):
         logger = logging.getLogger(__name__)

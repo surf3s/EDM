@@ -223,3 +223,83 @@
 2022-08-11 17:57:12 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
 2022-08-11 17:57:12 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
 2022-08-11 18:00:50 - INFO - EDM exited.
+2022-08-11 18:05:15 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 18:05:15 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 18:05:15 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 18:05:50 - INFO - EDM started, logger initialized, and application built.
+2022-08-11 18:05:50 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-11 18:05:50 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-11 18:06:15 - INFO - EDM exited.
+2022-08-12 10:04:27 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:04:27 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:04:27 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:05:41 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:05:41 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:05:41 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:08:06 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:08:06 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:08:06 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:08:25 - INFO - EDM exited.
+2022-08-12 10:09:19 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:09:19 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:09:19 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:20:53 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:20:53 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:20:53 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:21:20 - INFO - BLOC08-32(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 10:21:28 - INFO - EDM exited.
+2022-08-12 10:22:09 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:22:09 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:22:09 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:22:51 - INFO - BLOC08-36(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 10:25:29 - INFO - BLOC08-37(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 10:27:03 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:27:03 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:27:03 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:29:05 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:29:06 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:29:06 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 10:29:53 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 10:29:53 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 10:29:53 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:11:15 - INFO - EDM exited.
+2022-08-12 11:11:56 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 11:11:56 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 11:11:56 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:12:07 - INFO - BLOC08-304(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 11:12:23 - INFO - EDM exited.
+2022-08-12 11:24:19 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 11:24:19 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 11:24:19 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:25:11 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 11:25:11 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 11:25:11 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:26:32 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 11:26:32 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 11:26:32 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:27:21 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 11:27:21 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 11:27:21 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:27:53 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 11:27:53 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 11:27:53 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:28:28 - INFO - EDM exited.
+2022-08-12 11:29:57 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 11:29:57 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 11:29:57 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 11:31:41 - INFO - BLOC08-305(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:26:06 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 17:26:06 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 17:26:06 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 17:27:00 - INFO - BLOC08-312(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:27:12 - INFO - BLOC08-313(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:28:44 - INFO - test-303(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:29:16 - INFO - test-4001(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:32:55 - INFO - EDM started, logger initialized, and application built.
+2022-08-12 17:32:55 - INFO - CFG c:\Users\mcpherro\Local\Source\Python3\edmpy\CFGs\PIVL8-Station-1.CFG opened.
+2022-08-12 17:32:55 - INFO - Database c:\users\mcpherro\local\source\python3\edmpy\CFGs\PIVL8-Station-1.json opened.
+2022-08-12 17:33:18 - INFO - test-500(1) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:34:54 - INFO - test-501(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:35:20 - INFO - test-502(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:36:06 - INFO - test-503(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
+2022-08-12 17:36:21 - INFO - test-1003(0) hangle : , vangle : , sloped :  with prism height None from X : 0, Y : 0, Z : 0 
