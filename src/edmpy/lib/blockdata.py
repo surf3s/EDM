@@ -105,7 +105,7 @@ class blockdata:
                     f.write("[%s]\n" % block['BLOCKNAME'])
                     for item in block.keys():
                         if not item == 'BLOCKNAME' and not item[:2] == "__":
-                            if block[item]:
+                            if block[item] != '' and block[item] is not None:
                                 f.write(item + "=%s\n" % block[item])
                     f.write("\n")
             return(True)

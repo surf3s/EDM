@@ -1,3 +1,9 @@
+# CHeck to see if screen is maximized and save in ini if so
+# On station settings, don't do com port if station type doesn' tneed it
+# Don't open comport at start if station doesn't merit it
+# Try to show a message while opening com port at start to explain delay
+
+
 # To do for next version
 #   Better prism update in prism field
 #   Do unitchecking after doing an offset shot on suffix 0 points
@@ -39,17 +45,11 @@
 #   there is no error checking on duplicates in datagrid edits
 #   when editing pole height after shot, offer to update Z
 
-__version__ = '1.0.28'
-__date__ = 'August, 2022'
-__program__ = 'EDM'
-__DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
-__BUTTONS__ = 13
-__LASTCOMPORT__ = 16
+
 from edmpy.lib.constants import __SPLASH_HELP__
 
 # Region Imports
 from kivy.config import Config
-
 from kivy.core.clipboard import Clipboard
 from kivy.graphics import Color, Rectangle
 from kivy.app import App
@@ -66,10 +66,10 @@ from kivy.uix.scrollview import ScrollView
 from kivy.clock import Clock
 from kivy import __version__ as __kivy_version__
 
-# The explicit mention of this package here
-# triggers its inclusions in the pyinstaller spec file.
-# It is needed for the filechooser widget.
-# The TimeZoneInfo is just to avoid a flake8 error.
+#  The explicit mention of this package here
+#  triggers its inclusions in the pyinstaller spec file.
+#  It is needed for the filechooser widget.
+#  The TimeZoneInfo is just to avoid a flake8 error.
 try:
     import win32timezone
     win32timezone.TimeZoneInfo.local()
@@ -79,6 +79,7 @@ except ModuleNotFoundError:
 import os
 import random
 from datetime import datetime
+import time
 import csv
 from math import sqrt
 from math import pi
@@ -127,6 +128,17 @@ elif os.name == 'posix':
 # ~ elif os.name == 'java':
 else:
     raise ImportError("Sorry: no implementation for your platform ('{}') available".format(os.name))
+
+__version__ = '1.0.29'
+__date__ = 'January, 2023'
+__program__ = 'EDM'
+__DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
+__BUTTONS__ = 13
+__LASTCOMPORT__ = 16
+NO_ERROR = 0            # No total station error (Leica)
+TMC_CLEAR = 3           # Stop the current measure and clear the stored values
+TOPCON_TERMINATION = "\r\n"
+
 
 # Region Data Classes
 
@@ -573,6 +585,8 @@ class CFG(blockdata):
         return(True)
 
     def get(self, field_name):
+        if not field_name:
+            return('')
         f = self.field(field_name)
         f.inputtype = self.get_value(field_name, 'TYPE').upper()
         f.prompt = self.get_value(field_name, 'PROMPT')
@@ -973,20 +987,22 @@ class totalstation(object):
     def __init__(self, make = None, model = None):
         self.make = make if make else 'Manual XYZ'
         self.model = model
-        self.communication = 'Serial'
-        self.comport = 'COM1'
-        self.baudrate = '1200'
-        self.parity = 'EVEN'
-        self.databits = 7
-        self.stopbits = 1
+        self.communication = ''
+        self.comport = ''
+        self.baudrate = ''
+        self.parity = ''
+        self.databits = 0
+        self.stopbits = 0
         self.comport_settings = ''
         self.serialcom = serial.Serial()
+        self.serial_bt_input = serial.Serial()
         self.input_string = ''
         self.output_string = ''
         self.port_open = False
         self.location = point(0, 0, 0)
         self.xyz = point()
         self.prism_constant = 0.0
+        self.prism_offset = 0.0
         self.hangle = None              # Decimal degrees
         self.vangle = None              # Decimal degrees
         self.sloped = 0.0
@@ -998,18 +1014,12 @@ class totalstation(object):
         self.last_setup_type = ''
         self.shot_type = ''
         self.event = None
-        self.io = ''
+        self.io = ''                    # Used in debug mode to show back and forth with the station
+        self.received = ''              # Used in normal com to store the last line received
+        self.response = ''              # Used to store just the values returned from the station (with extra info deleted)
+        self.error_code = 0             # A place to put io error messages
+        self.error_message = ''         # A place to put io error messages
         self.open()
-
-    def text_to_point(self, txt):
-        if len(txt.split(',')) == 3:
-            x, y, z = txt.split(',')
-            try:
-                return(point(float(x), float(y), float(z)))
-            except Exception:
-                return(None)
-        else:
-            return(None)
 
     def setup(self, ini, data):
         if ini.get_value(__program__, 'STATION'):
@@ -1044,19 +1054,16 @@ class totalstation(object):
 
     def status(self):
         txt = '\nTotal Station:\n'
-        txt += '  Make is %s\n' % self.make
+        txt += f'  Make is {self.make}\n' 
         if self.make not in ['Microscribe']:
-            txt += '  Communication type is %s\n' % self.communication
-            txt += '  COM Port is %s\n' % self.comport
+            txt += f'  Communication type is {self.communication}\n' 
+            txt += f'  COM Port is {self.comport}\n'
             txt += '  Com settings are %s, %s, %s, %s\n' % (self.baudrate, self.parity, self.databits, self.stopbits)
-            if self.serialcom.is_open:
-                txt += 'COM Port is open\n'
-            else:
-                txt += 'COM port is closed\n'
-            txt += '  Station was initialized with %s\n' % self.last_setup_type
-            txt += '  Station X : %s\n' % self.location.x
-            txt += '  Station Y : %s\n' % self.location.y
-            txt += '  Station Z : %s\n' % self.location.z
+            txt += f'COM Port is {"open" if self.serialcom.is_open else "closed"}\n'
+            txt += f'  Station was initialized with {self.last_setup_type}\n'
+            txt += f'  Station X : {self.location.x}\n'  
+            txt += f'  Station Y : {self.location.y}\n'
+            txt += f'  Station Z : {self.location.z}\n'
         else:
             if self.last_setup_type:
                 txt += '  Station was initialized with %s\n' % self.last_setup_type
@@ -1069,6 +1076,65 @@ class totalstation(object):
                     txt += '    Datum %s globally is %s, %s, %s\n' % (n, coordinates.x, coordinates.y, coordinates.z)
                     n += 1
         return(txt)
+
+    def set_error_message(self):
+        if self.error_code:
+            if "Leica" in self.make:
+                if self.error_code == 0:
+                    self.error_message = ''
+                    return
+                if self.error_code == 1283:
+                    self.error_message = 'Warning: measurement without full correction'
+                    return
+                if self.error_code == 1284:
+                    self.error_message = 'Info: accuracy can not be guaranteed'
+                    return
+                if self.error_code == 1285:
+                    self.error_message = 'Warning: only angle measurement valid'
+                    return
+                if self.error_code == 1288:
+                    self.error_message = 'Warning: only angle measurement valid but without full correction'
+                    return
+                if self.error_code == 1289:
+                    self.error_message = 'Info: only angle measurement valid but accuracy can not be guaranteed'
+                    return
+                if self.error_code == 1290:
+                    self.error_message = 'Error: no angle measurement'
+                    return
+                if self.error_code == 1291:
+                    self.error_message = 'Error: wrong setting of PPM or MM on EDM'
+                    return
+                if self.error_code == 1292:
+                    self.error_message = 'Error: distance measurement no done (no aim, etc.)'
+                    return
+                if self.error_code == 1293:
+                    self.error_message = 'Error: system is busy (no measurement done)'
+                    return
+                if self.error_code == 1294:
+                    self.error_message = 'Error: no signal on EDM (only in signal mode)'
+                    return
+                if self.error_code == 1380:
+                    self.error_message = 'Warning: inclination our of time range'
+                    return
+                if self.error_code == 1381:
+                    self.error_message = 'Warning: measurement without plane inclination correction'
+                    return
+                if self.error_code == 1382:
+                    self.error_message = 'Warning: measurement without sensor inclination correction'
+                    return
+                if self.error_code == 1383:
+                    self.error_message = 'Info: inclination accuracy can not be guaranteed'
+                    return
+
+    def text_to_point(self, txt):
+        if len(txt.split(',')) == 3:
+            x, y, z = txt.split(',')
+            try:
+                return(point(float(x), float(y), float(z)))
+            except Exception:
+                return(None)
+        else:
+            return(None)
 
     def prism_adjust(self):
         if self.prism.height is not None:
@@ -1097,17 +1163,17 @@ class totalstation(object):
 
         return(angle)
 
-    def parseangle(self, hangle):
+    def parse_dddmmss_angle(self, hangle):
         hangle = str(hangle)
-        if hangle.find("."):
-            angle = int(hangle)
+        if '.' not in hangle:
+            angle = int(float(hangle))
             minutes = 0
             seconds = 0
         else:
             hangle = hangle + "0000"
-            angle = hangle.split(".")[0]
-            minutes = hangle.split(".")[1][0:2]
-            seconds = hangle.split(".")[1][2:4]
+            angle = int(hangle.split(".")[0])
+            minutes = int(hangle.split(".")[1][0:2])
+            seconds = int(hangle.split(".")[1][2:4])
 
         return([angle, minutes, seconds])
 
@@ -1117,14 +1183,18 @@ class totalstation(object):
     def decimal_degrees_to_dddmmss(self, angle):
         if angle is not None:
             sexa = deci2sexa(angle)
-            return(f'{sexa[1]}.{sexa[2]}{sexa[3]}')
+            return(f'{sexa[1]}.{sexa[2]:02d}{int(sexa[3]):02d}')
         else:
             return('')
+
+    def dddmmss_to_decimal_degrees(self, dddmmss_angle):
+        angle, minutes, seconds = self.parse_dddmmss_angle(dddmmss_angle)
+        return angle + minutes / 60.0 + seconds / 3600.0
 
     def decimal_degrees_to_sexa_pretty(self, angle):
         if angle is not None:
             sexa = deci2sexa(angle)
-            return(f'{sexa[1]}° {sexa[2]}\" {sexa[3]}\'')
+            return(f'{sexa[1]}° {sexa[2]:02d}\" {int(sexa[3]):02d}\'')
         else:
             return('')
 
@@ -1148,6 +1218,8 @@ class totalstation(object):
             self.set_horizontal_angle_topcon(angle)
         elif self.make in ['WILD', 'Leica']:
             self.set_horizontal_angle_leica(angle)
+        elif self.make in ['Leica GeoCom']:
+            self.set_horizontal_angle_geocom(angle)
         elif self.make == 'SOKKIA':
             self.set_horizontal_angle_sokkia(angle)
         elif self.make == 'Simulate':
@@ -1159,7 +1231,7 @@ class totalstation(object):
         # need to send to station in format dddmmss
         self.send("!HAN" + angle.encode())
         # delay(1)
-        self.clear_com()
+        self.clear_serial_buffers()
 
     def launch_point_simulate(self):
         # Put the points into one of two units
@@ -1177,13 +1249,16 @@ class totalstation(object):
     def take_shot(self):
 
         self.clear_xyz()
-        self.clear_com()
+        self.clear_serial_buffers()
 
-        if self.make == 'TOPCON':
+        if self.make == 'Topcon':
             self.launch_point_topcon()
 
         elif self.make in ['WILD', 'Leica']:
             self.launch_point_leica()
+
+        elif self.make == "Leica GeoCom":
+            self.launch_point_leica_geocom()
 
         elif self.make == "SOKKIA":
             self.launch_point_sokkia()
@@ -1205,7 +1280,7 @@ class totalstation(object):
         self.vangle = self.angle_between_xy_pairs(0, 0, level_distance, self.xyz.z)
 
     def make_global(self):
-        if self.xyz.x is not None and self.xyz.y is not None and self.xyz.z is not None:
+        if not self.xyz.is_none():
             if self.make == 'Microscribe':
                 if len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
                     self.xyz_global = self.rotate_point(self.xyz)
@@ -1213,7 +1288,7 @@ class totalstation(object):
                     self.xyz_global = self.xyz
                 self.round_xyz()
             else:
-                if self.location.x is not None and self.location.y is not None and self.location.z is not None:
+                if not self.location.is_none():
                     self.xyz_global = point(self.xyz.x + self.location.x,
                                             self.xyz.y + self.location.y,
                                             self.xyz.z + self.location.z,)
@@ -1221,21 +1296,15 @@ class totalstation(object):
                     self.xyz_global = self.xyz
 
     def round_xyz(self):
-        if self.xyz_global.x is not None:
-            self.xyz_global = self.round_point(self.xyz_global)
-
-        if self.xyz.x is not None:
-            self.xyz = self.round_point(self.xyz)
+        self.xyz_global = self.round_point(self.xyz_global)
+        self.xyz = self.round_point(self.xyz)
 
     def round_point(self, p):
-        return(point(round(p.x, 3), round(p.y, 3), round(p.z, 3)))
+        return(point(round(p.x, 3), round(p.y, 3), round(p.z, 3)) if not p.is_none() else p)
 
     def clear_xyz(self):
         self.xyz = point()
         self.xyz_global = point()
-
-    def parse_nez(self):
-        pass
 
     def comport_nos(self):
         ports = self.list_comports()
@@ -1257,6 +1326,17 @@ class totalstation(object):
         self.io = self.io + data
         self.trim_io()
 
+    def wait_for_received(self, seconds = 1):
+        time_one = time.time()
+        while time.time() - time_one < seconds:
+            if self.data_waiting():
+                self.receive()
+                return
+
+    def check_receive_buffer(self):
+        if self.data_waiting():
+            self.receive()
+
     def data_waiting(self):
         if self.serialcom.is_open:
             if self.serialcom.in_waiting > 0:
@@ -1271,43 +1351,65 @@ class totalstation(object):
             # sleep(0.1)
 
     def receive(self):
-        if self.serialcom.is_open:
-            data = self.serialcom.read_until().decode()
-            # data = self.serialcom.readline().decode()
+        data = ''
+        if self.serialcom.is_open or (self.communication == 'Bluetooth' and self.serial_bt_input.is_open):
+            port = self.serialcom if self.communication == 'Serial' else self.serial_bt_input
+            data = port.read_until().decode() if port.is_open else ''
             if data:
-                if self.event is not None:  # This is for Topcon where the COM has to be monitored
-                    self.event.cancel()
-                    self.event = None
+                # if self.event is not None:  # This is for Topcon where the COM has to be monitored
+                #     self.event.cancel()
+                #     self.event = None
                 self.add_to_io('Received <- ' + data)
-            return(data)
+        self.received = data
 
     def close(self):
         if self.serialcom.is_open:
             self.serialcom.close()
             self.clear_io()
+            # self.event.cancel()
 
     def open(self):
         self.close()
-        if self.baudrate and self.comport and self.parity and self.databits and self.stopbits:
-            if self.comport in self.comport_nos():
-                self.serialcom.port = self.comport
-                self.serialcom.baudrate = int(self.baudrate)
-                if self.parity == 'Even':
-                    self.serialcom.parity = serial.PARITY_EVEN
-                elif self.parity == 'Odd':
-                    self.serialcom.parity = serial.PARITY_ODD
-                elif self.parity == 'None':
-                    self.serialcom.parity = serial.PARITY_NONE
-                self.serialcom.stopbits = int(self.stopbits)
-                self.serialcom.bytesize = int(self.databits)
-                self.serialcom.timeout = 30
-                try:
-                    self.serialcom.open()
-                    self.clear_io()
-                    return(True)
-                except OSError:
-                    pass
-        return(False)
+        self.error = ''
+        if any(item is None for item in [self.baudrate, self.comport, self.parity, self.databits, self.stopbits]):
+            return self.error
+        if any(item == '' for item in [self.baudrate, self.comport, self.parity, self.databits, self.stopbits]):
+            return self.error
+        if self.make in ['Simulation', 'Manual XYZ', 'Manual VHD']:
+            return self.error
+        if self.comport not in self.comport_nos():
+            return self.error
+
+        self.serialcom.port = self.comport
+        self.serialcom.baudrate = int(self.baudrate)
+        if self.parity == 'Even':
+            self.serialcom.parity = serial.PARITY_EVEN
+        elif self.parity == 'Odd':
+            self.serialcom.parity = serial.PARITY_ODD
+        elif self.parity == 'None':
+            self.serialcom.parity = serial.PARITY_NONE
+        self.serialcom.stopbits = int(self.stopbits)
+        self.serialcom.bytesize = int(self.databits)
+        self.serialcom.timeout = 30
+        try:
+            self.serialcom.open()
+            self.clear_io()
+            # self.event = Clock.schedule_interval(self.check_receive_buffer, .1)
+            # if self.communication == 'Bluetooth':
+            #     self.serial_bt_input.port = f"COM{str(int(self.comport.replace('COM', '')) + 1)}"
+            #     self.serial_bt_input.baudrate = self.serialcom.baudrate
+            #     self.serial_bt_input.parity = self.serialcom.parity
+            #     self.serial_bt_input.stopbits = self.serialcom.stopbits
+            #     self.serial_bt_input.bytesize = self.serialcom.bytesize
+            #     self.serial_bt_input.timeout = self.serialcom.timeout
+            #     self.serial_bt_input.open()
+        except OSError as err:
+            self.error = str(err)
+        return self.error
+
+    def check_receive_buffer(self, dt):
+        if self.data_waiting():
+            self.receive()
 
     def settings_pretty(self):
         if self.baudrate and self.comport and self.parity and self.databits and self.stopbits:
@@ -1315,23 +1417,36 @@ class totalstation(object):
         else:
             return("Incomplete Settings")
 
-    def clear_com(self):
+    def clear_serial_buffers(self):
         if self.serialcom.is_open:
             self.serialcom.reset_input_buffer()
             self.serialcom.reset_output_buffer()
+            self.clear_serial_buffers_internal_only()
+
+    def clear_serial_buffers_internal_only(self):
+        self.received = ""
+        self.response = ""
+        self.error_code = 0
+        self.error_message = ""
 
     def distance(self, p1, p2):
         return(sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2 + (p1.z - p2.z)**2))
 
     def dms_to_decdeg(self, angle):
         angle = str(angle)
+        if '.' not in angle:
+            angle += "."
+        angle += "0000"
         degrees = int(angle.split(".")[0])
         minutes = int(angle.split(".")[1][0:2])
-        seconds = int(angle.split(".")[1][2:])
+        seconds = int(angle.split(".")[1][2:4])
         return(degrees + minutes / 60.0 + seconds / 3600.0)
 
     def decdeg_to_radians(self, angle):
         return(angle / 360.0 * (2.0 * pi))
+
+    def radians_to_decdeg(self, angle):
+        return angle / (2.0 * pi) * 360.0
 
     def vhd_to_xyz(self):
         if self.vangle is not None and self.hangle is not None and self.sloped is not None:
@@ -1553,47 +1668,90 @@ class totalstation(object):
     # Function specific to Topcon #
 
     def launch_point_topcon(self):
-        self.send("Z34")   # Slope angle mode
-        self.receive()
+        self.send(self.topcon_format("Z34"))   # Slope angle mode
+        self.wait_for_received(1)
         # delay(0.5)
 
-        self.send("C")     # Take the shot
-        self.receive()
+        self.send(self.topcon_format("C"))     # Take the shot
+        self.wait_for_received(1)
         # delay(0.5)
         self.event1 = Clock.schedule_interval(self.check_receive_buffer, .2)
 
-    def check_receive_buffer(self):
+    def check_receive_buffer(self, dt):
         # need code here to check for a completed shot
         # and then acknowledge back
-        pass
+        self.event1.cancel()
 
-    def make_bcc_topcon(self, itext):
-        # Dim b As Integer = 0
-        # Dim i As Integer
-        # Dim q As Integer
-        # Dim b1 As Integer
-        # Dim b2 As Integer
-
+    def make_bcc_topcon(self, text_to_send):
         b = 0
-        for i in range(0, len(itext)):
-            # q = asc(itext[i:i+1])
-            # b1 = q and (Not b) # this is not at all ready
-            # b2 = b and (Not q)
-            # b = b1 or b2
-            pass
-
+        for character in text_to_send:
+            q = ord(character)
+            b1 = q & (~b)
+            b2 = b & (~q)
+            b = b1 | b2
         bcc = "000" + str(b).strip()
-        return(bcc[-3])
+        return(bcc[-3:])
 
     def set_horizontal_angle_topcon(self, angle):
         # angle should be in dddmmss
-        self.send("J+" + angle + "d")
+        self.send(self.topcon_format("J+" + angle + "d"))
         self.receive()
         # delay(1)
-        self.clear_com()
+        self.clear_serial_buffers()
 
     def initialize_topcon(self):
-        self.send("ST0")
+        self.send(self.topcon_format("ST0"))
+
+    def topcon_acknowledge(self):
+        ack = chr(6) + "006" + chr(3) + TOPCON_TERMINATION
+        self.send(bytes(ack, 'utf-8'))
+
+    def topcon_format(self, text_to_send):
+        return bytes(text_to_send + self.make_bcc_topcon(text_to_send) + chr(3) + TOPCON_TERMINATION , 'utf-8')
+
+    def fetch_point_topcon(self):
+        if self.data_waiting():
+            self.receive()
+            self.topcon_acknowledge()
+            self.set_response_topcon()
+            if self.response:
+                self.parse_topcon()
+                self.vhd_to_xyz()
+
+    def set_response_topcon(self):
+        self.response = self.received
+
+    def parse_topcon(self):
+        if self.response:
+            if self.response[0] not in ['?', 'R']:
+                self.error_code = 4
+                self.error_message = 'Data stream did not start with ? or R'
+                return False
+        
+        if chr(3) in self.response:
+            delimiter = self.response.index(chr(3))
+            bcc1 = self.response[delimiter - 3:delimiter]
+            bcc2 = self.make_bcc_topcon(self.response[:delimiter - 3])
+            if bcc1 != bcc2:
+                self.error_code = 3
+                self.error_message = 'Communications error.  BCC did not match.'
+                return False
+
+        self.sloped = float(self.response[1:10]) / 1000.0
+        self.hangle = self.dddmmss_to_decimal_degrees(self.response[19:22] + '.' + self.response[22:26])
+        self.vangle = self.dddmmss_to_decimal_degrees(self.response[11:14] + '.' + self.response[14:18])
+        self.prism_offset = float(self.response[43:48])
+        measurement_unit = self.response[10:11]
+        if measurement_unit != 'm':
+            self.error_code = 2
+            self.error_message = 'Distance unit not in meters'
+            return False
+        angle_unit = self.response[26:27]
+        if angle_unit != 'd':
+            self.error_code = 1
+            self.error_message = 'Angle not in degrees'
+            return False
+        return True
 
     # end Topcon
 
@@ -1607,7 +1765,7 @@ class totalstation(object):
         set_angle_command = "/Dc " + angle + "\r\n"
         self.send(set_angle_command.encode())
         # delay(5)
-        self.clear_com()
+        self.clear_serial_buffers()
 
     def fetch_point_sokkia(self):
         self.pnt = self.receive()
@@ -1704,24 +1862,100 @@ class totalstation(object):
     def set_horizontal_angle_geocom(self, angle):
         # function expects angle as ddd.mmss as input
         # %R1Q,2113:HzOrientation[double]
-        output = "%R1Q,2113:{:10.8f}".format(self.decdeg_to_radians(self.dms_to_decdeg(angle)))
-        errorcode = self.send(output)
-        returncode = self.receive()
+        output = "%R1Q,2113:{:10.8f}\r\n".format(self.decdeg_to_radians(self.dms_to_decdeg(angle)))
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(1)
+        self.set_response_leica_geocom()
+        return self.error_code == NO_ERROR
 
-    def record_point_geocom(self):
-        self.clear_com()
-        self.send("%R1Q,2008:1,1")          # Use the defaults with 1 and 1
-        errorcode = self.receive()
-        if not errorcode:
-            # %R1Q,2108:WaitTime[long],Mode[long]
-            # Waittime is in ms
-            # Mode 1 = automatic
-            self.clear_com()
-            self.send("%R1Q,2108:10000,1")  # Wait for the measurements and return the angles + sloped
-            result = self.receive()
-        self.clear_com()
-        self.send("%R1Q,2008:3,1")          # Empty the measurement buffer as a precaution
-        returncode = self.receive()
+    def launch_point_leica_geocom(self):
+        self.clear_serial_buffers()
+        self.send(b"%R1Q,2008:1,1\r\n")          # Use the defaults with 1 and 1
+        self.wait_for_received(1)
+        self.set_response_leica_geocom()
+        if self.error_code == 0:
+            self.clear_serial_buffers_internal_only()
+            self.send(b"%R1Q,2108:10000,1\r\n")     # Fetch the measurements and return the angles + sloped
+        return self.error_code == NO_ERROR
+
+    def fetch_point_leica_geocom(self):
+        if self.data_waiting():
+            self.receive()
+            self.set_response_leica_geocom()
+            if self.response:
+                self.parse_leica_geocom()
+                self.vhd_to_xyz()
+
+    def stop_and_clear_geocom(self):
+        output = f"%R1Q,2008:{TMC_CLEAR},1\r\n"
+        self.send(bytes(output))
+        self.wait_for_received(1)
+        self.set_response_leica_geocom()
+        return self.error_code == NO_ERROR
+
+    def parse_leica_geocom(self):
+        if self.response:
+            if self.response.count(',') != 3:
+                return False
+        self.error_code, self.hangle, self.vangle, self.sloped = self.response.split(',')
+        self.hangle = self.radians_to_decdeg(float(self.hangle))
+        self.vangle = self.radians_to_decdeg(float(self.vangle))
+        self.sloped = float(self.sloped)
+        self.prism_constant = None
+        return self.error_code == NO_ERROR
+        
+    def leica_trim_crlf(self, value):
+        return value.replace('\r', '').replace('\n', '') if value else ""
+
+    def leica_return_value(self, value):
+        if value:
+            return value[value.find(':') + 1:] if ":" in value else ""  
+        else:
+            return value
+
+    def set_response_leica_geocom(self):
+        self.response = self.leica_return_value(self.leica_trim_crlf(self.received)) if self.received else ""
+        self.set_error_code()
+
+    def set_error_code(self):
+        if self.response:
+            if "," not in self.response:
+                self.error_code = int(self.response)
+            else:
+                self.error_code = int(self.response[:self.response.find(',')])
+            self.set_error_message()
+
+    def is_leica(self):
+        return  self.make in ['Leica', 'Leica GeoCom']
+
+    def get_model_name(self):
+        pass
+
+    def find_prism(self, horizontal_search = pi / 4, vertical_search = pi / 4):
+        output = f'%R1Q,9037:{horizontal_search},{vertical_search},0\r\n'
+        self.send(bytes(output, 'utf-8'))
+        self.set_response_leica_geocom(self.receive())
+        return self.response.startswith('0,')
+
+    def is_motorized(self):
+        if self.make not in ['Leica', 'Leica GeoCom']:
+            return False
+        self.send(b'%R1Q,6021:\r\n')
+        return self.leica_return_value(self.leica_trim_crlf(self.receive())) == '0'
+
+    def start_motor(self):
+        self.send(b'%R1Q,6001:1\r\n')
+        return self.leica_return_value(self.leica_trim_crlf(self.receive())) == '0'
+
+    def stop_motor(self):
+        self.send(b'%R1Q,6002:1\r\n')
+        return self.leica_return_value(self.leica_trim_crlf(self.receive())) == '0'
+
+    def get_scan_tolerances(self):
+        self.send(b'%R1Q,9008:\r\n')
+        self.set_response_leica_geocom(self.receive())
+        return self.response.startswith('0,')
+
     # ## Leica geocom functions ###
 
 # endregion
@@ -1862,6 +2096,8 @@ class MainScreen(e5_MainScreen):
         self.add_widget(self.layout)
         self.add_screens()
         restore_window_size_position(__program__, self.ini)
+
+        self.event = None
 
     def on_enter(self, *args):
         if self.warnings or self.errors:
@@ -2174,46 +2410,113 @@ class MainScreen(e5_MainScreen):
                 self.popup.open()
                 self.popup_open = True
                 return
-            else:
-                if self.station.make in ['Leica']:
-                    self.station.fetch_point()
-                    self.station.make_global()
-                elif self.station.make in ['Simulate']:
-                    self.station.pnt = None
-                elif self.station.make in ['Manual XYZ', 'Manual VHD']:
-                    self.station.pnt = None
-                self.station.prism_adjust()
+            # else:
+            #     if self.station.make in ['Leica']:
+            #         self.station.fetch_point()
+            #         self.station.make_global()
+            #     elif self.station.make in ['Leica GeoCom']:
+            #         self.station.fetch_point_leica_geocom()
+            #         self.station.make_global()
+            #     elif self.station.make in ['Simulate']:
+            #         self.station.received = None
+            #     elif self.station.make in ['Manual XYZ', 'Manual VHD']:
+            #         self.station.received = None
+            #     self.station.prism_adjust()
         self.popup.dismiss()
 
-        if self.station.xyz.x is not None and self.station.xyz.y is not None and self.station.xyz.z is not None:
-            if self.station.shot_type == 'measure':
-                txt = f'\nCoordinates:\n  X:  {self.station.xyz_global.x:.3f}\n  Y:  {self.station.xyz_global.y:.3f}\n  Z:  {self.station.xyz_global.z:.3f}'
-                unitname = self.data.point_in_unit(self.station.xyz_global)
-                if unitname:
-                    txt += f'\n\nThe point is in unit {unitname}.'
-                if self.station.make != 'Microscribe':
-                    txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  Slope distance:  {self.station.sloped:.3f}'
-                    txt += f'\n  X:  {self.station.xyz.x:.3f}\n  Y:  {self.station.xyz.y:.3f}\n  Z:  {self.station.xyz.z:.3f}'
-                    txt += f'\n\nStation coordinates:\n  X:  {self.station.location.x:.3f}\n  Y:  {self.station.location.y:.3f}\n  Z:  {self.station.location.z:.3f}'
-                    if self.station.prism_constant:
-                        txt += f'\n\nPrism constant :  {self.station.prism_constant} m'
-                    if self.station.pnt:
-                        txt += f'\n\nData stream:\n  {self.station.pnt}'
-                self.popup = e5_MessageBox('Measurement', txt,
-                                            response_type = "OK",
-                                            call_back = self.close_popup,
-                                            colors = self.colors)
-                self.popup.open()
-            else:
-                self.add_point_record()
-                # TODO self.station.prism = self.data.prisms.get(value.text).height
-                if self.data.db is not None:
-                    self.data.db.table(self.data.table).on_save = self.on_save
-                    self.data.db.table(self.data.table).on_cancel = self.on_cancel
-                self.parent.current = 'EditPointScreen'
-        else:
-            self.popup = e5_MessageBox(title = 'Error', message = '\nPointed not recorded.')
+        if self.station.shot_type == 'measure':
+            self.popup = e5_MessageBox('Measurement',
+                                        self.make_x_shot_summary(),
+                                        response_type = "Other",
+                                        response_text = ['Close', 'Repeat'],
+                                        call_back = [self.cancel_x_shot, self.record_another_x_shot],
+                                        colors = self.colors)
+            self.event = Clock.schedule_interval(self.check_for_station_response_x_shot, .1)
             self.popup.open()
+        else:
+            self.add_point_record()
+            # TODO self.station.prism = self.data.prisms.get(value.text).height
+            if self.data.db is not None:
+                self.data.db.table(self.data.table).on_save = self.on_save
+                self.data.db.table(self.data.table).on_cancel = self.on_cancel
+            self.parent.current = 'EditPointScreen'
+            self.event = Clock.schedule_interval(self.check_for_station_response_edit_record, .1)
+        # else:
+        #     self.popup = e5_MessageBox(title = 'Error', message = '\nPointed not recorded.')
+        #     self.popup.open()
+
+    def cancel_x_shot(self, instance):
+        self.popup.dismiss()
+        if self.event:
+            self.event.cancel()
+
+    def check_for_station_response_edit_record(self, dt):
+        if self.station.data_waiting():
+            if self.station.make in ['Leica']:
+                self.station.fetch_point()
+                self.station.make_global()
+            elif self.station.make in ['Leica GeoCom']:
+                self.station.fetch_point_leica_geocom()
+                self.station.make_global()
+            elif self.station.make in ['Topcon']:
+                self.station.fetch_point_topcon()
+                self.station.make_global()
+            elif self.station.make in ['Simulate']:
+                self.station.received = None
+            elif self.station.make in ['Manual XYZ', 'Manual VHD']:
+                self.station.received = None
+            self.station.prism_adjust()
+            if self.station.response:
+                self.station.make_global()
+                self.station.prism_adjust()
+                sm.get_screen('EditPointScreen').reset_defaults_from_recorded_point(self.station)
+    
+    def check_for_station_response_x_shot(self, dt):
+        if self.station.data_waiting():
+            if self.station.make in ['Leica']:
+                self.station.fetch_point()
+                self.station.make_global()
+            elif self.station.make in ['Leica GeoCom']:
+                self.station.fetch_point_leica_geocom()
+                self.station.make_global()
+            elif self.station.make in ['Topcon']:
+                self.station.fetch_point_topcon()
+                self.station.make_global()
+            elif self.station.make in ['Simulate']:
+                self.station.received = None
+            elif self.station.make in ['Manual XYZ', 'Manual VHD']:
+                self.station.received = None
+            self.station.prism_adjust()
+            if self.station.response:
+                self.station.make_global()
+                self.station.prism_adjust()
+                self.popup.txt.scrolling_label.text = self.make_x_shot_summary()
+                if not self.station.xyz.is_none():
+                    self.event.cancel()
+
+    def make_x_shot_summary(self):
+        if self.station.xyz.is_none():
+            return('Waiting....')
+
+        txt = f'\nCoordinates:\n  X:  {self.station.xyz_global.x:.3f}\n  Y:  {self.station.xyz_global.y:.3f}\n  Z:  {self.station.xyz_global.z:.3f}'
+        unitname = self.data.point_in_unit(self.station.xyz_global)
+        if unitname:
+            txt += f'\n\nThe point is in unit {unitname}.'
+        if self.station.make != 'Microscribe':
+            txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  Slope distance:  {self.station.sloped:.3f}'
+            txt += f'\n  X:  {self.station.xyz.x:.3f}\n  Y:  {self.station.xyz.y:.3f}\n  Z:  {self.station.xyz.z:.3f}'
+            txt += f'\n\nStation coordinates:\n  X:  {self.station.location.x:.3f}\n  Y:  {self.station.location.y:.3f}\n  Z:  {self.station.location.z:.3f}'
+            if self.station.prism_constant:
+                txt += f'\n\nPrism constant :  {self.station.prism_constant} m'
+            if self.station.received:
+                txt += f'\n\nData stream:\n  {self.station.received}'
+            if self.station.error_code != 0:
+                txt += f'\n{self.station.error_message}'
+        return(txt)
+
+    def record_another_x_shot(self, instance):
+        self.station.take_shot()
+        self.event = Clock.schedule_interval(self.check_for_station_response_x_shot, .1)
 
     def on_save(self):
         self.log_the_shot()
@@ -2236,10 +2539,7 @@ class MainScreen(e5_MainScreen):
         unit = self.get_last_value('UNIT')
         idno = self.get_last_value('ID')
         suffix = self.get_last_value('SUFFIX')
-        if unit is not None and idno is not None and suffix is not None:
-            return(f'{unit}-{idno}({suffix})')
-        else:
-            return('')
+        return f'{unit}-{idno}({suffix})' if all(item is not None for item in [unit, idno, suffix]) else ''
 
     def update_info_label(self):
         last_squid = self.get_last_squid()
@@ -2601,29 +2901,29 @@ class MainScreen(e5_MainScreen):
         fields = self.cfg.fields()
         for field in fields:
             if field == 'X':
-                new_record['X'] = self.station.xyz_global.x
+                new_record['X'] = self.station.xyz_global.x if self.station.xyz_global.x else ""
             elif field == 'Y':
-                new_record['Y'] = self.station.xyz_global.y
+                new_record['Y'] = self.station.xyz_global.y if self.station.xyz_global.y else ""
             elif field == 'Z':
-                new_record['Z'] = self.station.xyz_global.z
+                new_record['Z'] = self.station.xyz_global.z if self.station.xyz_global.z else ""
             elif field == 'SLOPED':
-                new_record['SLOPED'] = self.station.sloped
+                new_record['SLOPED'] = self.station.sloped if self.station.sloped else ""
             elif field == 'HANGLE':
-                new_record['HANGLE'] = self.station.hangle
+                new_record['HANGLE'] = self.station.hangle if self.station.hangle else ""
             elif field == 'VANGLE':
-                new_record['VANGLE'] = self.station.vangle
+                new_record['VANGLE'] = self.station.vangle if self.station.vangle else ""
             elif field == 'STATIONX':
-                new_record['STATIONX'] = self.station.location.x
+                new_record['STATIONX'] = self.station.location.x if self.station.location.x else ""
             elif field == 'STATIONY':
-                new_record['STATIONY'] = self.station.location.y
+                new_record['STATIONY'] = self.station.location.y if self.station.location.y else ""
             elif field == 'STATIONZ':
-                new_record['STATIONZ'] = self.station.location.z
+                new_record['STATIONZ'] = self.station.location.z if self.station.location.z else ""
             elif field == 'LOCALX':
-                new_record['LOCALX'] = self.station.xyz.x
+                new_record['LOCALX'] = self.station.xyz.x if self.station.xyz.x else ""
             elif field == 'LOCALY':
-                new_record['LOCALY'] = self.station.xyz.y
+                new_record['LOCALY'] = self.station.xyz.y if self.station.xyz.y else ""
             elif field == 'LOCALZ':
-                new_record['LOCALZ'] = self.station.xyz.z
+                new_record['LOCALZ'] = self.station.xyz.z if self.station.xyz.z else ""
             elif field == 'PRISM':
                 new_record['PRISM'] = self.station.prism.height if self.station.prism else 0.0
             elif field == 'DATE':
@@ -3482,8 +3782,37 @@ class EditLastRecordScreen(e5_RecordEditScreen):
 
 
 class EditPointScreen(e5_RecordEditScreen):
-    pass
 
+    def reset_defaults_from_recorded_point(self, station):
+        for widget in self.layout.walk():
+            if hasattr(widget, 'id'):
+                value = None
+                if widget.id == 'X':
+                    value = f"{station.xyz_global.x:.3f}"
+                if widget.id == 'Y':
+                    value = f"{station.xyz_global.y:.3f}"
+                if widget.id == 'Z':
+                    value = f"{station.xyz_global.z:.3f}"
+                if widget.id == 'STATIONX':
+                    value = f"{station.location.x:.3f}"
+                if widget.id == 'STATIONY':
+                    value = f"{station.location.y:.3f}"
+                if widget.id == 'STATIONZ':
+                    value = f"{station.location.z:.3f}"
+                if widget.id == 'LOCALX':
+                    value = f"{station.xyz.x:.3f}"
+                if widget.id == 'LOCALY':
+                    value = f"{station.xyz.y:.3f}"
+                if widget.id == 'LOCALZ':
+                    value = f"{station.xyz.z:.3f}"
+                if widget.id == 'SLOPED':
+                    value = f"{station.sloped:.3f}"
+                if widget.id == 'HANGLE':
+                    value = station.decimal_degrees_to_dddmmss(station.hangle)
+                if widget.id == 'VANGLE':
+                    value = station.decimal_degrees_to_dddmmss(station.vangle)
+                if value is not None:
+                    widget.text = value
 
 class EditDatumScreen(Screen):
     pass
@@ -3538,7 +3867,8 @@ class station_setting(GridLayout):
             comport = GridLayout(cols = 2, spacing = 5)
             comport.bind(minimum_height = comport.setter('height'))
             comport.add_widget(self.spinner)
-            comport.add_widget(e5_button('Scan', colors = colors, call_back = self.scanner))
+            scan_button = e5_button('Scan', colors = colors, call_back = self.scanner, button_height = comport.height)
+            comport.add_widget(scan_button)
             self.add_widget(comport)
         else:
             self.add_widget(self.spinner)
@@ -3550,7 +3880,7 @@ class station_setting(GridLayout):
             ports = self.station.list_comports()
             text = 'Available ports:\n\n'
             for port in ports:
-                text += '%s - %s\n' % (port[0]['port'], port[0]['desc'])
+                text += '%s - %s\n' % (port[0]['port'], port[0]['desc'][0:port[0]['desc'].find('(') - 1])
             self.spinner.values = list([port[0]['port'] for port in ports])
             self.popup = e5_MessageBox('COM Ports', text,
                                         response_type = "OK",
@@ -3627,7 +3957,7 @@ class StationConfigurationScreen(Screen):
 
     def build_screen(self):
         self.station_type = station_setting(label_text = 'Station type',
-                                            spinner_values = ("Leica", "Wild", "Topcon", "Sokkia", "Microscribe", "Manual XYZ", "Manual VHD", "Simulate"),
+                                            spinner_values = ("Leica", "Leica GeoCom", "Wild", "Topcon", "Sokkia", "Microscribe", "Manual XYZ", "Manual VHD", "Simulate"),
                                             call_back = self.toggle_buttons,
                                             id = 'station_type',
                                             colors = self.colors,
@@ -3643,7 +3973,7 @@ class StationConfigurationScreen(Screen):
         self.layout.add_widget(self.communications)
 
         self.comports = station_setting(label_text = 'Port Number',
-                                            spinner_values = [],
+                                            spinner_values = [f'COM{n + 1}' for n in range(20)],
                                             # call_back = self.update_ini,
                                             id = 'comport',
                                             colors = self.colors, station = self.station,
@@ -3651,7 +3981,7 @@ class StationConfigurationScreen(Screen):
         self.layout.add_widget(self.comports)
 
         self.baud_rate = station_setting(label_text = 'Baud rate',
-                                            spinner_values = ("1200", "2400", "4800", "9600", "14400", "19200"),
+                                            spinner_values = ("1200", "2400", "4800", "9600", "14400", "19200", "115200"),
                                             # call_back = self.update_ini,
                                             id = 'baudrate',
                                             colors = self.colors,
@@ -3719,12 +4049,16 @@ class StationConfigurationScreen(Screen):
         self.station.parity = self.parity.spinner.text
         self.ini.update_value(__program__, 'PARITY', self.parity.spinner.text)
 
-        self.station.communications = self.communications.spinner.text
+        self.station.communication = self.communications.spinner.text
         self.ini.update_value(__program__, 'COMMUNICATIONS', self.communications.spinner.text)
 
         self.ini.save()
-        self.station.open()
-        self.close_screen(None)
+        success = self.station.open()
+        if success != '':
+            self.popup = e5_MessageBox('Error', success)
+            self.popup.open()
+        else:
+            self.close_screen(None)
 
     def close_screen(self, value):
         self.parent.current = self.call_back
