@@ -94,6 +94,7 @@ import string
 from platform import python_version
 
 import logging
+from appdata import AppDataPaths
 
 # My libraries for this project
 from edmpy.lib.blockdata import blockdata
@@ -129,9 +130,9 @@ elif os.name == 'posix':
 else:
     raise ImportError("Sorry: no implementation for your platform ('{}') available".format(os.name))
 
-__version__ = '1.0.29'
-__date__ = 'January, 2023'
-__program__ = 'EDM'
+VERSION = '1.0.29'
+PRODUCTION_DATE = 'January, 2023'
+APP_NAME = 'EDM'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -428,7 +429,7 @@ class INI(blockdata):
 
     def __init__(self, filename = ''):
         if filename == '':
-            filename = __program__ + '.ini'
+            filename = APP_NAME + '.ini'
         self.filename = filename
         self.incremental_backups = False
         self.backup_interval = 0
@@ -441,39 +442,39 @@ class INI(blockdata):
         self.blocks = self.read_blocks()
         self.first_time = (self.blocks == [])
         self.is_valid()
-        self.incremental_backups = self.get_value(__program__, 'IncrementalBackups').upper() == 'TRUE'
-        self.backup_interval = int(self.get_value(__program__, 'BackupInterval'))
-        self.debug = self.get_value(__program__, 'Debug').upper() == 'TRUE'
+        self.incremental_backups = self.get_value(APP_NAME, 'IncrementalBackups').upper() == 'TRUE'
+        self.backup_interval = int(self.get_value(APP_NAME, 'BackupInterval'))
+        self.debug = self.get_value(APP_NAME, 'Debug').upper() == 'TRUE'
 
     def is_valid(self):
         for field_option in ['DARKMODE', 'INCREMENTALBACKUPS']:
-            if self.get_value(__program__, field_option):
-                if self.get_value(__program__, field_option).upper() == 'YES':
-                    self.update_value(__program__, field_option, 'TRUE')
+            if self.get_value(APP_NAME, field_option):
+                if self.get_value(APP_NAME, field_option).upper() == 'YES':
+                    self.update_value(APP_NAME, field_option, 'TRUE')
             else:
-                self.update_value(__program__, field_option, 'FALSE')
+                self.update_value(APP_NAME, field_option, 'FALSE')
 
-        if self.get_value(__program__, "BACKUPINTERVAL"):
+        if self.get_value(APP_NAME, "BACKUPINTERVAL"):
             try:
-                test = int(self.get_value(__program__, "BACKUPINTERVAL"))
+                test = int(self.get_value(APP_NAME, "BACKUPINTERVAL"))
                 if test < 0:
                     test = 0
                 elif test > 200:
                     test = 200
-                self.update_value(__program__, 'BACKUPINTERVAL', test)
+                self.update_value(APP_NAME, 'BACKUPINTERVAL', test)
             except ValueError:
-                self.update_value(__program__, 'BACKUPINTERVAL', 0)
+                self.update_value(APP_NAME, 'BACKUPINTERVAL', 0)
         else:
-            self.update_value(__program__, 'BACKUPINTERVAL', 0)
+            self.update_value(APP_NAME, 'BACKUPINTERVAL', 0)
 
     def update(self, colors, cfg):
-        self.update_value(__program__, 'CFG', cfg.filename)
-        self.update_value(__program__, 'ColorScheme', colors.color_scheme)
-        self.update_value(__program__, 'ButtonFontSize', colors.button_font_size)
-        self.update_value(__program__, 'TextFontSize', colors.text_font_size)
-        self.update_value(__program__, 'DarkMode', 'TRUE' if colors.darkmode else 'FALSE')
-        self.update_value(__program__, 'IncrementalBackups', self.incremental_backups)
-        self.update_value(__program__, 'BackupInterval', self.backup_interval)
+        self.update_value(APP_NAME, 'CFG', cfg.filename)
+        self.update_value(APP_NAME, 'ColorScheme', colors.color_scheme)
+        self.update_value(APP_NAME, 'ButtonFontSize', colors.button_font_size)
+        self.update_value(APP_NAME, 'TextFontSize', colors.text_font_size)
+        self.update_value(APP_NAME, 'DarkMode', 'TRUE' if colors.darkmode else 'FALSE')
+        self.update_value(APP_NAME, 'IncrementalBackups', self.incremental_backups)
+        self.update_value(APP_NAME, 'BackupInterval', self.backup_interval)
         self.save()
 
     def save(self):
@@ -1022,20 +1023,20 @@ class totalstation(object):
         self.open()
 
     def setup(self, ini, data):
-        if ini.get_value(__program__, 'STATION'):
-            self.make = ini.get_value(__program__, 'STATION')
-        if ini.get_value(__program__, 'COMMUNICATIONS'):
-            self.communication = ini.get_value(__program__, 'COMMUNICATIONS')
-        if ini.get_value(__program__, 'COMPORT'):
-            self.comport = ini.get_value(__program__, 'COMPORT')
-        if ini.get_value(__program__, 'BAUDRATE'):
-            self.baudrate = ini.get_value(__program__, 'BAUDRATE')
-        if ini.get_value(__program__, 'PARITY'):
-            self.parity = ini.get_value(__program__, 'PARITY')
-        if ini.get_value(__program__, 'DATABITS'):
-            self.databits = ini.get_value(__program__, 'DATABITS')
-        if ini.get_value(__program__, 'STOPBITS'):
-            self.stopbits = ini.get_value(__program__, 'STOPBITS')
+        if ini.get_value(APP_NAME, 'STATION'):
+            self.make = ini.get_value(APP_NAME, 'STATION')
+        if ini.get_value(APP_NAME, 'COMMUNICATIONS'):
+            self.communication = ini.get_value(APP_NAME, 'COMMUNICATIONS')
+        if ini.get_value(APP_NAME, 'COMPORT'):
+            self.comport = ini.get_value(APP_NAME, 'COMPORT')
+        if ini.get_value(APP_NAME, 'BAUDRATE'):
+            self.baudrate = ini.get_value(APP_NAME, 'BAUDRATE')
+        if ini.get_value(APP_NAME, 'PARITY'):
+            self.parity = ini.get_value(APP_NAME, 'PARITY')
+        if ini.get_value(APP_NAME, 'DATABITS'):
+            self.databits = ini.get_value(APP_NAME, 'DATABITS')
+        if ini.get_value(APP_NAME, 'STOPBITS'):
+            self.stopbits = ini.get_value(APP_NAME, 'STOPBITS')
 
         self.last_setup_type = ini.get_value('SETUPS', 'LASTSETUP_TYPE')
 
@@ -1163,6 +1164,34 @@ class totalstation(object):
 
         return(angle)
 
+    def format_widget_value(self, widget):
+        value = ''
+        if widget == 'X':
+            value = self.coordinate_pretty(self.xyz_global.x)
+        if widget == 'Y':
+            value = self.coordinate_pretty(self.xyz_global.y)
+        if widget == 'Z':
+            value = self.coordinate_pretty(self.xyz_global.z)
+        if widget == 'STATIONX':
+            value = self.coordinate_pretty(self.location.x)
+        if widget == 'STATIONY':
+            value = self.coordinate_pretty(self.location.y)
+        if widget == 'STATIONZ':
+            value = self.coordinate_pretty(self.location.z)
+        if widget == 'LOCALX':
+            value = self.coordinate_pretty(self.xyz.x)
+        if widget == 'LOCALY':
+            value = self.coordinate_pretty(self.xyz.y)
+        if widget == 'LOCALZ':
+            value = self.coordinate_pretty(self.xyz.z)
+        if widget == 'SLOPED':
+            value = self.coordinate_pretty(self.sloped)
+        if widget == 'HANGLE':
+            value = self.decimal_degrees_to_dddmmss(self.hangle) if self.hangle is not None else ''
+        if widget == 'VANGLE':
+            value = self.decimal_degrees_to_dddmmss(self.vangle) if self.vangle is not None else ''
+        return value
+
     def parse_dddmmss_angle(self, hangle):
         hangle = str(hangle)
         if '.' not in hangle:
@@ -1177,8 +1206,11 @@ class totalstation(object):
 
         return([angle, minutes, seconds])
 
+    def coordinate_pretty(self, coordinate):
+        return round(coordinate, 3) if coordinate is not None else ''
+
     def point_pretty(self, point):
-        return(f'X: {round(point.x, 3)}\nY: {round(point.y, 3)}\nZ: {round(point.z, 3)}')
+        return(f'X: {self.coordinate_pretty(point.x)}\nY: {self.coordinate_pretty(point.y)}\nZ: {self.coordinate_pretty(point.z)}')
 
     def decimal_degrees_to_dddmmss(self, angle):
         if angle is not None:
@@ -1199,7 +1231,7 @@ class totalstation(object):
             return('')
 
     def vhd_to_sexa_pretty_compact(self):
-        return(f"hangle : {self.decimal_degrees_to_sexa_pretty(self.hangle)}, vangle : {self.decimal_degrees_to_sexa_pretty(self.vangle)}, sloped : {round(self.sloped, 3) if self.sloped else ''}")
+        return(f"hangle : {self.decimal_degrees_to_sexa_pretty(self.hangle)}, vangle : {self.decimal_degrees_to_sexa_pretty(self.vangle)}, sloped : {self.coordinate_pretty(self.sloped)}")
 
     def add_points(self, p1, p2):
         return point(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z)
@@ -1213,19 +1245,27 @@ class totalstation(object):
             hash += random.choice(string.ascii_uppercase)
         return(hash)
 
+    def is_numeric(self, value):
+        try:
+            float(value)
+            return(True)
+        except ValueError:
+            return(False)
+
     def set_horizontal_angle(self, angle):
-        if self.make == 'TOPCON':
-            self.set_horizontal_angle_topcon(angle)
-        elif self.make in ['WILD', 'Leica']:
-            self.set_horizontal_angle_leica(angle)
-        elif self.make in ['Leica GeoCom']:
-            self.set_horizontal_angle_geocom(angle)
-        elif self.make == 'SOKKIA':
-            self.set_horizontal_angle_sokkia(angle)
-        elif self.make == 'Simulate':
-            pass
-        elif self.make in ['Manual XYZ', 'Manual VHD']:
-            pass
+        if self.is_numeric(angle):
+            if self.make == 'Topcon':
+                self.set_horizontal_angle_topcon(angle)
+            elif self.make in ['WILD', 'Leica']:
+                self.set_horizontal_angle_leica(angle)
+            elif self.make in ['Leica GeoCom']:
+                self.set_horizontal_angle_geocom(angle)
+            elif self.make == 'SOKKIA':
+                self.set_horizontal_angle_sokkia(angle)
+            elif self.make == 'Simulate':
+                pass
+            elif self.make in ['Manual XYZ', 'Manual VHD']:
+                pass
 
     def set_horizontal_angle_nikon(self, angle):
         # need to send to station in format dddmmss
@@ -1347,8 +1387,6 @@ class totalstation(object):
         if self.serialcom.is_open:
             self.serialcom.write(data)
             self.add_to_io('Sent -> ' + data.decode())
-            # print(data)
-            # sleep(0.1)
 
     def receive(self):
         data = ''
@@ -1356,9 +1394,6 @@ class totalstation(object):
             port = self.serialcom if self.communication == 'Serial' else self.serial_bt_input
             data = port.read_until().decode() if port.is_open else ''
             if data:
-                # if self.event is not None:  # This is for Topcon where the COM has to be monitored
-                #     self.event.cancel()
-                #     self.event = None
                 self.add_to_io('Received <- ' + data)
         self.received = data
 
@@ -1366,19 +1401,25 @@ class totalstation(object):
         if self.serialcom.is_open:
             self.serialcom.close()
             self.clear_io()
-            # self.event.cancel()
 
     def open(self):
         self.close()
-        self.error = ''
+        self.error_message = ''
+        self.error_code = 0
         if any(item is None for item in [self.baudrate, self.comport, self.parity, self.databits, self.stopbits]):
-            return self.error
+            self.error_code = 1
+            self.error_message = 'Missing baudrate, comport, parity, databits, or stopbits'
+            return self.error_message
         if any(item == '' for item in [self.baudrate, self.comport, self.parity, self.databits, self.stopbits]):
-            return self.error
+            self.error_code = 1
+            self.error_message = 'Missing baudrate, comport, parity, databits, or stopbits'
+            return self.error_message
         if self.make in ['Simulation', 'Manual XYZ', 'Manual VHD']:
-            return self.error
+            return self.error_message
         if self.comport not in self.comport_nos():
-            return self.error
+            self.error_code = 1
+            self.error_message = self.comport + ' is an invalid COM port number'
+            return self.error_message
 
         self.serialcom.port = self.comport
         self.serialcom.baudrate = int(self.baudrate)
@@ -1394,6 +1435,7 @@ class totalstation(object):
         try:
             self.serialcom.open()
             self.clear_io()
+            self.initialize()
             # self.event = Clock.schedule_interval(self.check_receive_buffer, .1)
             # if self.communication == 'Bluetooth':
             #     self.serial_bt_input.port = f"COM{str(int(self.comport.replace('COM', '')) + 1)}"
@@ -1404,8 +1446,9 @@ class totalstation(object):
             #     self.serial_bt_input.timeout = self.serialcom.timeout
             #     self.serial_bt_input.open()
         except OSError as err:
-            self.error = str(err)
-        return self.error
+            self.error_code = 1
+            self.error_message = str(err)
+        return self.error_message
 
     def check_receive_buffer(self, dt):
         if self.data_waiting():
@@ -1665,8 +1708,17 @@ class totalstation(object):
         self.rotate_local = local_datums
         self.rotate_global = global_datums
 
-    # Function specific to Topcon #
+    def cancel(self):
+        if self.make == 'Topcon':
+            self.topcon_stop_tracking()
 
+    def initialize(self):
+        if self.make == 'Topcon':
+            self.topcon_initialize()
+
+    """
+    Topcon specific functions for the total statin
+    """
     def launch_point_topcon(self):
         self.send(self.topcon_format("Z34"))   # Slope angle mode
         self.wait_for_received(1)
@@ -1693,15 +1745,33 @@ class totalstation(object):
         return(bcc[-3:])
 
     def set_horizontal_angle_topcon(self, angle):
-        # angle should be in dddmmss
+        # angle should be in dddmmss with decimal point
+        if "." not in angle:
+            angle = angle + "."
+        angle = "000" + angle + "0000"
+        decimal_point = angle.index('.')
+        angle = angle[decimal_point - 3: decimal_point] + angle[decimal_point + 1: decimal_point + 5]
         self.send(self.topcon_format("J+" + angle + "d"))
-        self.receive()
+        self.wait_for_received(1)
         # delay(1)
         self.clear_serial_buffers()
 
-    def initialize_topcon(self):
-        self.send(self.topcon_format("ST0"))
+    def topcon_stop_tracking(self):
+        self.send(self.topcon_format("N"))
+        self.wait_for_received(2)
 
+    def topcon_horizontal_mode(self):
+        # Should bump the display back to angle mode
+        # Can be used after taking a shot
+        self.send(self.topcon_format("Z10"))
+        self.wait_for_received(1)
+
+    def topcon_initialize(self):
+        self.send(self.topcon_format("L"))
+        self.wait_for_received(1)
+        self.topcon_set_response()
+        return self.topcon_valid_bcc()
+        
     def topcon_acknowledge(self):
         ack = chr(6) + "006" + chr(3) + TOPCON_TERMINATION
         self.send(bytes(ack, 'utf-8'))
@@ -1713,29 +1783,37 @@ class totalstation(object):
         if self.data_waiting():
             self.receive()
             self.topcon_acknowledge()
-            self.set_response_topcon()
+            self.topcon_set_response()
             if self.response:
-                self.parse_topcon()
+                self.topcon_parse()
                 self.vhd_to_xyz()
 
-    def set_response_topcon(self):
+    def topcon_set_response(self):
         self.response = self.received
 
-    def parse_topcon(self):
+    def topcon_valid_bcc(self):
+        if chr(3) not in self.response:
+            return False
+        
+        delimiter = self.response.index(chr(3))
+        bcc1 = self.response[delimiter - 3:delimiter]
+        bcc2 = self.make_bcc_topcon(self.response[:delimiter - 3])
+        if bcc1 != bcc2:
+            self.error_code = 3
+            self.error_message = 'Communications error.  BCC did not match.'
+            return False
+
+        return True
+
+    def topcon_parse(self):
         if self.response:
             if self.response[0] not in ['?', 'R']:
                 self.error_code = 4
                 self.error_message = 'Data stream did not start with ? or R'
                 return False
         
-        if chr(3) in self.response:
-            delimiter = self.response.index(chr(3))
-            bcc1 = self.response[delimiter - 3:delimiter]
-            bcc2 = self.make_bcc_topcon(self.response[:delimiter - 3])
-            if bcc1 != bcc2:
-                self.error_code = 3
-                self.error_message = 'Communications error.  BCC did not match.'
-                return False
+        if not self.topcon_valid_bcc():
+            return
 
         self.sloped = float(self.response[1:10]) / 1000.0
         self.hangle = self.dddmmss_to_decimal_degrees(self.response[19:22] + '.' + self.response[22:26])
@@ -1753,10 +1831,9 @@ class totalstation(object):
             return False
         return True
 
-    # end Topcon
-
-    # Sokkia functions
-
+    """
+    Sokkia specific functions
+    """
     def launch_point_sokkia(self):
         self.send(chr(17).encode())
 
@@ -1793,10 +1870,9 @@ class totalstation(object):
     def initialize_sokkia(self):
         pass
 
-    # end Sokkia
-
-    # Leica functions ###
-
+    """
+    Leica specific functions
+    """
     def pad_dms_leica(self, angle):
         degrees = ('000' + angle.split('.')[0])[-3:]
         minutes_seconds = (angle.split('.')[1] + '0000')[0:4]
@@ -1853,9 +1929,10 @@ class totalstation(object):
         self.send("SET/149/2")
         acknow2 = self.receive()
         return(acknow1 + acknow2)
-    # ## Leica functions ###
 
-    # ## Leica geocom functions ###
+    """
+    Leica GeoCom specific functions
+    """
     def initialize_geocom(self):
         pass
 
@@ -1956,10 +2033,6 @@ class totalstation(object):
         self.set_response_leica_geocom(self.receive())
         return self.response.startswith('0,')
 
-    # ## Leica geocom functions ###
-
-# endregion
-
 
 class ComTestScreen(Screen):
     def __init__(self, station = None, cfg = None, colors = None, **kwargs):
@@ -2057,15 +2130,10 @@ class ComTestScreen(Screen):
 
 class MainScreen(e5_MainScreen):
 
-    popup = ObjectProperty(None)
-    popup_open = False
-    text_color = (0, 0, 0, 1)
-    title = __program__
 
-    def __init__(self, user_data_dir, **kwargs):
+    def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
 
-        self.user_data_dir = user_data_dir
         self.setup_logger()
 
         self.colors = ColorScheme()
@@ -2075,9 +2143,11 @@ class MainScreen(e5_MainScreen):
 
         self.warnings, self.errors = self.setup_program()
 
-        self.station = totalstation(self.ini.get_value(__program__, 'STATION'))
+        self.station = totalstation(self.ini.get_value(APP_NAME, 'STATION'))
         self.station.setup(self.ini, self.data)
         self.station.open()
+        if self.station.error_message:
+            self.warnings.append(self.station.error_message)
 
         self.cfg_datums = CFG()
         self.cfg_datums.build_datum()
@@ -2095,7 +2165,7 @@ class MainScreen(e5_MainScreen):
         self.build_mainscreen()
         self.add_widget(self.layout)
         self.add_screens()
-        restore_window_size_position(__program__, self.ini)
+        restore_window_size_position(APP_NAME, self.ini)
 
         self.event = None
 
@@ -2114,11 +2184,11 @@ class MainScreen(e5_MainScreen):
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt = '%Y-%m-%d %H:%M:%S')
-        fh = logging.FileHandler(os.path.join(self.user_data_dir, __program__ + '.log'))
+        fh = logging.FileHandler(self.app_paths.log_file_path)
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
-        logger.info(__program__ + ' started, logger initialized, and application built.')
+        logger.info(APP_NAME + ' started, logger initialized, and application built.')
 
     def add_screens(self):
         sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen',
@@ -2449,6 +2519,7 @@ class MainScreen(e5_MainScreen):
         self.popup.dismiss()
         if self.event:
             self.event.cancel()
+            self.station.cancel()
 
     def check_for_station_response_edit_record(self, dt):
         if self.station.data_waiting():
@@ -2576,9 +2647,9 @@ class MainScreen(e5_MainScreen):
             filename = filename + '.cfg'
         self.cfg.initialize()
         self.cfg.build_default()
-        self.ini.update_value(__program__, 'CFG', os.path.join(path, filename))
-        self.cfg.update_value(__program__, 'DATABASE', os.path.join(path, filename.split('.')[0] + '.json'))
-        self.cfg.update_value(__program__, 'TABLE', filename.split('.')[0])
+        self.ini.update_value(APP_NAME, 'CFG', os.path.join(path, filename))
+        self.cfg.update_value(APP_NAME, 'DATABASE', os.path.join(path, filename.split('.')[0] + '.json'))
+        self.cfg.update_value(APP_NAME, 'TABLE', filename.split('.')[0])
         self.data.open(os.path.join(path, filename.split('.')[0] + '.json'))
         self.open_db()
         self.set_new_data_to_true()
@@ -2599,10 +2670,7 @@ class MainScreen(e5_MainScreen):
             self.data.new_data[table_name] = True
 
     def show_load_cfg(self):
-        if self.cfg.path:
-            start_path = self.cfg.path
-        else:
-            start_path = self.ini.get_value(__program__, 'APP_PATH')
+        start_path = self.cfg.path if self.cfg.path else self.app_paths.app_data_path
         if not os.path.exists(start_path):
             start_path = os.path.abspath(os.path.dirname(__file__))
         content = e5_LoadDialog(load = self.load_cfg,
@@ -2664,10 +2732,7 @@ class MainScreen(e5_MainScreen):
     def select_csv_file(self, instance):
         self.csv_data_type = instance.text
         self.popup.dismiss()
-        if self.cfg.filename and self.cfg.path:
-            start_path = self.cfg.path
-        else:
-            start_path = self.ini.get_value('EDM', 'APP_PATH')
+        start_path = self.cfg.path if self.cfg.path else self.app_paths.app_data_path
         content = e5_LoadDialog(load = self.load_csv,
                                 cancel = self.dismiss_popup,
                                 start_path = start_path,
@@ -2900,33 +2965,10 @@ class MainScreen(e5_MainScreen):
     def fill_default_fields(self, new_record):
         fields = self.cfg.fields()
         for field in fields:
-            if field == 'X':
-                new_record['X'] = self.station.xyz_global.x if self.station.xyz_global.x else ""
-            elif field == 'Y':
-                new_record['Y'] = self.station.xyz_global.y if self.station.xyz_global.y else ""
-            elif field == 'Z':
-                new_record['Z'] = self.station.xyz_global.z if self.station.xyz_global.z else ""
-            elif field == 'SLOPED':
-                new_record['SLOPED'] = self.station.sloped if self.station.sloped else ""
-            elif field == 'HANGLE':
-                new_record['HANGLE'] = self.station.hangle if self.station.hangle else ""
-            elif field == 'VANGLE':
-                new_record['VANGLE'] = self.station.vangle if self.station.vangle else ""
-            elif field == 'STATIONX':
-                new_record['STATIONX'] = self.station.location.x if self.station.location.x else ""
-            elif field == 'STATIONY':
-                new_record['STATIONY'] = self.station.location.y if self.station.location.y else ""
-            elif field == 'STATIONZ':
-                new_record['STATIONZ'] = self.station.location.z if self.station.location.z else ""
-            elif field == 'LOCALX':
-                new_record['LOCALX'] = self.station.xyz.x if self.station.xyz.x else ""
-            elif field == 'LOCALY':
-                new_record['LOCALY'] = self.station.xyz.y if self.station.xyz.y else ""
-            elif field == 'LOCALZ':
-                new_record['LOCALZ'] = self.station.xyz.z if self.station.xyz.z else ""
-            elif field == 'PRISM':
-                new_record['PRISM'] = self.station.prism.height if self.station.prism else 0.0
-            elif field == 'DATE':
+            value = self.station.format_widget_value(field)
+            if field != '':
+                new_record[field] = value
+            if field == 'DATE':
                 new_record['DATE'] = '%s' % datetime.now().replace(microsecond=0)
         return(new_record)
 
@@ -2941,7 +2983,7 @@ class MainScreen(e5_MainScreen):
 
     def exit_program(self):
         logger = logging.getLogger(__name__)
-        logger.info(__program__ + ' exited.')
+        logger.info(APP_NAME + ' exited.')
         self.save_window_location()
         App.get_running_app().stop()
 
@@ -3596,7 +3638,7 @@ class InitializeStationScreen(Screen):
         self.scroll_content.add_widget(self.setup_widgets)
 
     def go_back(self, instance):
-        self.ini.update_value(__program__, 'LASTSETUP_TYPE', self.setup_type.text)
+        self.ini.update_value(APP_NAME, 'LASTSETUP_TYPE', self.setup_type.text)
         self.parent.current = 'MainScreen'
 
     def accept_setup(self, instance):
@@ -3786,32 +3828,8 @@ class EditPointScreen(e5_RecordEditScreen):
     def reset_defaults_from_recorded_point(self, station):
         for widget in self.layout.walk():
             if hasattr(widget, 'id'):
-                value = None
-                if widget.id == 'X':
-                    value = f"{station.xyz_global.x:.3f}"
-                if widget.id == 'Y':
-                    value = f"{station.xyz_global.y:.3f}"
-                if widget.id == 'Z':
-                    value = f"{station.xyz_global.z:.3f}"
-                if widget.id == 'STATIONX':
-                    value = f"{station.location.x:.3f}"
-                if widget.id == 'STATIONY':
-                    value = f"{station.location.y:.3f}"
-                if widget.id == 'STATIONZ':
-                    value = f"{station.location.z:.3f}"
-                if widget.id == 'LOCALX':
-                    value = f"{station.xyz.x:.3f}"
-                if widget.id == 'LOCALY':
-                    value = f"{station.xyz.y:.3f}"
-                if widget.id == 'LOCALZ':
-                    value = f"{station.xyz.z:.3f}"
-                if widget.id == 'SLOPED':
-                    value = f"{station.sloped:.3f}"
-                if widget.id == 'HANGLE':
-                    value = station.decimal_degrees_to_dddmmss(station.hangle)
-                if widget.id == 'VANGLE':
-                    value = station.decimal_degrees_to_dddmmss(station.vangle)
-                if value is not None:
+                value = station.format_widget_value(widget.id)
+                if value != '':
                     widget.text = value
 
 class EditDatumScreen(Screen):
@@ -3961,7 +3979,7 @@ class StationConfigurationScreen(Screen):
                                             call_back = self.toggle_buttons,
                                             id = 'station_type',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'STATION'))
+                                            default = self.ini.get_value(APP_NAME, 'STATION'))
         self.layout.add_widget(self.station_type)
 
         self.communications = station_setting(label_text = 'Communications',
@@ -3969,7 +3987,7 @@ class StationConfigurationScreen(Screen):
                                                 # call_back = self.update_ini,
                                                 id = 'communications',
                                                 colors = self.colors,
-                                                default = self.ini.get_value(__program__, 'COMMUNICATIONS'))
+                                                default = self.ini.get_value(APP_NAME, 'COMMUNICATIONS'))
         self.layout.add_widget(self.communications)
 
         self.comports = station_setting(label_text = 'Port Number',
@@ -3977,7 +3995,7 @@ class StationConfigurationScreen(Screen):
                                             # call_back = self.update_ini,
                                             id = 'comport',
                                             colors = self.colors, station = self.station,
-                                            default = self.ini.get_value(__program__, 'COMPORT'))
+                                            default = self.ini.get_value(APP_NAME, 'COMPORT'))
         self.layout.add_widget(self.comports)
 
         self.baud_rate = station_setting(label_text = 'Baud rate',
@@ -3985,7 +4003,7 @@ class StationConfigurationScreen(Screen):
                                             # call_back = self.update_ini,
                                             id = 'baudrate',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'BAUDRATE'))
+                                            default = self.ini.get_value(APP_NAME, 'BAUDRATE'))
         self.layout.add_widget(self.baud_rate)
 
         self.parity = station_setting(label_text = 'Parity',
@@ -3993,7 +4011,7 @@ class StationConfigurationScreen(Screen):
                                             # call_back = self.update_ini,
                                             id = 'parity',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'PARITY'))
+                                            default = self.ini.get_value(APP_NAME, 'PARITY'))
         self.layout.add_widget(self.parity)
 
         self.data_bits = station_setting(label_text = 'Databits',
@@ -4001,7 +4019,7 @@ class StationConfigurationScreen(Screen):
                                             # call_back = self.update_ini,
                                             id = 'databits',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'DATABITS'))
+                                            default = self.ini.get_value(APP_NAME, 'DATABITS'))
         self.layout.add_widget(self.data_bits)
 
         self.stop_bits = station_setting(label_text = 'Stopbits',
@@ -4009,7 +4027,7 @@ class StationConfigurationScreen(Screen):
                                             # call_back = self.update_ini,
                                             id = 'stopbits',
                                             colors = self.colors,
-                                            default = self.ini.get_value(__program__, 'STOPBITS'))
+                                            default = self.ini.get_value(APP_NAME, 'STOPBITS'))
         self.layout.add_widget(self.stop_bits)
 
         self.buttons = e5_side_by_side_buttons(text = ['Back', 'Set'],
@@ -4032,25 +4050,25 @@ class StationConfigurationScreen(Screen):
 
     def update_ini(self, instance):
         self.station.make = self.station_type.spinner.text
-        self.ini.update_value(__program__, 'STATION', self.station_type.spinner.text)
+        self.ini.update_value(APP_NAME, 'STATION', self.station_type.spinner.text)
 
         self.station.stopbits = self.stop_bits.spinner.text
-        self.ini.update_value(__program__, 'STOPBITS', self.stop_bits.spinner.text)
+        self.ini.update_value(APP_NAME, 'STOPBITS', self.stop_bits.spinner.text)
 
         self.station.baudrate = self.baud_rate.spinner.text
-        self.ini.update_value(__program__, 'BAUDRATE', self.baud_rate.spinner.text)
+        self.ini.update_value(APP_NAME, 'BAUDRATE', self.baud_rate.spinner.text)
 
         self.station.databits = self.data_bits.spinner.text
-        self.ini.update_value(__program__, 'DATABITS', self.data_bits.spinner.text)
+        self.ini.update_value(APP_NAME, 'DATABITS', self.data_bits.spinner.text)
 
         self.station.comport = self.comports.spinner.text
-        self.ini.update_value(__program__, 'COMPORT', self.comports.spinner.text)
+        self.ini.update_value(APP_NAME, 'COMPORT', self.comports.spinner.text)
 
         self.station.parity = self.parity.spinner.text
-        self.ini.update_value(__program__, 'PARITY', self.parity.spinner.text)
+        self.ini.update_value(APP_NAME, 'PARITY', self.parity.spinner.text)
 
         self.station.communication = self.communications.spinner.text
-        self.ini.update_value(__program__, 'COMMUNICATIONS', self.communications.spinner.text)
+        self.ini.update_value(APP_NAME, 'COMMUNICATIONS', self.communications.spinner.text)
 
         self.ini.save()
         success = self.station.open()
@@ -4068,9 +4086,9 @@ class StationConfigurationScreen(Screen):
 
 class AboutScreen(e5_InfoScreen):
     def on_pre_enter(self):
-        self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + __version__ + ' Alpha\nApple Pie\n\n'
-        self.content.text += 'Built using Python 3.8, Kivy 2.0 and TinyDB 4.0\n\n'
-        self.content.text += 'An OldStoneAge.Com Production\n\n' + __date__
+        self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + VERSION + ' Alpha\nApple Pie\n\n'
+        self.content.text += f'Built using Python 3.8, Kivy {__kivy_version__} and TinyDB {__tinydb_version__}\n\n'
+        self.content.text += 'An OldStoneAge.Com Production\n\n' + PRODUCTION_DATE
         self.content.halign = 'center'
         self.content.valign = 'middle'
         self.content.color = self.colors.text_color
@@ -4088,11 +4106,12 @@ class StatusScreen(e5_InfoScreen):
         self.station = station
 
     def on_pre_enter(self):
+        app_paths = AppDataPaths(APP_NAME)
         txt = self.data.status() if self.data else 'A data file has not been initialized or opened.\n\n'
         txt += self.cfg.status() if self.cfg else 'A CFG is not open.\n\n'
         txt += self.ini.status() if self.ini else 'An INI file is not available.\n\n'
         txt += self.station.status() if self.station else 'Total station information is not available.\n\n'
-        txt += '\nThe default user path is %s.\n' % self.ini.get_value(__program__, "APP_PATH")
+        txt += '\nThe default user path is %s.\n' % app_paths.app_data_path
         logger = logging.getLogger(__name__)
         txt += f'\nThe log is written to {logger.handlers[0].baseFilename}\n'
         txt += '\nThe operating system is %s.\n' % platform_name()
@@ -4117,20 +4136,17 @@ class EDMApp(App):
     def __init__(self, **kwargs):
         super(EDMApp, self).__init__(**kwargs)
 
-        if platform_name() != 'Android':
-            self.app_path = os.path.abspath(os.path.dirname(__file__))
-        else:
-            self.app_path = self.user_data_dir
+        self.app_paths = AppDataPaths(APP_NAME)
+        self.app_paths.setup()
 
     def build(self):
-        sm.add_widget(MainScreen(user_data_dir = self.app_path, name = 'MainScreen'))
+        sm.add_widget(MainScreen(name = 'MainScreen'))
         sm.current = 'MainScreen'
-        # Window.borderless = True
-        self.title = __program__ + " " + __version__
+        self.title = APP_NAME + " " + VERSION
         return(sm)
 
 
-Factory.register(__program__, cls = EDMApp)
+Factory.register(APP_NAME, cls = EDMApp)
 
 
 if __name__ == '__main__':

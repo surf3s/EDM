@@ -33,9 +33,10 @@ import requests
 import json
 import urllib
 from threading import Thread
+from appdata import AppDataPaths
 
 SCROLLBAR_WIDTH = 5
-__program__ = 'EDM'
+APP_NAME = 'EDM'
 
 
 def width_calculator(fraction_size = .8, maximum_width = 800):
@@ -201,7 +202,7 @@ class e5_textinput(TextInput):
         super(e5_textinput, self).__init__(**kwargs)
         if 'id' in kwargs:
             self.id = kwargs.get('id')
-            if self.id in ['X', 'Y', 'Z'] and __program__ == 'EDM':
+            if self.id in ['X', 'Y', 'Z'] and APP_NAME == 'EDM':
                 self.bind(on_text_validate = self.do_coordinate_math)
 
     def do_coordinate_math(self, instance):
@@ -420,37 +421,38 @@ class e5_MainScreen(Screen):
     event = ObjectProperty(None)
     widget_with_focus = ObjectProperty(None)
     text_color = (0, 0, 0, 1)
-
+    title = APP_NAME
+    app_paths = AppDataPaths(APP_NAME)
+    
     def setup_program(self):
         warnings, errors = [], []
-        self.ini.open(os.path.join(self.user_data_dir, __program__ + '.ini'))
+        self.ini.open(self.app_paths.config_path)
         if not self.ini.first_time:
-            if self.ini.get_value(__program__, 'ColorScheme'):
-                self.colors.set_to(self.ini.get_value(__program__, 'ColorScheme'))
-            if self.ini.get_value(__program__, 'DarkMode').upper() == 'TRUE':
+            if self.ini.get_value(APP_NAME, 'ColorScheme'):
+                self.colors.set_to(self.ini.get_value(APP_NAME, 'ColorScheme'))
+            if self.ini.get_value(APP_NAME, 'DarkMode').upper() == 'TRUE':
                 self.colors.darkmode = True
             else:
                 self.colors.darkmode = False
 
-            if self.ini.get_value(__program__, 'ButtonFontSize'):
-                self.colors.button_font_size = (self.ini.get_value(__program__, 'ButtonFontSize'))
-            if self.ini.get_value(__program__, 'TextFontSize'):
-                self.colors.text_font_size = (self.ini.get_value(__program__, 'TextFontSize'))
+            if self.ini.get_value(APP_NAME, 'ButtonFontSize'):
+                self.colors.button_font_size = (self.ini.get_value(APP_NAME, 'ButtonFontSize'))
+            if self.ini.get_value(APP_NAME, 'TextFontSize'):
+                self.colors.text_font_size = (self.ini.get_value(APP_NAME, 'TextFontSize'))
 
-            if self.ini.get_value(__program__, "CFG"):
-                self.cfg.open(self.ini.get_value(__program__, "CFG"))
+            if self.ini.get_value(APP_NAME, "CFG"):
+                self.cfg.open(self.ini.get_value(APP_NAME, "CFG"))
                 if self.cfg.filename:
                     warnings, errors = self.open_db()
             self.ini.update(self.colors, self.cfg)
             self.ini.save()
         self.colors.set_colormode()
         self.colors.need_redraw = False
-        self.ini.update_value(__program__, 'APP_PATH', self.user_data_dir)
         return(warnings, errors)
 
     def get_path(self):
-        if self.ini.get_value(__program__, "CFG"):
-            return(ntpath.split(self.ini.get_value(__program__, "CFG"))[0])
+        if self.ini.get_value(APP_NAME, "CFG"):
+            return(ntpath.split(self.ini.get_value(APP_NAME, "CFG"))[0])
         else:
             return(os.getcwd())
 
@@ -467,13 +469,13 @@ class e5_MainScreen(Screen):
     def open_db(self):
         warnings = []
         errors = []
-        database = locate_file(self.cfg.get_value(__program__, 'DATABASE'), self.cfg.path)
+        database = locate_file(self.cfg.get_value(APP_NAME, 'DATABASE'), self.cfg.path)
         if not database:
             database = os.path.split(self.cfg.filename)[1]
             if "." in database:
                 database = database.split('.')[0]
             database = os.path.join(self.cfg.path, database + '.json')
-            warning = f"Could not locate the data file {self.cfg.get_value(__program__, 'DATABASE')} as specified in the CFG file.  EDM looked in the specified location and also in "
+            warning = f"Could not locate the data file {self.cfg.get_value(APP_NAME, 'DATABASE')} as specified in the CFG file.  EDM looked in the specified location and also in "
             warning += f"in the same folder as the CFG file {self.cfg.path}.  A new empty data file was created as {database}.  If this is not correct, leave the program and alter the CFG file "
             warning += "and/or move the data file to the correct location."
             warnings.append(warning)
@@ -493,12 +495,12 @@ class e5_MainScreen(Screen):
             errors.append(error)
         else:
             self.data.open(database)
-            if self.cfg.get_value(__program__, 'TABLE'):
-                self.data.table = self.cfg.get_value(__program__, 'TABLE')
+            if self.cfg.get_value(APP_NAME, 'TABLE'):
+                self.data.table = self.cfg.get_value(APP_NAME, 'TABLE')
             else:
                 self.data.table = '_default'
-            self.cfg.update_value(__program__, 'DATABASE', self.data.filename)
-            self.cfg.update_value(__program__, 'TABLE', self.data.table)
+            self.cfg.update_value(APP_NAME, 'DATABASE', self.data.filename)
+            self.cfg.update_value(APP_NAME, 'TABLE', self.data.table)
             self.cfg.save()
             self.data.new_data[self.data.table] = True
         return((warnings, errors))
@@ -522,7 +524,7 @@ class e5_MainScreen(Screen):
                 title = 'Warnings'
             message_text = message_text + '\n\n'.join(self.cfg.errors)
         else:
-            title = __program__
+            title = APP_NAME
             message_text = __SPLASH_HELP__
         self.popup = e5_MessageBox(title, message_text, call_back = self.close_popup, colors = self.colors)
         self.popup.open()
@@ -550,10 +552,10 @@ class e5_MainScreen(Screen):
             return(self.cfg.current_field.info)
 
     def save_window_location(self):
-        self.ini.update_value(__program__, 'ScreenTop', max(Window.top, 0))
-        self.ini.update_value(__program__, 'ScreenLeft', max(Window.left, 0))
-        self.ini.update_value(__program__, 'ScreenWidth', Window.size[0])
-        self.ini.update_value(__program__, 'ScreenHeight', Window.size[1])
+        self.ini.update_value(APP_NAME, 'ScreenTop', max(Window.top, 0))
+        self.ini.update_value(APP_NAME, 'ScreenLeft', max(Window.left, 0))
+        self.ini.update_value(APP_NAME, 'ScreenWidth', Window.size[0])
+        self.ini.update_value(APP_NAME, 'ScreenHeight', Window.size[1])
         self.ini.save()
 
     def open_popup(self):
@@ -582,7 +584,7 @@ class e5_MainScreen(Screen):
     def make_backup(self):
         if self.ini.backup_interval > 0:
             try:
-                record_counter = int(self.cfg.get_value(__program__, 'RECORDS UNTIL BACKUP')) if self.cfg.get_value(__program__, 'RECORDS UNTIL BACKUP') else self.ini.backup_interval
+                record_counter = int(self.cfg.get_value(APP_NAME, 'RECORDS UNTIL BACKUP')) if self.cfg.get_value(APP_NAME, 'RECORDS UNTIL BACKUP') else self.ini.backup_interval
                 record_counter -= 1
                 if record_counter <= 0:
                     backup_path, backup_file = os.path.split(self.data.filename)
@@ -592,7 +594,7 @@ class e5_MainScreen(Screen):
                     backup_file = os.path.join(backup_path, backup_file)
                     copyfile(self.data.filename, backup_file)
                     record_counter = self.ini.backup_interval
-                self.cfg.update_value(__program__, 'RECORDS UNTIL BACKUP', str(record_counter))
+                self.cfg.update_value(APP_NAME, 'RECORDS UNTIL BACKUP', str(record_counter))
             except OSError:
                 self.popup = e5_MessageBox('Backup Error', "\nAn error occurred while attempting to make a backup.  Check the backup settings and that the disk has enough space for a backup.",
                                             call_back = self.close_popup, colors = self.colors)
@@ -742,7 +744,7 @@ class e5_MainScreen(Screen):
 
         filename = os.path.join(path, filename)
 
-        if __program__ == 'EDM' and self.csv_data_type != 'points':
+        if APP_NAME == 'EDM' and self.csv_data_type != 'points':
             table = self.data.db.table(self.csv_data_type)
             if self.csv_data_type == 'datums':
                 errors = self.cfg_datums.write_csvs(filename, table)
@@ -1761,34 +1763,34 @@ class DataUploadScreen(Screen):
         self.test_thread = None
 
     def on_pre_enter(self):
-        database = self.cfg.get_value(__program__, 'ONLINE_DATABASE')
+        database = self.cfg.get_value(APP_NAME, 'ONLINE_DATABASE')
         if database:
             self.dbname.txt.text = database
 
-        table = self.cfg.get_value(__program__, 'ONLINE_TABLE')
+        table = self.cfg.get_value(APP_NAME, 'ONLINE_TABLE')
         if table:
             self.tablename.txt.text = table
 
-        username = self.cfg.get_value(__program__, 'ONLINE_USERNAME')
+        username = self.cfg.get_value(APP_NAME, 'ONLINE_USERNAME')
         if username:
             self.username.txt.text = username
 
-        url = self.cfg.get_value(__program__, 'ONLINE_URL')
+        url = self.cfg.get_value(APP_NAME, 'ONLINE_URL')
         if url:
             self.url.txt.text = url
 
     def back(self, instance):
         if self.dbname.txt.text:
-            self.cfg.update_value(__program__, 'ONLINE_DATABASE', self.dbname.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_DATABASE', self.dbname.txt.text)
 
         if self.tablename.txt.text:
-            self.cfg.update_value(__program__, 'ONLINE_TABLE', self.tablename.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_TABLE', self.tablename.txt.text)
 
         if self.username.txt.text:
-            self.cfg.update_value(__program__, 'ONLINE_USERNAME', self.username.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_USERNAME', self.username.txt.text)
 
         if self.url.txt.text:
-            self.cfg.update_value(__program__, 'ONLINE_URL', self.url.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_URL', self.url.txt.text)
 
         self.cfg.save()
         self.parent.current = 'MainScreen'
@@ -2948,7 +2950,7 @@ class DataGridAddNewPanel(GridLayout):
                 self.call_back = call_back
             else:
                 self.clear_widgets()
-                if __program__ == 'EDM':
+                if APP_NAME == 'EDM':
                     self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled for the main points table but is enabled for datums, units and prisms.',
                                                         popup = False, colors = self.colors))
                 else:
