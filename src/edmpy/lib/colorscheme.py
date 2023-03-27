@@ -3,6 +3,8 @@ from edmpy.lib.misc import platform_name
 
 BLACK = 0x000000
 WHITE = 0xFFFFFF
+MIDDLE_GREY = (.5, .5, .5, 1)
+DARK_GREY = (.2, .2, .2, 1)
 
 # Color from Google material design
 # https://material.io/design/color/the-color-system.html#tools-for-picking-colors

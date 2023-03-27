@@ -11,7 +11,7 @@
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "justMyCode": "True"
+            "justMyCode": true
         },
         {
             "name": "Python: Attach",
@@ -42,6 +42,7 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/manage.py",
+            "justMyCode": true,
             "args": [
                 "runserver",
                 "--noreload",

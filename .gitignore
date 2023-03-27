@@ -35,3 +35,5 @@ src/edmpy/EDM.ini
 CFGs/PIVL8-Station-1_datums_2022_08_16.csv
 CFGs/default_cfg.cfg
 src/edmpy/EDM.ini
+*.csv
+*.geojson

@@ -140,8 +140,8 @@
                         on_press: app.root.current = 'RecordDatumsScreen'
                         color: SUBMENU_COLOR
                     ActionButton:
-                        text: 'Leica Motor'
-                        on_press: app.root.current = 'LeicaMotorScreen'
+                        text: 'Options'
+                        on_press: app.root.current = 'OptionsScreen'
                         color: SUBMENU_COLOR
                 ActionGroup:
                     text: 'File'
@@ -177,7 +177,6 @@
                         color: SUBMENU_COLOR
 
 
-
 <e5_LoadDialog>:
     BoxLayout:
         size: root.size
@@ -200,19 +199,21 @@
             padding: 5
             Button:
                 text: "Cancel"
+                font_size: root.font_size
                 on_release: root.cancel()
                 color: root.button_color
                 background_color: root.button_background
                 background_normal: ''
             Button:
                 text: "Open"
+                font_size: root.font_size
                 on_release: root.load(filechooser.path, filechooser.selection)
                 color: root.button_color
                 background_color: root.button_background
                 background_normal: ''
 
 
-#region code from https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
+#region code based on https://github.com/MichaelStott/DataframeGUIKivy/blob/master/dfguik.py
 
 <DataGridHeaderCell>:
     size_hint: (None, None)
@@ -231,6 +232,7 @@
             size: self.size
     on_release: root.parent.parent.parent.parent._generate_table(self.text)
 
+
 <DataGridTableHeader>:
     header: header
     bar_width: 0
@@ -245,6 +247,7 @@
         width: self.minimum_width
         height: self.minimum_height
 
+
 <DataGridScrollCell>:
     canvas.before:
         #Color:
@@ -255,7 +258,7 @@
     text: root.text
     id: root.id
     on_press: root.callback(root.key, root.field, root.db)
-    background_color: root.datagrid_odd if root.is_even else root.datagrid_even
+    background_color: root.datagrid_even if root.is_even else root.datagrid_odd
     halign: "center"
     valign: "middle"
     # This setting determines if text wraps in the grid cell box
@@ -263,6 +266,7 @@
     size_hint: 1, 1
     #height: 60
     #width: 400
+
 
 <DataGridTableData>:
     rgrid: rgrid
@@ -280,6 +284,7 @@
         size_hint: (None, None)
         width: self.minimum_width
         height: self.minimum_height
+
 
 <DataGridWidget>:
     panel1: data_frame_panel
@@ -316,8 +321,10 @@
         on_release: root.close_panels()
         background_normal: ''
 
+
 <DataGridGridPanel>:
 #    orientation: 'vertical'
+
 
 <DataGridAddNewPanel>:
     addnew_list: addnew_list
@@ -338,7 +345,7 @@
 
 <DataGridCasePanel>:
     edit_list: edit_list
-#    orientation: 'vertical'
+    orientation: 'vertical'
     ScrollView:
         do_scroll_x: False
         do_scroll_y: True
@@ -352,6 +359,7 @@
             row_default_height: '35dp'
             row_force_default: True
             size_hint_y: None
+
 
 <DataGridDeletePanel>:
 #    orientation: 'vertical'

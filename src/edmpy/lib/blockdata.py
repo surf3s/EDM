@@ -20,21 +20,21 @@ class blockdata:
                     block[varname.upper()] = [block[varname.upper()], vardata]
                 else:
                     block[varname.upper()] = vardata
-                return(True)
+                return True
         if not block_exists:
             temp = {}
             temp['BLOCKNAME'] = blockname.upper()
             temp[varname.upper()] = vardata
             self.blocks.append(temp)
-            return(True)
-        return(False)
+            return True
+        return False
 
     def get_block(self, blockname):
         if self.blocks:
             for block in self.blocks:
                 if block['BLOCKNAME'] == blockname.upper():
-                    return(block)
-        return('')
+                    return block
+        return ''
 
     def read_blocks(self):
         self.blocks = []
@@ -58,27 +58,27 @@ class blockdata:
             message = template.format(type(ex).__name__, ex.args)
             logging.exception(message)
             print(message)
-        return(self.blocks)
+        return self.blocks
 
     def names(self):
         name_list = []
         for block in self.blocks:
             name_list.append(block['BLOCKNAME'])
-        return(name_list)
+        return name_list
 
     def fields(self):
         field_names = [field for field in self.names() if field not in [__program__]]
-        return(field_names)
+        return field_names
 
     def get_value(self, blockname, varname):
         if self.blocks:
             for block in self.blocks:
                 if block['BLOCKNAME'] == blockname.upper():
                     if varname.upper() in block.keys():
-                        return(block[varname.upper()])
+                        return block[varname.upper()]
                     else:
-                        return('')
-        return('')
+                        return ''
+        return ''
 
     def delete_key(self, blockname, key):
         for block in self.blocks:
@@ -108,12 +108,12 @@ class blockdata:
                             if block[item] != '' and block[item] is not None:
                                 f.write(item + "=%s\n" % block[item])
                     f.write("\n")
-            return(True)
+            return True
         except OSError:
-            return(False)
+            return False
 
     def save(self):
         self.write_blocks()
 
     def __len__(self):
-        return(len(self.blocks))
+        return len(self.blocks)
