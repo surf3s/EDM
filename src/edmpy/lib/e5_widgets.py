@@ -21,9 +21,9 @@ from kivy.uix.behaviors.focus import FocusBehavior
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.progressbar import ProgressBar
 
-from edmpy.lib.constants import __SPLASH_HELP__
-from edmpy.lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS, MIDDLE_GREY, DARK_GREY
-from edmpy.lib.misc import platform_name, locate_file
+from lib.constants import __SPLASH_HELP__
+from lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS, MIDDLE_GREY, DARK_GREY
+from lib.misc import platform_name, locate_file
 import ntpath
 import os
 from shutil import copyfile
@@ -525,23 +525,28 @@ class e5_MainScreen(Screen):
             if "." in database:
                 database = database.split('.')[0]
             database = os.path.join(self.cfg.path, database + '.json')
-            warning = f"Could not locate the data file {self.cfg.get_value(APP_NAME, 'DATABASE')} as specified in the CFG file.  EDM looked in the specified location and also in "
-            warning += f"in the same folder as the CFG file {self.cfg.path}.  A new empty data file was created as {database}.  If this is not correct, leave the program and alter the CFG file "
+            warning = f"Could not locate the data file {self.cfg.get_value(APP_NAME, 'DATABASE')} as specified in the CFG file.  "
+            warning += 'EDM looked in the specified location and also in '
+            warning += f'in the same folder as the CFG file {self.cfg.path}.  A new empty data file was created as {database}.  '
+            warning += 'If this is not correct, leave the program and alter the CFG file '
             warning += "and/or move the data file to the correct location."
             warnings.append(warning)
         if database.lower().endswith('.mdb') or database.lower().endswith('.sdf'):
             database = database[:-4] + '.json'
-            warning = 'EDM does not accept the mdb and sdf data files that were used with EDMWin and EDM-Mobile.  A new, empty json format file has been opened in this case.  '
-            warning += f'The filename is {database}.  '
-            warning += 'JSON files are human readable ASCII files.  To move your data from the old format to this program, follow the directions found on the EDM GitHub site '
-            warning += 'https://github.com/surf3s/EDM/tree/master/Import_from_EDM-Mobile or https://github.com/surf3s/EDM/tree/master/Import_from_EDMWin.  Basically you need to '
-            warning += 'create csv files that can be imported into this program.  EDM-Mobile will create them for you.  With EDMWin you need to create them youself.  '
+            warning = 'EDM does not accept the mdb and sdf data files that were used with EDMWin and EDM-Mobile.  '
+            warning += f'A new, empty json format file has been opened in this case.  The filename is {database}.  '
+            warning += 'JSON files are human readable ASCII files.  To move your data from the old format to this program, '
+            warning += 'follow the directions found on the EDM GitHub site '
+            warning += 'https://github.com/surf3s/EDM/tree/master/Import_from_EDM-Mobile or https://github.com/surf3s/EDM/tree/master/Import_from_EDMWin.  '
+            warning += 'Basically you need to create csv files that can be imported into this program.  '
+            warning += 'EDM-Mobile will create them for you.  With EDMWin you need to create them youself.  '
             warning += 'Alternatively, you can hand enter items like datums, units, and prisms using the various menu options under Edit.'
             warnings.append(warning)
         if not self.data.valid_format(database):
-            error = f'The file {database} does not load as a valid json file.  If the wrong file has been loaded, edit the CFG file to point to the correct database.  If the file is '
-            error += 'the correct one, then it appears that it has become corrupted.  Open the file in any text editor and assess the situation.  A json file is a human readable '
-            error += 'file format, and you should be able to see your data.  If you need more help fixing the problem, you can contact me.'
+            error = f'The file {database} does not load as a valid json file.  If the wrong file has been loaded, edit the CFG file to point to the '
+            error += 'correct database.  If the file is the correct one, then it appears that it has become corrupted.  Open the file in any text '
+            error += 'editor and assess the situation.  A json file is a human readable file format, and you should be able to see your data.  '
+            error += 'If you need more help fixing the problem, you can contact me.'
             errors.append(error)
         else:
             self.data.open(database)
@@ -565,12 +570,14 @@ class e5_MainScreen(Screen):
         self.event.cancel()
         if self.cfg.has_errors or self.cfg.has_warnings:
             if self.cfg.has_errors:
-                message_text = '\nThe following errors were found in the configuration file %s and must be corrected before data entry can begin.\n\n' % self.cfg.filename
+                message_text = f'\nThe following errors were found in the configuration file {self.cfg.filename} \
+                                and must be corrected before data entry can begin.\n\n'
                 self.cfg.filename = ''
                 title = 'CFG File Errors'
             elif self.cfg.has_warnings:
                 self.cfg.has_warnings = False
-                message_text = '\nThough data collection can start, there are the following warnings in the configuration file %s.\n\n' % self.cfg.filename
+                message_text = f'\nThough data collection can start, there are the following warnings in \
+                                    the configuration file {self.cfg.filename}.\n\n'
                 title = 'Warnings'
             message_text = message_text + '\n\n'.join(self.cfg.errors)
         else:
@@ -646,7 +653,8 @@ class e5_MainScreen(Screen):
                     record_counter = self.ini.backup_interval
                 self.cfg.update_value(APP_NAME, 'RECORDS UNTIL BACKUP', str(record_counter))
             except OSError:
-                self.popup = e5_MessageBox('Backup Error', "\n An error occurred while attempting to make a backup.  Check the backup settings and that the disk has enough space for a backup.",
+                self.popup = e5_MessageBox('Backup Error', "\n An error occurred while attempting to make a backup.  \
+                                            Check the backup settings and that the disk has enough space for a backup.",
                                             call_back = self.close_popup, colors = self.colors)
                 self.popup.open()
                 self.popup_open = True
@@ -690,7 +698,8 @@ class e5_MainScreen(Screen):
                                             call_back = [self.delete_last_object, self.close_popup],
                                             colors = self.colors)
             else:
-                self.popup = e5_MessageBox('Delete last object', '\n For now, this option requires a field called UNIT and another called ID.',
+                self.popup = e5_MessageBox('Delete last object',
+                                            '\n For now, this option requires a field called UNIT and another called ID.',
                                             call_back = self.close_popup,
                                             colors = self.colors)
         else:
@@ -830,7 +839,9 @@ class e5_MainScreen(Screen):
                                     content = content,
                                     size_hint = (0.9, 0.9))
             else:
-                self.popup = e5_MessageBox('E5', '\nA geoJSON file requires a GPS type field or fields named XY(Z) or Latitude, Longitude and optionally Elevation.',
+                self.popup = e5_MessageBox('E5',
+                                            '\nA geoJSON file requires a GPS type field or fields named XY(Z) or Latitude, \
+                                            Longitude and optionally Elevation.',
                                             call_back = self.dismiss_popup,
                                             colors = self.colors)
         else:
@@ -1553,7 +1564,8 @@ class e5_RecordEditScreen(Screen):
                 if hasattr(widget, 'id'):
                     if widget.id == field_name:
                         if "\"" in widget.text:
-                            save_errors.append('The field %s contains characters that are not recommended in a data file.  These include \" and \\.' % field_name)
+                            save_errors.append(f'The field {field_name} contains characters that are not recommended in a data file.  \
+                                                These include \" and \\.')
         return save_errors
 
     def no_errors_before_save(self):
@@ -1893,9 +1905,15 @@ class DataUploadScreen(Screen):
                                         spacing = 5,
                                         padding = 5,
                                         size_hint_y = None)
-        instructions = 'Here the data are uploaded to an online database repository like OSA.  The URL of the repository and your credentials are needed.  '
-        instructions += 'You also need the database and table names for the online repository.  If you select overwrite, all data for existing matching records in the online repository will be overwritten with the data here.  Normally you do not want to do this, but if you are making changes here to already uploaded data, you may want to select this option. '
-        instructions += 'A local backup of your JSON datafile is made before the upload.  Select Delete to remove the data here after the upload (this is good practice).'
+        instructions = 'Here the data are uploaded to an online database repository like OSA.  '
+        instructions += 'The URL of the repository and your credentials are needed.  '
+        instructions += 'You also need the database and table names for the online repository.  '
+        instructions += 'If you select overwrite, all data for existing matching records in the '
+        instructions += 'online repository will be overwritten with the data here.  Normally you '
+        instructions += 'do not want to do this, but if you are making changes here to already '
+        instructions += 'uploaded data, you may want to select this option. '
+        instructions += 'A local backup of your JSON datafile is made before the upload.  '
+        instructions += 'Select Delete to remove the data here after the upload (this is good practice).'
         self.scroll_grid.add_widget(e5_label_wrapped(text = instructions, colors = self.colors))
         self.url = DataGridLabelAndField(col = 'URL', colors = self.colors)
         if url:
@@ -2005,7 +2023,8 @@ class DataUploadScreen(Screen):
             return (False, str(inst))
 
     def get_structure(self, route):
-        response = requests.get(f"{route['url']}structure/{route['database']}/{route['table']}/", headers = {'Authorization': f"Token {route['api']}"})
+        response = requests.get(f"{route['url']}structure/{route['database']}/{route['table']}/",
+                                headers = {'Authorization': f"Token {route['api']}"})
         try:
             return json.loads(response.text)
         except:
@@ -2013,9 +2032,11 @@ class DataUploadScreen(Screen):
 
     def get_details(self, route, detail_keys):
         if route['type'] == 'Standard':
-            response = requests.get(f"{route['url']}{route['database']}/{route['table']}{detail_keys}/", headers = {'Authorization': f"Token {route['api']}"})
+            response = requests.get(f"{route['url']}{route['database']}/{route['table']}{detail_keys}/",
+                                        headers = {'Authorization': f"Token {route['api']}"})
         else:
-            response = requests.get(f"{route['url']}{route['database']}/{route['table']}/detail{detail_keys}/", headers = {'Authorization': f"Token {route['api']}"})
+            response = requests.get(f"{route['url']}{route['database']}/{route['table']}/detail{detail_keys}/",
+                                    headers = {'Authorization': f"Token {route['api']}"})
         return json.loads(response.text)
 
     def replace_keyfields(self, route, record, unique_together, structure):
@@ -2117,7 +2138,9 @@ class DataUploadScreen(Screen):
         route['api'] = status['token']
         connected, status = self.connected_to_rest(route)
         if not connected:
-            return (f"Could not connect to the URL provided above with those credentials.  This URL should look something like https://www.oldstoneage.com/api/ but modified for your database. The exact error message was '{status}'.", route)
+            return (f"Could not connect to the URL provided above with those credentials.  \
+                        This URL should look something like https://www.oldstoneage.com/api/ but modified for your database.  \
+                        The exact error message was '{status}'.", route)
         if not self.dbname.txt.text or not self.tablename.txt.text:
             return ('Provide a database and table name.', route)
         route['type'] = status['type']
@@ -2131,7 +2154,8 @@ class DataUploadScreen(Screen):
                 missing_fields.append(field)
 
         if missing_fields:
-            return f"The following fields are in the CFG but not in the online database: {', '.join(missing_fields)}.\n\nData cannot be transfered until this is fixed."
+            return f"The following fields are in the CFG but not in the online database: {', '.join(missing_fields)}.\n\n\
+                    Data cannot be transfered until this is fixed."
         else:
             return ''
 
@@ -2162,9 +2186,15 @@ class DataUploadScreen(Screen):
             if self.progress.label.text == 'Done\n':
                 if self.error_message:
                     fails = list(dict.fromkeys(self.fails))
-                    self.popup = e5_MessageBox('Data Upload', f"\n{self.additions} records were added. {len(self.overwrites)} were updated.  {len(self.fails)} records could not be added or updated.\n\nThese are the reported errors:\n{self.error_message}\nAnd these are the affected records:\n{', '.join(fails)}", call_back = self.close_popup)
+                    self.popup = e5_MessageBox('Data Upload',
+                                                f"\n{self.additions} records were added. {len(self.overwrites)} were updated.  {len(self.fails)} records \
+                                                    could not be added or updated.\n\nThese are the reported errors:\n{self.error_message}\nAnd these are \
+                                                    the affected records:\n{', '.join(fails)}",
+                                                call_back = self.close_popup)
                 else:
-                    self.popup = e5_MessageBox('Data Upload', f'\n{self.additions} records were added. {len(self.overwrites)} were updated.', call_back = self.close_popup)
+                    self.popup = e5_MessageBox('Data Upload',
+                                                f'\n{self.additions} records were added. {len(self.overwrites)} were updated.',
+                                                call_back = self.close_popup)
                 self.popup.open()
                 self.event.cancel()
                 self.progress.bar.value = 0
@@ -2175,15 +2205,29 @@ class DataUploadScreen(Screen):
                 if not self.error_message:
                     if len(self.overwrites) > 0:
                         self.overwrites = list(dict.fromkeys(self.overwrites))
-                        self.popup = e5_MessageBox('Data Upload Test', f"\nTest results.  A data upload would add {self.additions} records and modify {len(self.overwrites)} records.\n\nThe modified records would be {', '.join(self.overwrites)}", call_back = self.close_popup)
+                        self.popup = e5_MessageBox('Data Upload Test',
+                                                    f"\nTest results.  A data upload would add {self.additions} records and \
+                                                        modify {len(self.overwrites)} records.\n\n\
+                                                        The modified records would be {', '.join(self.overwrites)}",
+                                                    call_back = self.close_popup)
                     else:
-                        self.popup = e5_MessageBox('Data Upload Test', f"\nTest results.  A data upload would add {self.additions} records and modify {len(self.overwrites)} records.", call_back = self.close_popup)
+                        self.popup = e5_MessageBox('Data Upload Test',
+                                                    f"\nTest results.  A data upload would add {self.additions} records and \
+                                                        modify {len(self.overwrites)} records.",
+                                                    call_back = self.close_popup)
                 else:
                     if len(self.fails) > 0:
                         self.fails = list(dict.fromkeys(self.fails))
-                        self.popup = e5_MessageBox('Data Upload Test', f"\nA data upload would add {self.additions} records, modify {len(self.overwrites)} records.  However, the upload test produced errors.  Here first is a descripion of the errors:\n{self.error_message}.\n\nHere is a list of the problem cases:\n{', '.join(self.fails)}", call_back = self.close_popup)
+                        self.popup = e5_MessageBox('Data Upload Test',
+                                                    f"\nA data upload would add {self.additions} records, modify {len(self.overwrites)} records.  \
+                                                        However, the upload test produced errors.  \
+                                                        Here first is a descripion of the errors:\n{self.error_message}.\n\n\
+                                                        Here is a list of the problem cases:\n{', '.join(self.fails)}",
+                                                    call_back = self.close_popup)
                     else:
-                        self.popup = e5_MessageBox('Data Upload Test', f'\n{self.error_message}', call_back = self.close_popup)
+                        self.popup = e5_MessageBox('Data Upload Test',
+                                                    f'\n{self.error_message}',
+                                                    call_back = self.close_popup)
                 self.popup.open()
                 self.event.cancel()
                 self.progress.bar.value = 0
@@ -2224,8 +2268,8 @@ class DataUploadScreen(Screen):
             return
 
         unique_together_xyz = ['unit', 'id', 'suffix']
-        unique_together_context = ['unit', 'id']
-        unique_keys = {}
+        # unique_together_context = ['unit', 'id']
+        # unique_keys = {}
         self.error_message = ''
         n_records = len(self.data.db.table(self.data.table))
         record_counter = 0
@@ -2246,7 +2290,8 @@ class DataUploadScreen(Screen):
 
             online_record = self.record_already_exists(route, record_copy, self.cfg.unique_together, structure)
             if online_record == 'Lookup error':
-                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - Unable to test whether this record already exists."
+                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - \
+                                        Unable to test whether this record already exists."
                 self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
             elif online_record and self.overwrite.check.active:
                 if route['type'] == 'Standard':
@@ -2269,7 +2314,8 @@ class DataUploadScreen(Screen):
                     if self.deleteafter.check.active:
                         to_delete.append(doc_id)
                 else:
-                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - Unexpected response - {response.reason}'
+                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - \
+                                            Unexpected response - {response.reason}'
             elif not online_record:
                 record_copy = self.replace_keyfields(route, record_copy, self.cfg.unique_together, structure)
                 record_copy = self.fix_numeric_fields(record_copy, structure)
@@ -2290,9 +2336,11 @@ class DataUploadScreen(Screen):
                     if self.deleteafter.check.active:
                         to_delete.append(doc_id)
                 else:
-                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - Unexpected response - {response.reason}\n'
+                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - \
+                                            Unexpected response - {response.reason}\n'
             else:
-                self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - Record already exists and overwrite set to false.\n'
+                self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - \
+                                        Record already exists and overwrite set to false.\n'
 
         if self.deleteafter.check.active:
             self.progress.label.text = 'Deleting uploaded and updated records\n\n'
@@ -2316,7 +2364,8 @@ class DataUploadScreen(Screen):
         self.progress.label.text = 'Retrieving structure\n'
         structure = self.get_structure(route)
         if not structure:
-            self.error_message = 'Something went wrong that should not have.  Could not retreive structure of the data table from website.  Make sure the name of the database and the name of the table are correct.'
+            self.error_message = 'Something went wrong that should not have.  Could not retreive structure of the data table from website.  \
+                                    Make sure the name of the database and the name of the table are correct.'
             self.progress.label.text = 'Done\n'
             return
 
@@ -2341,7 +2390,8 @@ class DataUploadScreen(Screen):
 
             online_record = self.record_already_exists(route, record, unique_together, structure)
             if online_record == 'Lookup error':
-                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - Unable to test whether this record already exists."
+                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                        Unable to test whether this record already exists."
                 self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             elif online_record and self.overwrite.check.active:
                 if route['type'] == 'Standard':
@@ -2398,12 +2448,14 @@ class DataUploadScreen(Screen):
     def duplicate_check(self, route, record, unique_together, structure):
         already_in_db = self.record_already_exists(route, record, unique_together, structure)
         if already_in_db == 'Lookup error.':
-            self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - Unable to test whether this record already exists."
+            self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                    Unable to test whether this record already exists."
             self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
         elif already_in_db and self.overwrite.check.active:
             self.overwrites.append(self.unique_together_as_humanreadable(record, unique_together))
         elif already_in_db and not self.overwrite.check.active:
-            self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - Already exists but overwrite is set to False."
+            self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                    Already exists but overwrite is set to False."
             self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
         else:
             self.additions += 1
@@ -2411,27 +2463,33 @@ class DataUploadScreen(Screen):
     def field_check(self, record, structure, unique_together):
         for field, value in record.items():
             if field not in structure:
-                self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the field {field} is in datafile but not in the online database.'
+                self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                        the field {field} is in datafile but not in the online database.'
                 self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 continue
             field_online_structure = structure[field]
             if field_online_structure['type'] == 'CharField':
                 if len(record[field]) > field_online_structure['length']:
-                    self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - {record[field]} in {field} exceeds the valid field length. Maximum length is {field_online_structure['length']}.  Actual length is {len(record[field])}."
+                    self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                            {record[field]} in {field} exceeds the valid field length. Maximum length is {field_online_structure['length']}.  \
+                                            Actual length is {len(record[field])}."
                     self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             elif field_online_structure['type'] == 'FloatField':
                 if not self.is_numeric(record[field]):
-                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the value {record[field]} for {field} must be numeric.'
+                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                            the value {record[field]} for {field} must be numeric.'
                     self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             elif field_online_structure['type'] == 'IntegerField':
                 if not self.is_integer(record[field]):
-                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the value {record[field]} for {field} must be an integer.'
+                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                            the value {record[field]} for {field} must be an integer.'
                     self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             elif field_online_structure['type'] == 'DateTimeField':
                 pass
             elif field_online_structure['type'] == 'BooleanField':
                 if record[field] not in [True, False, None]:
-                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the value {record[field]} for {field} must be True or False.'
+                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                            the value {record[field]} for {field} must be True or False.'
                     self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             elif field_online_structure['type'] == 'ForeignKey':
                 pass    # TODO look up in related table
@@ -2501,7 +2559,9 @@ class DataUploadScreen(Screen):
             self.field_check(record_copy, xyz_structure + context_structure, unique_together_xyz)
 
         if len(unique_keys) != record_counter:
-            self.error_message += '\n\nWARNING: The following records are duplicated in the data file.  When they are transfered they will overwrite each other: ' + ', '.join([item for item, value in unique_keys.items() if value > 1])
+            self.error_message += f"\n\nWARNING: The following records are duplicated in the data file.  \
+                                    When they are transfered they will overwrite each other: \
+                                    {', '.join([item for item, value in unique_keys.items() if value > 1])}"
 
         self.progress.label.text = 'Done\n'
         return
@@ -2545,12 +2605,14 @@ class DataUploadScreen(Screen):
 
             already_in_db = self.record_already_exists(route, record, unique_together, structure)
             if already_in_db == 'Lookup error.':
-                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - Unable to test whether this record already exists."
+                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                        Unable to test whether this record already exists."
                 self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             elif already_in_db and self.overwrite.check.active:
                 self.overwrites.append(self.unique_together_as_humanreadable(record, unique_together))
             elif already_in_db and not self.overwrite.check.active:
-                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - Already exists but overwrite is set to False."
+                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                        Already exists but overwrite is set to False."
                 self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             else:
                 self.additions += 1
@@ -2565,33 +2627,41 @@ class DataUploadScreen(Screen):
 
             for field, value in record.items():
                 if field not in structure:
-                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the field {field} is in datafile but not in the online database.'
+                    self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                            the field {field} is in datafile but not in the online database.'
                     self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                     continue
                 field_online_structure = structure[field]
                 if field_online_structure['type'] == 'CharField':
                     if len(record[field]) > field_online_structure['length']:
-                        self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - {record[field]} in {field} exceeds the valid field length. Maximum length is {field_online_structure['length']}.  Actual length is {len(record[field])}."
+                        self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                                {record[field]} in {field} exceeds the valid field length. \
+                                                Maximum length is {field_online_structure['length']}.  Actual length is {len(record[field])}."
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'FloatField':
                     if not self.is_numeric(record[field]):
-                        self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the value {record[field]} for {field} must be numeric.'
+                        self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                                the value {record[field]} for {field} must be numeric.'
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'IntegerField':
                     if not self.is_integer(record[field]):
-                        self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the value {record[field]} for {field} must be an integer.'
+                        self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                                the value {record[field]} for {field} must be an integer.'
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'DateTimeField':
                     pass
                 elif field_online_structure['type'] == 'BooleanField':
                     if record[field] not in [True, False, None]:
-                        self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - the value {record[field]} for {field} must be True or False.'
+                        self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - \
+                                                the value {record[field]} for {field} must be True or False.'
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'ForeignKey':
                     pass    # TODO look up in related table
 
         if len(unique_keys) != record_counter:
-            self.error_message += '\n\nWARNING: The following records are duplicated in the data file.  When they are transfered they will overwrite each other: ' + ', '.join([item for item, value in unique_keys.items() if value > 1])
+            self.error_message += f"\n\nWARNING: The following records are duplicated in the data file.  \
+                                    When they are transfered they will overwrite each other: \
+                                {', '.join([item for item, value in unique_keys.items() if value > 1])}"
 
         self.progress.label.text = 'Done\n'
         return
@@ -3119,8 +3189,9 @@ class DataGridDeletePanel(GridLayout):
                                         selected = True,
                                         call_back = call_back, colors = self.colors))
         else:
-            self.add_widget(e5_scrollview_label('\nHighlight a record in the grid view (data tab) by clicking on its doc_id, and then delete that record here.',
-                                                 popup = False, colors = self.colors))
+            self.add_widget(e5_scrollview_label('\nHighlight a record in the grid view (data tab) by clicking on its doc_id, \
+                                                and then delete that record here.',
+                                                popup = False, colors = self.colors))
 
 
 class DataGridAddNewPanel(GridLayout):
@@ -3145,10 +3216,12 @@ class DataGridAddNewPanel(GridLayout):
             else:
                 self.clear_widgets()
                 if APP_NAME == 'EDM':
-                    self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled for the main points table but is enabled for datums, units and prisms.',
+                    self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled for the main points table but is enabled \
+                                                        for datums, units and prisms.',
                                                         popup = False, colors = self.colors))
                 else:
-                    self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled in E5 because it would bipass conditions and error checking (but it is enabled in EDM which is why it appears in this list of tabs).',
+                    self.add_widget(e5_scrollview_label('\nAdding records in this way is not enabled in E5 because it would bipass conditions \
+                                                        and error checking (but it is enabled in EDM which is why it appears in this list of tabs).',
                                                         popup = False, colors = self.colors))
 
     def next_field(self, instance):
@@ -3402,7 +3475,8 @@ class DataGridWidget(TabbedPanel):
             for record in self.data.all():
                 if record.doc_id != current_doc_id:
                     if unique_key == self.get_unique_key(record):
-                        unique_error = f'Based on the unique together field(s) {",".join(self.cfg.unique_together)}, this record\'s unique key of {unique_key} duplicates another record.  This is not allowed.'
+                        unique_error = f'Based on the unique together field(s) {",".join(self.cfg.unique_together)}, \
+                                        this record\'s unique key of {unique_key} duplicates another record.  This is not allowed.'
                         break
         return unique_error
 

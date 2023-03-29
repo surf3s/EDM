@@ -1,5 +1,5 @@
-from edmpy.lib.blockdata import blockdata
-from edmpy.constants import APP_NAME
+from lib.blockdata import blockdata
+from constants import APP_NAME
 
 
 class INI(blockdata):
@@ -58,5 +58,5 @@ class INI(blockdata):
         self.write_blocks()
 
     def status(self):
-        txt = '\nThe INI file is %s.\n' % self.filename
+        txt = f'\nThe INI file is {self.filename}.\n' 
         return txt

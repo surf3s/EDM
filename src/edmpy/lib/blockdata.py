@@ -3,7 +3,7 @@
 
 import logging
 import os
-from edmpy.lib.constants import __program__
+from lib.constants import __program__
 
 
 class blockdata:
@@ -102,11 +102,11 @@ class blockdata:
         try:
             with open(self.filename, mode = 'w') as f:
                 for block in self.blocks:
-                    f.write("[%s]\n" % block['BLOCKNAME'])
+                    f.write(f"[{block['BLOCKNAME']}]\n")
                     for item in block.keys():
                         if not item == 'BLOCKNAME' and not item[:2] == "__":
                             if block[item] != '' and block[item] is not None:
-                                f.write(item + "=%s\n" % block[item])
+                                f.write(f"{item}={block[item]}\n")
                     f.write("\n")
             return True
         except OSError:

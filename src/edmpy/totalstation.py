@@ -1,8 +1,8 @@
 from kivy.properties import ObjectProperty
 import serial
 import os
-from edmpy.geo import point, prism
-from edmpy.constants import APP_NAME
+from geo import point, prism
+from constants import APP_NAME
 from math import sqrt
 from math import pi
 from math import cos
@@ -284,7 +284,9 @@ class totalstation(object):
             return ''
 
     def vhd_to_sexa_pretty_compact(self):
-        return f"hangle : {self.decimal_degrees_to_sexa_pretty(self.hangle)}, vangle : {self.decimal_degrees_to_sexa_pretty(self.vangle)}, sloped : {self.coordinate_pretty(self.sloped)}"
+        return f"hangle : {self.decimal_degrees_to_sexa_pretty(self.hangle)}, \
+                vangle : {self.decimal_degrees_to_sexa_pretty(self.vangle)}, \
+                sloped : {self.coordinate_pretty(self.sloped)}"
 
     def add_points(self, p1, p2):
         return point(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z)
@@ -639,7 +641,7 @@ class totalstation(object):
         i = self.identity_matrix()
 
         v = self.cross_product(local_vector, global_vector)
-        s = self.vector_magnitude(v)
+        # s = self.vector_magnitude(v)
         c = self.dot_product(local_vector, global_vector)
 
         vx = self.empty_matrix()
@@ -675,7 +677,7 @@ class totalstation(object):
         i = self.identity_matrix()
 
         v = rotation_vector
-        s = self.vector_magnitude(v)
+        # s = self.vector_magnitude(v)
         c = self.dot_product(local_vector, global_vector)
 
         vx = self.empty_matrix()
@@ -741,8 +743,12 @@ class totalstation(object):
             # by computing the surface normal of each and rotating on the first already rotated side
             local_datums_normal = self.normalize_vector(self.cross_product(self.normalize_vector(rotated_local[1]),
                                                         self.normalize_vector(rotated_local[2])))
-            global_datums_normal = self.normalize_vector(self.cross_product(self.normalize_vector(self.vector_subtract(self.rotate_global[1], self.rotate_global[0])),
-                                                                            self.normalize_vector(self.vector_subtract(self.rotate_global[2], self.rotate_global[0]))))
+            global_datums_normal = self.normalize_vector(
+                                        self.cross_product(
+                                            self.normalize_vector(
+                                                self.vector_subtract(self.rotate_global[1], self.rotate_global[0])),
+                                            self.normalize_vector(
+                                                self.vector_subtract(self.rotate_global[2], self.rotate_global[0]))))
             p_out2 = self.rotate_point_2d(global_datums_normal, local_datums_normal, p_out)
 
             # Finish the rotation for the local datums as well (not strictly needed for points 2 and 3)

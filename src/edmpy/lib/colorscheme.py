@@ -1,5 +1,5 @@
 from kivy.core.window import Window
-from edmpy.lib.misc import platform_name
+from lib.misc import platform_name
 
 BLACK = 0x000000
 WHITE = 0xFFFFFF
@@ -28,10 +28,10 @@ GOOGLE_COLORS = {'red': [0xFF8A80, BLACK, 0xFF1744, WHITE],
 
 
 def make_rgb(hex_color):
-    return([((hex_color >> 16) & 0xFF) / 255.0,
+    return [((hex_color >> 16) & 0xFF) / 255.0,
             ((hex_color >> 8) & 0xFF) / 255.0,
             (hex_color & 0xFF) / 255.0,
-            1])
+            1]
 
 
 class ColorScheme:
@@ -93,7 +93,7 @@ class ColorScheme:
         Window.clearcolor = self.window_background
 
     def color_names(self):
-        return(list(self.valid_colors.keys()))
+        return list(self.valid_colors.keys())
 
     def set_to(self, name):
         self.need_redraw = True
@@ -104,4 +104,4 @@ class ColorScheme:
             self.button_color = make_rgb(self.valid_colors[name][3])
             self.color_scheme = name
         else:
-            return('Error: %s is not a valid color scheme.' % (name))
+            return f'Error: {name} is not a valid color scheme.'

@@ -1,6 +1,6 @@
-from edmpy.lib.dbs import dbs
+from lib.dbs import dbs
 from tinydb import TinyDB, Query, where
-from edmpy.geo import datum, unit, prism
+from geo import datum, unit, prism
 import re
 from typing import Dict
 from math import sqrt
