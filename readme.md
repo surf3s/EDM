@@ -35,9 +35,9 @@ pip install --upgrade edm-arch
 
 I am not sure I will do an Android version or not.  I have look into how to connect a phone to a total station, and it doesn't look straightforward even with BlueTooth.  I will keep looking at this option.  Better will be to use a ChromeBook I think.
 
-##### Linux (and ChromeBook)
+##### Linux and ChromeBooks
 
-I have run the program on Linux and on the Linux subsystem for ChromeBooks (I will provide more information on this soon).  However, I have not tried to connect either to a total station (coming soon).
+I have run the program on Linux, on the Linux subsystem for Windows, and on the Linux subsystem for ChromeBooks.  On ChromeBooks, I have tested a cabled connection to a Leica total station.  I used a serial to USB cable, and when connected to the ChromeBook I was given the option to make it a serial port in Linux.  Once this was done, I was able to configure EDM to see that port and to record points.  On Windows Linux, I didn't have to do anything special and it worked like it was Windows.  On pure Linux, I am not sure, but if you know Linux then you must know how to install this type of connection (USB and serial).
 
 ```
 pip install edm-arch
