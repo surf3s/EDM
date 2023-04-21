@@ -3,7 +3,8 @@
 
 import logging
 import os
-from lib.constants import __program__
+
+from lib.constants import APP_NAME
 
 
 class blockdata:
@@ -67,7 +68,7 @@ class blockdata:
         return name_list
 
     def fields(self):
-        field_names = [field for field in self.names() if field not in [__program__]]
+        field_names = [field for field in self.names() if field not in [APP_NAME]]
         return field_names
 
     def get_value(self, blockname, varname):

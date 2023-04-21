@@ -36,6 +36,10 @@ Changes for Version 1.0.31
   Made geoJSON files work with QGIS (points and lines are separate layers)
   Substantial refactoring of Python classes and file structure
 
+Changes for Version 1.0.31
+  Fixed issue with numeric values saved as text in JSON after initial save
+  Added Help JSON to view raw data in JSON file
+
 Bugs/To Do
   could make menus work better with keyboard (at least with tab)
   there is no error checking on duplicates in datagrid edits
@@ -46,9 +50,12 @@ Bugs/To Do
   Thoroughly test unit checking
   Thoroughly test setups (with and without prism)
   Add home/end page up/page down and control home/control end to datagrid movement
+  *** Keeping checking edit/save issues
+  *** Program asks for save record in all points even when having saved already
+  Add move to top or bottom in Help JSON and others (like Log file)
+  Check what gets logged
 """
 
-from lib.constants import __SPLASH_HELP__
 
 from kivy.config import Config
 from kivy.core.clipboard import Clipboard
@@ -72,9 +79,7 @@ from datetime import datetime
 import csv
 from math import cos
 from math import sin
-
 from platform import python_version
-
 import logging
 from appdata import AppDataPaths
 
@@ -82,7 +87,7 @@ from appdata import AppDataPaths
 from lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
 from lib.e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
 from lib.e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
-from lib.e5_widgets import DataGridLabelAndField
+from lib.e5_widgets import e5_JSONScreen, DataGridLabelAndField
 from lib.colorscheme import ColorScheme
 from lib.misc import restore_window_size_position, filename_only, platform_name
 
@@ -92,6 +97,7 @@ from ini import INI
 from cfg import CFG
 from totalstation import totalstation
 from constants import APP_NAME
+from lib.constants import __SPLASH_HELP__
 
 # The database - pure Python
 from tinydb import TinyDB
@@ -120,8 +126,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.31'
-PRODUCTION_DATE = 'March, 2023'
+VERSION = '1.0.32'
+PRODUCTION_DATE = 'April, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -256,6 +262,8 @@ class MainScreen(e5_MainScreen):
         sm.add_widget(e5_CFGScreen(name = 'CFGScreen', colors = self.colors, cfg = self.cfg))
 
         sm.add_widget(e5_INIScreen(name = 'INIScreen', colors = self.colors, ini = self.ini))
+
+        sm.add_widget(e5_JSONScreen(name = 'JSONScreen', colors = self.colors, data = self.data))
 
         sm.add_widget(AboutScreen(name = 'AboutScreen', colors = self.colors))
 
@@ -419,7 +427,7 @@ class MainScreen(e5_MainScreen):
     def have_shot_manual(self, instance):
         # check that next was pressed and get values
         if self.popup.xcoord and self.popup.ycoord and self.popup.zcoord:
-            p = self.station.text_to_point(f'{self.popup.xcoord.text},{self.popup.ycoord.text},{self.popup.zcoord.text}')
+            p = self.station.text_to_point(f'{self.popup.xcoord.textbox.text},{self.popup.ycoord.textbox.text},{self.popup.zcoord.textbox.text}')
             if p:
                 self.station.xyz = p
                 self.station.make_global()
@@ -605,16 +613,19 @@ class MainScreen(e5_MainScreen):
         last_squid = self.get_last_squid()
         self.info.text = last_squid if last_squid else 'EDM'
 
+    def same_coordinates(record1, record2):
+        return record1['X'] == record2['X'] and record1['Y'] == record2['Y'] and record1['Z'] == record2['Z']
+
     def check_for_duplicate_xyz(self):
         if self.station.make == 'Microscribe' and self.data.db is not None:
             if len(self.data.db.table(self.data.table)) > 1:
                 last_record = self.data.db.table(self.data.table).all()[-1]
                 next_to_last_record = self.data.db.table(self.data.table).all()[-2]
-                if 'X' in last_record.keys() and 'Y' in last_record.keys() and 'Z' in last_record.keys():
-                    if last_record['X'] == next_to_last_record['X'] and last_record['Y'] == next_to_last_record['Y'] and last_record['Z'] == next_to_last_record['Z']:
+                if all(field in last_record.keys() for field in ['X', 'Y', 'Z']):
+                    if self.same_coordinates(last_record, next_to_last_record):
                         self.popup = e5_MessageBox(title = 'Warning',
-                                                    message = f"\nThe last two recorded points have the exact same XYZ coordinates \
-                                                    ({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  \
+                                                    message = f"\nThe last two recorded points have the exact same XYZ \
+                                                    coordinates ({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  \
                                                     Verify that the Microscribe is still properly recording points (green light is on).  \
                                                     If the red light is on, you need to re-initialize (Setup - Initialize Station) and \
                                                     re-shoot the last two points.")
@@ -1929,9 +1940,13 @@ class InitializeStationScreen(Screen):
                 self.foresight = self.station.decimal_degrees_to_dddmmss(self.foresight)
 
         elif self.setup_type.text == 'Three datum shift':
-            if self.setup_widgets.datum1.datum.is_none() or self.setup_widgets.datum2.datum.is_none() or self.setup_widgets.datum3.datum.is_none():
+            if self.setup_widgets.datum1.datum.is_none() or \
+                self.setup_widgets.datum2.datum.is_none() or \
+                    self.setup_widgets.datum3.datum.is_none():
                 error_message = '\nSelect three datums to record.'
-            elif self.setup_widgets.recorder[0].result.xyz is None or self.setup_widgets.recorder[1].result.xyz is None or self.setup_widgets.recorder[2].result.xyz is None:
+            elif self.setup_widgets.recorder[0].result.xyz is None or \
+                    self.setup_widgets.recorder[1].result.xyz is None or \
+                        self.setup_widgets.recorder[2].result.xyz is None:
                 error_message = '\nRecord each datum.'
             else:
                 dist_12_measured = self.station.distance(self.setup_widgets.recorder[0].result.xyz, self.setup_widgets.recorder[1].result.xyz)
@@ -1948,7 +1963,8 @@ class InitializeStationScreen(Screen):
 
                 # should also include a mean error by averaging everything
 
-                txt = f'\nThe following errors are noted.  The actual distance between datums 1 and 2 is {round(dist_12_datums, 3)} and the measured distance was {round(dist_12_measured, 3)}.  '
+                txt = f'\nThe following errors are noted.  The actual distance between datums 1 and 2 is {round(dist_12_datums, 3)} and '
+                txt += f'the measured distance was {round(dist_12_measured, 3)}.  '
                 txt += f'The actual distance between datums 2 and 3 is {round(dist_23_datums, 3)} and the measured distance was {round(dist_23_measured, 3)}.  '
                 txt += f'The actual distance between datums 1 and 3 is {round(dist_13_datums, 3)} and the measured distance was {round(dist_13_measured, 3)}.  '
                 txt += f'\n\nThis corresponds to errors of {dist_12_error}, {dist_23_error}, and {dist_13_error}, respectively.'
@@ -2008,8 +2024,10 @@ class InitializeStationScreen(Screen):
                 self.ini.update_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1', self.setup_widgets.datum1.datum.name)
                 self.ini.update_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2', self.setup_widgets.datum2.datum.name)
                 self.ini.update_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3', self.setup_widgets.datum3.datum.name)
-                logger.info(f'Setup 3 datum shift using {self.setup_widgets.datum1.datum}, {self.setup_widgets.datum2.datum}, and {self.setup_widgets.datum3.datum}')
-                logger.info(f'Recorded values were respectively {self.setup_widgets.recorder[0].result.xyz}, {self.setup_widgets.recorder[1].result.xyz}, and {self.setup_widgets.recorder[2].result.xyz}')
+                logger.info(f'Setup 3 datum shift using {self.setup_widgets.datum1.datum}, {self.setup_widgets.datum2.datum}, and \
+                                {self.setup_widgets.datum3.datum}')
+                logger.info(f'Recorded values were respectively {self.setup_widgets.recorder[0].result.xyz}, {self.setup_widgets.recorder[1].result.xyz}, and \
+                                {self.setup_widgets.recorder[2].result.xyz}')
 
         self.popup.dismiss()
         if self.foresight:
@@ -2181,7 +2199,8 @@ class StationConfigurationScreen(Screen):
 
     def build_screen(self):
         self.station_type = station_setting(label_text = 'Station type',
-                                            spinner_values = ("Leica", "Leica GeoCom", "Wild", "Topcon", "Sokkia", "Microscribe", "Manual XYZ", "Manual VHD", "Simulate"),
+                                            spinner_values = ("Leica", "Leica GeoCom", "Wild", "Topcon", "Sokkia", "Microscribe",
+                                                                "Manual XYZ", "Manual VHD", "Simulate"),
                                             call_back = self.toggle_buttons,
                                             id = 'station_type',
                                             colors = self.colors,

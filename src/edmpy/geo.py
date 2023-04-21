@@ -124,7 +124,8 @@ class unit:
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return (self.name == other.name and self.minx == other.minx and self.miny == other.miny and self.maxx == other.maxx and self.maxy == other.maxy and self.centerx == other.centerx and self.centery == other.centery and self.radius == other.radius)
+            return self.name == other.name and self.minx == other.minx and self.miny == other.miny and self.maxx == other.maxx and self.maxy == other.maxy and\
+                self.centerx == other.centerx and self.centery == other.centery and self.radius == other.radius
         else:
             return False
 
@@ -132,7 +133,8 @@ class unit:
         return not self.__eq__(other)
 
     def is_none(self):
-        return self.name is None and self.minx is None and self.miny is None and self.maxx is None and self.maxy is None and self.radius is None and self.centerx is None and self.centery is None
+        return self.name is None and self.minx is None and self.miny is None and self.maxx is None and self.maxy is None and\
+            self.radius is None and self.centerx is None and self.centery is None
 
     def is_valid(self):
         if self.name == '' or self.name is None:

@@ -1,4 +1,3 @@
-from decimal import DivisionByZero
 from kivy.core.clipboard import Clipboard
 from kivy.clock import Clock
 from kivy.uix.textinput import TextInput
@@ -21,9 +20,8 @@ from kivy.uix.behaviors.focus import FocusBehavior
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.progressbar import ProgressBar
 
-from lib.constants import __SPLASH_HELP__
-from lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS, MIDDLE_GREY, DARK_GREY
-from lib.misc import platform_name, locate_file
+from decimal import DivisionByZero
+
 import ntpath
 import os
 from shutil import copyfile
@@ -36,7 +34,11 @@ import urllib
 from threading import Thread
 from appdata import AppDataPaths
 
-APP_NAME = 'EDM'
+from lib.constants import __SPLASH_HELP__
+from lib.constants import APP_NAME
+from lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS, MIDDLE_GREY, DARK_GREY
+from lib.misc import platform_name, locate_file
+
 
 SCROLLBAR_WIDTH = 5
 TEXTBOX_HEIGHT = 30
@@ -641,7 +643,8 @@ class e5_MainScreen(Screen):
     def make_backup(self):
         if self.ini.backup_interval > 0:
             try:
-                record_counter = int(self.cfg.get_value(APP_NAME, 'RECORDS UNTIL BACKUP')) if self.cfg.get_value(APP_NAME, 'RECORDS UNTIL BACKUP') else self.ini.backup_interval
+                record_counter = int(self.cfg.get_value(APP_NAME, 'RECORDS UNTIL BACKUP')) \
+                    if self.cfg.get_value(APP_NAME, 'RECORDS UNTIL BACKUP') else self.ini.backup_interval
                 record_counter -= 1
                 if record_counter <= 0:
                     backup_path, backup_file = os.path.split(self.data.filename)
@@ -1072,6 +1075,20 @@ class e5_InfoScreen(Screen):
         Clipboard.copy(self.content.text)
 
 
+class e5_JSONScreen(e5_InfoScreen):
+
+    def __init__(self, data = None, **kwargs):
+        super(e5_JSONScreen, self).__init__(**kwargs)
+        self.data = data
+
+    def on_pre_enter(self):
+        with open(self.data.filename, 'r') as f:
+            self.content.text = f.read()
+        self.content.color = self.colors.text_color
+        self.back_button.background_color = self.colors.button_background
+        self.back_button.color = self.colors.button_color
+
+
 class e5_LogScreen(e5_InfoScreen):
 
     def __init__(self, logger = None, **kwargs):
@@ -1483,7 +1500,13 @@ class e5_RecordEditScreen(Screen):
                 for widget in self.layout.walk():
                     if hasattr(widget, 'id'):
                         if widget.id == field:
-                            update[widget.id] = widget.text
+                            if self.e5_cfg.save_as_numeric_field(field):
+                                if '.' in widget.text:
+                                    update[widget.id] = float(widget.text)
+                                else:
+                                    update[widget.id] = int(widget.text)
+                            else:
+                                update[widget.id] = widget.text
                             break
             self.data.db.table(self.data.table).update(update, doc_ids = [self.doc_id])
             self.data.new_data[self.data.table] = True
@@ -2995,7 +3018,9 @@ class DataGridTableData(RecycleView):
 
     def menu_selection(self, instance):
         self.popup.dismiss()
-        if self.inputtype in ['MENU', 'BOOLEAN']:
+        if self.field in ['HANGLE', 'VANGLE'] and APP_NAME == 'EDM':
+            new_data = {self.field: self.datatable_widget.popup_textbox.text}
+        elif self.inputtype in ['MENU', 'BOOLEAN']:
             new_data = {self.field: instance.text if not instance.text == 'Add' else self.datatable_widget.popup_textbox.text}
         elif self.inputtype == 'NUMERIC':
             if self.field in ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ'] and APP_NAME == 'EDM':
@@ -3411,7 +3436,13 @@ class DataGridWidget(TabbedPanel):
             if hasattr(widget, 'id'):
                 if widget.id in cfg_fields:
                     if widget.text:
-                        new_record[widget.id] = widget.text
+                        if self.cfg.save_as_numeric_field(widget.id):
+                            if '.' in widget.text:
+                                new_record[widget.id] = float(widget.text)
+                            else:
+                                new_record[widget.id] = int(widget.text)
+                        else:
+                            new_record[widget.id] = widget.text
         return new_record
 
     def strip_strings_from_number_fields(self, new_record):
@@ -3446,6 +3477,7 @@ class DataGridWidget(TabbedPanel):
                 unique_error = self.check_unique_together(int(datatable.datagrid_doc_id), new_record)
                 if unique_error == '':
                     self.data.update(new_record, doc_ids = [int(datatable.datagrid_doc_id)])
+                    self.get_widget_by_id(self.panel2, 'datagridcase').changed = False
                     self.update_datagrid_record(datatable.datagrid_doc_id, new_record)
                     self.data.new_data = True  # TODO Needs to reference parent
                     self.close_popup(None)

@@ -1,11 +1,13 @@
-from lib.blockdata import blockdata
 from typing import List
 from tinydb import where
 import logging
 import os
 
+from lib.blockdata import blockdata
+
 __BUTTONS__ = 13
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
+__DEFAULT_FIELDS_NUMERIC__ = ['X', 'Y', 'Z', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'PRISM']
 
 
 class CFG(blockdata):
@@ -71,7 +73,7 @@ class CFG(blockdata):
                     if result:
                         error_message = f'\nThe field {field} is set to unique and the value {value} already exists for this field in this data table.'
                         return error_message
-                if "\"" in value:
+                if "\"" in str(value):
                     error_message = f'\nThe field {field} contains characters that are not recommended in a data file.  These include \" and \\.'
                     return error_message
         return True
@@ -82,7 +84,7 @@ class CFG(blockdata):
             f = self.get(field)
             if f.required:
                 if field in data_to_insert.keys():
-                    if data_to_insert[field].strip() == '':
+                    if str(data_to_insert[field]).strip() == '':
                         error_message = f'\nThe field {field} is set to unique or required.  Enter a value to save this record.'
                         return error_message
                 else:
@@ -111,6 +113,18 @@ class CFG(blockdata):
         # TODO run the validator in whichever
         # TODO and return results
         return True
+
+    def save_as_numeric_field(self, field_name):
+        if field_name in ['HANGLE', 'VANGLE']:
+            return False
+        if field_name in __DEFAULT_FIELDS_NUMERIC__:
+            return True
+        return self.get_value(field_name, 'TYPE').upper() == 'NUMERIC'
+
+    def edit_as_numeric_field(self, field_name):
+        if field_name in __DEFAULT_FIELDS_NUMERIC__:
+            return True
+        return self.get_value(field_name, 'TYPE').upper() == 'NUMERIC'
 
     def get(self, field_name):
         if not field_name:
@@ -390,7 +404,14 @@ class CFG(blockdata):
         return (self.has_errors, self.errors)
 
     def is_numeric(self, value):
-        return True
+        if value:
+            try:
+                float(value)
+                return True
+            except ValueError:
+                return False
+        else:
+            return True
 
     def save(self):
         self.write_blocks()

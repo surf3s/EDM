@@ -1,4 +1,5 @@
 # EDMpy (Beta)
+
 The Python version of EDM-Mobile and EDMWin.
 
 This is now a Beta version which means that I am ready for other people to try to use it in field situations.  Beta means that I have eliminated the bugs that I know of but a) there are still bugs and b) users should proceed with some caution.  I would also recommend that if you do not have time to test extensively before going into the field, you should also have a backup option (e.g. EDM-Mobile or EDMWin).  By summer 2023 I will know better how the program is working.
@@ -84,43 +85,6 @@ Short answer, I don't know.  I have simulated having 1000 points in the database
 I am working on this.  Once this program is working smoothly, I will add plot functionality.
 
 
-##### Update (June 21, 2022)
-1. Fix a number of bugs (some of them important)
-2. Added a screen called Test COM to help test serial connections to the total station
-3. Started adding support for Sokkia.  I need someone who can help me debug this.
-4. Made the logging actual log something useful.
-5. Create a PyPi project called edm-py so that Linux and MacOS users can easily install the program
-
-##### Update (July 1, 2022)
-1. Tweaked the default CFG to carry unit and increment ID
-2. Changed how increment works a bit (should work properly now)
-3. Disabled multitouch to disable red dot on right mouse click
-4. Check to see if mdf or sdf file is specified (from EDMWin and EDM-Mobile).
-5. Change to json format and give warning#$
-6. Check to see if json file can be found
-7.   If not, new empty file is created and warning given
-8.  Prism height - whether menu or manual - carries between shots
-9.  Prism height menu - works better with keyboard (enter key and arrow keys)
-10. A number of issues with using the program before opening a CFG fixed
-
-##### Update (July 6, 2022)
-1. Improvements in CSV file import
-2. Some misc. bug fixing
-3. Added CSV export to EDMWin (see oldstoneage.com website)
-
-##### Update (July 16, 2022)
-1. Microscribe setup asked for prism
-2. Manual XYZ or VDH didn't work for setups
-3. Welcome screen kept reappearing
-
-##### Update (July 18, 2022)
-1. Bugs in editing that converted numeric values to string values
-
-##### Update (July 21, 2022)
-1. Bugs in datagrid
-2. Bugs in data filter in edit last record
-3. Bug in starting path that meant a first CFG could not be opened
-
 ##### Update (March 2, 2023)
 1.   Added and debugged Topcon stations
 2.   Added and debugged Leica and Leica GeoCom stations
@@ -147,4 +111,40 @@ I am working on this.  Once this program is working smoothly, I will add plot fu
 25.  BlueTooth working on Leica GeoCOM stations
 26.  Multiple UI fixes
 
+##### Update (July 21, 2022)
+1. Bugs in datagrid
+2. Bugs in data filter in edit last record
+3. Bug in starting path that meant a first CFG could not be opened
+
+##### Update (July 18, 2022)
+1. Bugs in editing that converted numeric values to string values
+
+##### Update (July 16, 2022)
+1. Microscribe setup asked for prism
+2. Manual XYZ or VDH didn't work for setups
+3. Welcome screen kept reappearing
+
+##### Update (July 6, 2022)
+1. Improvements in CSV file import
+2. Some misc. bug fixing
+3. Added CSV export to EDMWin (see oldstoneage.com website)
+
+##### Update (July 1, 2022)
+1. Tweaked the default CFG to carry unit and increment ID
+2. Changed how increment works a bit (should work properly now)
+3. Disabled multitouch to disable red dot on right mouse click
+4. Check to see if mdf or sdf file is specified (from EDMWin and EDM-Mobile).
+5. Change to json format and give warning#$
+6. Check to see if json file can be found
+7.   If not, new empty file is created and warning given
+8. Prism height - whether menu or manual - carries between shots
+9. Prism height menu - works better with keyboard (enter key and arrow keys)
+10. A number of issues with using the program before opening a CFG fixed
+
+##### Update (June 21, 2022)
+1. Fix a number of bugs (some of them important)
+2. Added a screen called Test COM to help test serial connections to the total station
+3. Started adding support for Sokkia.  I need someone who can help me debug this.
+4. Made the logging actual log something useful.
+5. Create a PyPi project called edm-py so that Linux and MacOS users can easily install the program
 
