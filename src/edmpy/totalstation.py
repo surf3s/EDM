@@ -284,9 +284,9 @@ class totalstation(object):
             return ''
 
     def vhd_to_sexa_pretty_compact(self):
-        return f"hangle : {self.decimal_degrees_to_sexa_pretty(self.hangle)}, \
-                vangle : {self.decimal_degrees_to_sexa_pretty(self.vangle)}, \
-                sloped : {self.coordinate_pretty(self.sloped)}"
+        return (f"hangle : {self.decimal_degrees_to_sexa_pretty(self.hangle)}, "
+                f"vangle : {self.decimal_degrees_to_sexa_pretty(self.vangle)}, "
+                f"sloped : {self.coordinate_pretty(self.sloped)}")
 
     def add_points(self, p1, p2):
         return point(p1.x + p2.x, p1.y + p2.y, p1.z + p2.z)

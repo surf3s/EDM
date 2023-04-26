@@ -563,9 +563,9 @@ class MainScreen(e5_MainScreen):
         if unitname:
             txt += f'\n\nThe point is in unit {unitname}.'
         if self.station.make != 'Microscribe':
-            txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  \
-                    Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  \
-                    Slope distance:  {self.station.sloped:.3f}'
+            txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  '\
+                    'Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  '\
+                    'Slope distance:  {self.station.sloped:.3f}'
             txt += f'\n  X:  {self.station.xyz.x:.3f}\n  Y:  {self.station.xyz.y:.3f}\n  Z:  {self.station.xyz.z:.3f}'
             txt += f'\n\nStation coordinates:\n  X:  {self.station.location.x:.3f}\n  Y:  {self.station.location.y:.3f}\n  Z:  {self.station.location.z:.3f}'
             if self.station.prism_constant:
@@ -594,8 +594,8 @@ class MainScreen(e5_MainScreen):
 
     def log_the_shot(self):
         logger = logging.getLogger(__name__)
-        logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} with prism height {self.station.prism.height} \
-                        from {self.station.location} ')
+        logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} with prism height {self.station.prism.height} '\
+                        'from {self.station.location} ')
 
     def on_cancel(self):
         if self.data.db is not None:
@@ -624,11 +624,11 @@ class MainScreen(e5_MainScreen):
                 if all(field in last_record.keys() for field in ['X', 'Y', 'Z']):
                     if self.same_coordinates(last_record, next_to_last_record):
                         self.popup = e5_MessageBox(title = 'Warning',
-                                                    message = f"\nThe last two recorded points have the exact same XYZ \
-                                                    coordinates ({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  \
-                                                    Verify that the Microscribe is still properly recording points (green light is on).  \
-                                                    If the red light is on, you need to re-initialize (Setup - Initialize Station) and \
-                                                    re-shoot the last two points.")
+                                                    message = "\nThe last two recorded points have the exact same XYZ "
+                                                        f"coordinates ({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  "
+                                                        "Verify that the Microscribe is still properly recording points (green light is on).  "
+                                                        "If the red light is on, you need to re-initialize (Setup - Initialize Station) and "
+                                                        "re-shoot the last two points.")
                         self.popup.open()
 
     def close_popup(self, instance):
@@ -776,9 +776,9 @@ class MainScreen(e5_MainScreen):
         missing_fields = [field for field in fields if field not in cfg_fields]
         missing_fields = [field for field in missing_fields if field not in ['RECNO', 'TIME']]
         if missing_fields:
-            return f"The following field(s) are present in the import data but not in the current CFG: {', '.join(missing_fields)}. \
-                    Importing these data could cause the loss of data.  Please add these missing fields to the CFG before importing \
-                    these data."
+            return (f"The following field(s) are present in the import data but not in the current CFG: {', '.join(missing_fields)}. "
+                    "Importing these data could cause the loss of data.  Please add these missing fields to the CFG before importing "
+                    "these data.")
         else:
             return ""
 
@@ -801,28 +801,28 @@ class MainScreen(e5_MainScreen):
         errors = ''
         if self.csv_data_type == 'Datums':
             if len(fields) < 4:
-                errors = f'\nThese data seem to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  \
-                            If this is a CSV file, the first row in the file should contain these field names separated by commas.  \
-                            The fieldnames read were {fields}.'
+                errors = '\nThese data seem to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  '\
+                            'If this is a CSV file, the first row in the file should contain these field names separated by commas.  '\
+                            f'The fieldnames read were {fields}.'
             if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
-                errors = f'\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and \
-                            must include a field called Name, X, Y and Z.  The fields read were {fields}.'
+                errors = '\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and '\
+                            f'must include a field called Name, X, Y and Z.  The fields read were {fields}.'
         if self.csv_data_type == 'Prisms':
             if len(fields) < 2:
-                errors = f'\nThese data seem to have fewer than two fields.  To import prisms requires a Name and height and optionally \
-                            an offset field.  If this is a csv file, the first row in the file should contain these field names separated \
-                            by commas.  The fieldnames read were {fields}.'
+                errors = '\nThese data seem to have fewer than two fields.  To import prisms requires a Name and height and optionally '\
+                            'an offset field.  If this is a csv file, the first row in the file should contain these field names separated '\
+                            f'by commas.  The fieldnames read were {fields}.'
             if 'NAME' not in fields or 'HEIGHT' not in fields:
-                errors = f'\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and must \
-                            include a field called Name and Height.  The fields read were {fields}.'
+                errors = '\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and must '\
+                            f'include a field called Name and Height.  The fields read were {fields}.'
         if self.csv_data_type == 'Units':
             if len(fields) < 5:
-                errors = f'\nThese data seem to have fewer than five fields.  To import units requires a Unit, Minx, Miny, Maxx, Maxy field.  \
-                            If this is a CSV file, the first row in the file should contain these field names separated by commas.  \
-                            The fieldnames read were {fields}.'
+                errors = '\nThese data seem to have fewer than five fields.  To import units requires a Unit, Minx, Miny, Maxx, Maxy field.  '\
+                            'If this is a CSV file, the first row in the file should contain these field names separated by commas.  '\
+                            f'The fieldnames read were {fields}.'
             if 'UNIT' not in fields or 'MINX' not in fields or 'MINY' not in fields or 'MAXX' not in fields or 'MAXY' not in fields:
-                errors = f'\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and \
-                            must include at least fields called Unit, Minx, Miny, Maxx, Maxy.  The fields read were {fields}.'
+                errors = '\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and '\
+                            f'must include at least fields called Unit, Minx, Miny, Maxx, Maxy.  The fields read were {fields}.'
         if self.csv_data_type == 'Points':
             errors = self.check_import_fields_against_cfg_fields(fields)
         return errors
@@ -1128,12 +1128,12 @@ class ComTestScreen(Screen):
         self.record.add_widget(self.measure)
         self.layout.add_widget(self.record)
 
-        self.io = e5_scrollview_label('Set an angle or record a point and the communication to the station will appear here.  \
-                                        If nothing is received at all, then it might be a COM port number issue.  \
-                                        If what is received is unreadable, then there is a problem with the speed, parity, data bits, and stop bits.  \
-                                        If everything looks fine, but the angle does not change or a point is not taken, \
-                                        then likely Shannon needs to have a look.  \
-                                        Email the results here to him.', popup = False, colors = self.colors)
+        self.io = e5_scrollview_label('Set an angle or record a point and the communication to the station will appear here.  '
+                                        'If nothing is received at all, then it might be a COM port number issue.  '
+                                        'If what is received is unreadable, then there is a problem with the speed, parity, data bits, and stop bits.  '
+                                        'If everything looks fine, but the angle does not change or a point is not taken, '
+                                        'then likely Shannon needs to have a look.  '
+                                        'Email the results here to him.', popup = False, colors = self.colors)
         self.layout.add_widget(self.io)
 
         self.layout.add_widget(e5_side_by_side_buttons(text = ['Back', 'Clear', 'Copy'],
@@ -1300,8 +1300,8 @@ class VerifyStationScreen(Screen):
 
     def on_enter(self, *args):
         if len(self.data.names('datums')) == 0:
-            self.popup = e5_MessageBox('Datums', '\nBefore you can use this option, you need to define some datums.  \
-                                                    Go to the menu Edit Datums or to Setup Record Datums to add datums.',
+            self.popup = e5_MessageBox('Datums', '\nBefore you can use this option, you need to define some datums.  '
+                                                    'Go to the menu Edit Datums or to Setup Record Datums to add datums.',
                                         call_back = self.close_popup)
             self.popup.open()
         return super().on_enter(*args)
@@ -1364,8 +1364,8 @@ class record_button(e5_button):
         if angle is not None:
             if self.station.make in ['Manual XYZ', 'Manual VHD']:
                 self.popup = e5_MessageBox('Set horizonal angle',
-                                            f'\nAim at {self.datum1.datum.name} and set the horizontal angle\
-                                                 to {self.station.decimal_degrees_to_sexastr(angle)}.',
+                                            f'\nAim at {self.datum1.datum.name} and set the horizontal angle '
+                                                'to {self.station.decimal_degrees_to_sexastr(angle)}.',
                                             call_back = self.now_take_shot, colors = self.colors)
                 self.popup.open()
             elif self.station.make == 'Leica':
@@ -1624,9 +1624,9 @@ class setups(ScrollView):
             self.scrollbox.add_widget(content2)
 
         elif setup_type == "Over a datum":
-            instructions.text = '\nUse this option when the station is setup over a known point and you can measure the station height \
-                                or to set the station location directly (with no station height).  Note this option assumes the horizontal \
-                                angle is already correct or will be otherwise set.'
+            instructions.text = '\nUse this option when the station is setup over a known point and you can measure the station height '\
+                                'or to set the station location directly (with no station height).  Note this option assumes the horizontal '\
+                                'angle is already correct or will be otherwise set.'
             self.scrollbox.add_widget(instructions)
 
             self.over_datum = datum_selector(text = 'Select a datum',
@@ -1649,8 +1649,8 @@ class setups(ScrollView):
             self.scrollbox.add_widget(widget)
 
         elif setup_type == "Over a datum + Record a datum":
-            instructions.text = "\nSelect the datum under the station and a datum to recorded.  \
-                                    EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
+            instructions.text = "\nSelect the datum under the station and a datum to recorded.  "\
+                                "EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
             self.datum1 = datum_selector(text = 'Select datum\nunder the\nstation',
@@ -1674,9 +1674,9 @@ class setups(ScrollView):
             self.scrollbox.add_widget(self.recorder[0])
 
         elif setup_type == "Record two datums":
-            instructions.text = "\nSelect two datums to record. EDM will use triangulation to compute the station's XYZ coordinates.  \
-                                Always record datum one first and then datum two.  When you record datum one, the horizontal angle will \
-                                be set to 0.0.  When you accept the setup, the horizontal angle will be reset correctly on datum 2."
+            instructions.text = "\nSelect two datums to record. EDM will use triangulation to compute the station's XYZ coordinates.  "\
+                                "Always record datum one first and then datum two.  When you record datum one, the horizontal angle will "\
+                                "be set to 0.0.  When you accept the setup, the horizontal angle will be reset correctly on datum 2."
             self.scrollbox.add_widget(instructions)
 
             self.datum1 = datum_selector(text = 'Select\ndatum\none',
@@ -1701,8 +1701,8 @@ class setups(ScrollView):
                 self.scrollbox.add_widget(self.recorder[n])
 
         elif setup_type == "Three datum shift":
-            instructions.text = "\nThis option is designed to let one grid be rotated into another and is best for when a block of \
-                                sediment is being excavated in a lab.  It requires three datums points."
+            instructions.text = "\nThis option is designed to let one grid be rotated into another and is best for when a block of "\
+                                "sediment is being excavated in a lab.  It requires three datums points."
             self.scrollbox.add_widget(instructions)
 
             self.datum1 = datum_selector(text = 'Select datum 1',
@@ -1840,8 +1840,8 @@ class InitializeStationScreen(Screen):
         self.scroll_content.add_widget(self.setup_widgets)
         if value not in ['Horizontal Angle Only']:
             if len(self.data.names('datums')) == 0:
-                self.popup = e5_MessageBox('Datums', '\nBefore you can use this option, you need to define some datums.  \
-                                                        Go to the menu Edit Datums or to Setup Record Datums to add datums.',
+                self.popup = e5_MessageBox('Datums', '\nBefore you can use this option, you need to define some datums.  '
+                                                    'Go to the menu Edit Datums or to Setup Record Datums to add datums.',
                                             call_back = self.close_popup)
                 self.popup.open()
 
@@ -1860,8 +1860,8 @@ class InitializeStationScreen(Screen):
             if self.station.location.is_none() is True:
                 txt = '\nThe location of the station has not been set.'
             else:
-                txt = f'\nThe location of the station is at {str(self.station.location)}.  \
-                        All measured points will be relative to that point and the horizontal angle uploaded here.'
+                txt = f'\nThe location of the station is at {str(self.station.location)}.  '\
+                        'All measured points will be relative to that point and the horizontal angle uploaded here.'
 
         elif self.setup_type.text == 'Over a datum':
             if self.setup_widgets.over_datum.datum is None:
@@ -1888,8 +1888,8 @@ class InitializeStationScreen(Screen):
                 txt = f'\n{self.setup_widgets.datum2.datum.name} recorded as \nX : {datum2.x}\nY : {datum2.y}\nZ : {datum2.z}\n'
                 txt += f'\nThe error in this measurement is \nX : {station_error.x}\nY : {station_error.y}\nZ : {station_error.z}\n'
                 txt += '(Note that Z will be off by the station height in most setups)\n'
-                txt += f'\nIf the setup as measured is accepted, the new station coordinates will be \n\
-                        X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}'
+                txt += '\nIf the setup as measured is accepted, the new station coordinates will be \n'\
+                        f'X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}'
 
         elif self.setup_type.text == 'Record two datums':
             if self.setup_widgets.datum1.datum is None or self.setup_widgets.datum2.datum is None:
@@ -1899,8 +1899,8 @@ class InitializeStationScreen(Screen):
             elif self.station.subtract_points(self.setup_widgets.datum1.datum, self.setup_widgets.datum2.datum) == point(0, 0, 0):
                 error_message = '\nSelect two different datums with different coordinates.'
             elif self.setup_widgets.recorder[0].result.xyz.is_none() or self.setup_widgets.recorder[1].result.xyz.is_none():
-                error_message = '\nRecord each datum.  It is important that the first datum is recorded and then the second and not the other way around.  \
-                                Note that before the first datum is recorded, a horizontal angle of 0.0000 will be uploaded.'
+                error_message = '\nRecord each datum.  It is important that the first datum is recorded and then the second and not the other way around.  '\
+                                'Note that before the first datum is recorded, a horizontal angle of 0.0000 will be uploaded.'
             else:
                 measured_distance = self.station.distance(self.setup_widgets.recorder[0].result.xyz, self.setup_widgets.recorder[1].result.xyz)
                 actual_distance = self.station.distance(self.setup_widgets.datum1.datum.as_point(), self.setup_widgets.datum2.datum.as_point())
@@ -1930,13 +1930,13 @@ class InitializeStationScreen(Screen):
 
                 # Workout what angle needs to be uploaded to the station
                 self.foresight = self.station.angle_between_points(self.new_station, self.setup_widgets.datum2.datum.as_point())
-                txt = f'\nThe measured distance between {self.setup_widgets.datum1.datum.name} and {self.setup_widgets.datum2.datum.name} \
-                        was {round(measured_distance, 3)} m.  The distance based on the datum definitions should be {round(actual_distance, 3)} m.  \
-                        The error is {round(error_distance, 3)} m.\n'
-                txt += f'\nIf the setup as measured is accepted, the new station coordinates will be \n\
-                            X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
-                txt += f'\nAn angle of {self.station.decimal_degrees_to_sexa_pretty(self.foresight)} \
-                            will be uploaded (do not turn the station until this angle is set).'
+                txt = f'\nThe measured distance between {self.setup_widgets.datum1.datum.name} and {self.setup_widgets.datum2.datum.name} '\
+                        'was {round(measured_distance, 3)} m.  The distance based on the datum definitions should be {round(actual_distance, 3)} m.  '\
+                        'The error is {round(error_distance, 3)} m.\n'
+                txt += '\nIf the setup as measured is accepted, the new station coordinates will be \n'\
+                            f'X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
+                txt += f'\nAn angle of {self.station.decimal_degrees_to_sexa_pretty(self.foresight)} '\
+                            'will be uploaded (do not turn the station until this angle is set).'
                 self.foresight = self.station.decimal_degrees_to_dddmmss(self.foresight)
 
         elif self.setup_type.text == 'Three datum shift':
@@ -2134,8 +2134,8 @@ class station_setting(GridLayout):
             self.event2 = Clock.schedule_interval(self.check_comports, .2)
 
     def show_popup_message(self, dt):
-        self.popup = e5_MessageBox('COM Ports', '\nLooking for valid COM ports...This can take several seconds...\
-                                                    And the Cancel button might appear non-responsive...',
+        self.popup = e5_MessageBox('COM Ports', '\nLooking for valid COM ports...This can take several seconds...'
+                                                    'And the Cancel button might appear non-responsive...',
                                     response_type = "CANCEL",
                                     call_back = self.close_popup,
                                     colors = self.colors)
