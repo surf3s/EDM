@@ -259,15 +259,18 @@ class e5_textinput(GridLayout):
 class e5_label(Label):
     id = ObjectProperty('')
 
-    def __init__(self, text, popup = False, colors = None, height = None, **kwargs):
+    def __init__(self, text, popup = False, colors = None, label_height = None, **kwargs):
         super(e5_label, self).__init__(**kwargs)
         self.text = text
         self.color = set_color(popup, colors)
         if colors:
             if colors.text_font_size:
                 self.font_size = colors.text_font_size
-        self.bind(size = self.setter('text_size'))
-        self.height = 30 if height is None else height
+        if label_height is None:
+            self.bind(size = self.setter('text_size'))
+        # else:
+        #     self.height = label_height
+        self.height = 30 if label_height is None else label_height
         self.valign = 'center'
 
 
@@ -573,7 +576,7 @@ class e5_MainScreen(Screen):
         if self.cfg.has_errors or self.cfg.has_warnings:
             if self.cfg.has_errors:
                 message_text = f'\nThe following errors were found in the configuration file {self.cfg.filename} '\
-                                'and must be corrected before data entry can begin.\n\n'
+                               'and must be corrected before data entry can begin.\n\n'
                 self.cfg.filename = ''
                 title = 'CFG File Errors'
             elif self.cfg.has_warnings:
@@ -1082,8 +1085,11 @@ class e5_JSONScreen(e5_InfoScreen):
         self.data = data
 
     def on_pre_enter(self):
+        self.content.text = 'The last 150 lines:\n\n'
         with open(self.data.filename, 'r') as f:
-            self.content.text = f.read()
+            content = f.readlines()
+        # self.content.text += ''.join(list(reversed(content))[0:150])
+        self.content.text += ''.join(list(content)[-150:])
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
         self.back_button.color = self.colors.button_color
@@ -1587,8 +1593,7 @@ class e5_RecordEditScreen(Screen):
                 if hasattr(widget, 'id'):
                     if widget.id == field_name:
                         if "\"" in widget.text:
-                            save_errors.append(f'The field {field_name} contains characters that are not recommended in a data file.  '\
-                                                'These include \" and \\.')
+                            save_errors.append(f'The field {field_name} contains characters that are not recommended in a data file.  These include \" and \\.')
         return save_errors
 
     def no_errors_before_save(self):
@@ -2012,7 +2017,7 @@ class DataUploadScreen(Screen):
             # This is hardwired to OSA but it could be anything on the internet
             urllib.request.urlopen('https://www.oldstoneage.com')
             return True
-        except:
+        except (urllib.error.HTTPError, urllib.error.URLError):
             return False
 
     def get_auth_token(self, route):
@@ -2050,7 +2055,7 @@ class DataUploadScreen(Screen):
                                 headers = {'Authorization': f"Token {route['api']}"})
         try:
             return json.loads(response.text)
-        except:
+        except ValueError:
             return ''
 
     def get_details(self, route, detail_keys):
@@ -2130,7 +2135,7 @@ class DataUploadScreen(Screen):
             try:
                 float(value)
                 return True
-            except (ValueError, TypeError) as e:
+            except (ValueError, TypeError):
                 return False
 
     def is_integer(self, value):
@@ -2309,7 +2314,7 @@ class DataUploadScreen(Screen):
             online_record = self.record_already_exists(route, record_copy, self.cfg.unique_together, structure)
             if online_record == 'Lookup error':
                 self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - "\
-                                        "Unable to test whether this record already exists."
+                                      "Unable to test whether this record already exists."
                 self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
             elif online_record and self.overwrite.check.active:
                 if route['type'] == 'Standard':
@@ -2578,8 +2583,8 @@ class DataUploadScreen(Screen):
 
         if len(unique_keys) != record_counter:
             self.error_message += "\n\nWARNING: The following records are duplicated in the data file.  "\
-                                    "When they are transfered they will overwrite each other: "\
-                                    f"{', '.join([item for item, value in unique_keys.items() if value > 1])}"
+                                  "When they are transfered they will overwrite each other: "\
+                                  f"{', '.join([item for item, value in unique_keys.items() if value > 1])}"
 
         self.progress.label.text = 'Done\n'
         return
@@ -2624,13 +2629,13 @@ class DataUploadScreen(Screen):
             already_in_db = self.record_already_exists(route, record, unique_together, structure)
             if already_in_db == 'Lookup error.':
                 self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - "\
-                                        "Unable to test whether this record already exists."
+                                      "Unable to test whether this record already exists."
                 self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             elif already_in_db and self.overwrite.check.active:
                 self.overwrites.append(self.unique_together_as_humanreadable(record, unique_together))
             elif already_in_db and not self.overwrite.check.active:
                 self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - "\
-                                        "Already exists but overwrite is set to False."
+                                      "Already exists but overwrite is set to False."
                 self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
             else:
                 self.additions += 1
@@ -2646,40 +2651,40 @@ class DataUploadScreen(Screen):
             for field, value in record.items():
                 if field not in structure:
                     self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - '\
-                                            f'the field {field} is in datafile but not in the online database.'
+                                          f'the field {field} is in datafile but not in the online database.'
                     self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                     continue
                 field_online_structure = structure[field]
                 if field_online_structure['type'] == 'CharField':
                     if len(record[field]) > field_online_structure['length']:
                         self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - "\
-                                                f"{record[field]} in {field} exceeds the valid field length. "\
-                                                f"Maximum length is {field_online_structure['length']}.  Actual length is {len(record[field])}."
+                                              f"{record[field]} in {field} exceeds the valid field length. "\
+                                              f"Maximum length is {field_online_structure['length']}.  Actual length is {len(record[field])}."
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'FloatField':
                     if not self.is_numeric(record[field]):
                         self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - '\
-                                                f'the value {record[field]} for {field} must be numeric.'
+                                              f'the value {record[field]} for {field} must be numeric.'
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'IntegerField':
                     if not self.is_integer(record[field]):
                         self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - '\
-                                                f'the value {record[field]} for {field} must be an integer.'
+                                              f'the value {record[field]} for {field} must be an integer.'
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'DateTimeField':
                     pass
                 elif field_online_structure['type'] == 'BooleanField':
                     if record[field] not in [True, False, None]:
                         self.error_message += f'\n\nRecord {self.unique_together_as_humanreadable(record, unique_together)} - '\
-                                                f'the value {record[field]} for {field} must be True or False.'
+                                              f'the value {record[field]} for {field} must be True or False.'
                         self.fails.append(self.unique_together_as_humanreadable(record, unique_together))
                 elif field_online_structure['type'] == 'ForeignKey':
                     pass    # TODO look up in related table
 
         if len(unique_keys) != record_counter:
             self.error_message += f"\n\nWARNING: The following records are duplicated in the data file.  "\
-                                    "When they are transfered they will overwrite each other: "\
-                                    f"{', '.join([item for item, value in unique_keys.items() if value > 1])}"
+                                  "When they are transfered they will overwrite each other: "\
+                                  f"{', '.join([item for item, value in unique_keys.items() if value > 1])}"
 
         self.progress.label.text = 'Done\n'
         return
@@ -3179,7 +3184,7 @@ class DataGridLabelAndField(BoxLayout):
         self.spacing = 10
         label = e5_label(text = prompt if prompt else col, id = '__label',
                             colors = colors, popup = popup, size_hint_y = None,
-                            halign = 'right', height = height)
+                            halign = 'right', label_height = height)
         label.bind(texture_size = label.setter('size'))
         self.txt = e5_textinput(multiline = note_field,
                                 size_hint = (0.75, None),

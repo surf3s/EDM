@@ -311,10 +311,13 @@ class totalstation(object):
         if self.is_numeric(angle):
             if self.make == 'Topcon':
                 self.set_horizontal_angle_topcon(angle)
+                time.sleep(1.5)
             elif self.make in ['WILD', 'Leica']:
                 self.set_horizontal_angle_leica(angle)
+                time.sleep(1.5)
             elif self.make in ['Leica GeoCom']:
                 self.set_horizontal_angle_geocom(angle)
+                time.sleep(1.5)
             elif self.make == 'SOKKIA':
                 self.set_horizontal_angle_sokkia(angle)
             elif self.make == 'Simulate':
@@ -343,6 +346,8 @@ class totalstation(object):
 
     def take_shot(self):
 
+        error = False
+
         self.clear_xyz()
         self.clear_serial_buffers()
 
@@ -353,7 +358,7 @@ class totalstation(object):
             self.launch_point_leica()
 
         elif self.make == "Leica GeoCom":
-            self.launch_point_leica_geocom()
+            error = self.launch_point_leica_geocom()
 
         elif self.make == "SOKKIA":
             self.launch_point_sokkia()
@@ -364,9 +369,13 @@ class totalstation(object):
         else:
             pass
 
+        return error
+    
     def fetch_point(self):
         if self.make in ['WILD', 'Leica']:
             self.fetch_point_leica()
+        elif self.make in ['Leica GeoCom']:
+            self.fetch_point_leica_geocom()
 
     def vhd_from_xyz(self):
         self.hangle = self.angle_between_xy_pairs(self.location.x, self.location.y, self.xyz.x, self.xyz.y)
@@ -418,7 +427,7 @@ class totalstation(object):
         self.io = ''
 
     def trim_io(self, length = 1024):
-        self.io = self.io[:length]
+        self.io = self.io[-length:]
 
     def add_to_io(self, data):
         self.io = self.io + data
@@ -1010,7 +1019,7 @@ class totalstation(object):
     def launch_point_leica_geocom(self):
         self.clear_serial_buffers()
         self.send(b"%R1Q,2008:1,1\r\n")          # Use the defaults with 1 and 1
-        self.wait_for_received(1)
+        self.wait_for_received(5)
         self.set_response_leica_geocom()
         if self.error_code == 0:
             self.clear_serial_buffers_internal_only()
@@ -1027,8 +1036,8 @@ class totalstation(object):
 
     def stop_and_clear_geocom(self):
         output = f"%R1Q,2008:{TMC_CLEAR},1\r\n"
-        self.send(bytes(output))
-        self.wait_for_received(1)
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(5)
         self.set_response_leica_geocom()
         return self.error_code == NO_ERROR
 

@@ -40,6 +40,9 @@ Changes for Version 1.0.31
   Fixed issue with numeric values saved as text in JSON after initial save
   Added Help JSON to view raw data in JSON file
 
+Changes for Version 1.0.32
+  Fixing issues with GeoCom and station setup
+  
 Bugs/To Do
   could make menus work better with keyboard (at least with tab)
   there is no error checking on duplicates in datagrid edits
@@ -112,7 +115,8 @@ __plyer_version__ = 'None'
 from angles import d2r
 
 import serial
-
+import requests
+import serial.tools.list_ports_windows
 
 """
 The explicit mention of this package here
@@ -127,7 +131,7 @@ except ModuleNotFoundError:
     pass
 
 VERSION = '1.0.32'
-PRODUCTION_DATE = 'April, 2023'
+PRODUCTION_DATE = 'May, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -563,9 +567,9 @@ class MainScreen(e5_MainScreen):
         if unitname:
             txt += f'\n\nThe point is in unit {unitname}.'
         if self.station.make != 'Microscribe':
-            txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  '\
-                    'Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  '\
-                    'Slope distance:  {self.station.sloped:.3f}'
+            txt += f'\n\nMeasurement Data:\n  Horizontal angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.hangle)}\n  ' \
+                   f'Vertical angle:  {self.station.decimal_degrees_to_sexa_pretty(self.station.vangle)}\n  ' \
+                   f'Slope distance:  {self.station.sloped:.3f}'
             txt += f'\n  X:  {self.station.xyz.x:.3f}\n  Y:  {self.station.xyz.y:.3f}\n  Z:  {self.station.xyz.z:.3f}'
             txt += f'\n\nStation coordinates:\n  X:  {self.station.location.x:.3f}\n  Y:  {self.station.location.y:.3f}\n  Z:  {self.station.location.z:.3f}'
             if self.station.prism_constant:
@@ -594,7 +598,7 @@ class MainScreen(e5_MainScreen):
 
     def log_the_shot(self):
         logger = logging.getLogger(__name__)
-        logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} with prism height {self.station.prism.height} '\
+        logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} with prism height {self.station.prism.height} '
                         'from {self.station.location} ')
 
     def on_cancel(self):
@@ -802,27 +806,27 @@ class MainScreen(e5_MainScreen):
         if self.csv_data_type == 'Datums':
             if len(fields) < 4:
                 errors = '\nThese data seem to have fewer than four fields.  To import datums requires a Name, X, Y, and Z field.  '\
-                            'If this is a CSV file, the first row in the file should contain these field names separated by commas.  '\
-                            f'The fieldnames read were {fields}.'
+                         'If this is a CSV file, the first row in the file should contain these field names separated by commas.  '\
+                         f'The fieldnames read were {fields}.'
             if 'X' not in fields or 'Y' not in fields or 'Z' not in fields or 'NAME' not in fields:
                 errors = '\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and '\
-                            f'must include a field called Name, X, Y and Z.  The fields read were {fields}.'
+                         f'must include a field called Name, X, Y and Z.  The fields read were {fields}.'
         if self.csv_data_type == 'Prisms':
             if len(fields) < 2:
                 errors = '\nThese data seem to have fewer than two fields.  To import prisms requires a Name and height and optionally '\
-                            'an offset field.  If this is a csv file, the first row in the file should contain these field names separated '\
-                            f'by commas.  The fieldnames read were {fields}.'
+                         'an offset field.  If this is a csv file, the first row in the file should contain these field names separated '\
+                         f'by commas.  The fieldnames read were {fields}.'
             if 'NAME' not in fields or 'HEIGHT' not in fields:
                 errors = '\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and must '\
-                            f'include a field called Name and Height.  The fields read were {fields}.'
+                         f'include a field called Name and Height.  The fields read were {fields}.'
         if self.csv_data_type == 'Units':
             if len(fields) < 5:
                 errors = '\nThese data seem to have fewer than five fields.  To import units requires a Unit, Minx, Miny, Maxx, Maxy field.  '\
-                            'If this is a CSV file, the first row in the file should contain these field names separated by commas.  '\
-                            f'The fieldnames read were {fields}.'
+                         'If this is a CSV file, the first row in the file should contain these field names separated by commas.  '\
+                         f'The fieldnames read were {fields}.'
             if 'UNIT' not in fields or 'MINX' not in fields or 'MINY' not in fields or 'MAXX' not in fields or 'MAXY' not in fields:
                 errors = '\nIf these data are coming from a CSV file, the first row must list the field names (comma delimited) and '\
-                            f'must include at least fields called Unit, Minx, Miny, Maxx, Maxy.  The fields read were {fields}.'
+                         f'must include at least fields called Unit, Minx, Miny, Maxx, Maxy.  The fields read were {fields}.'
         if self.csv_data_type == 'Points':
             errors = self.check_import_fields_against_cfg_fields(fields)
         return errors
@@ -1102,7 +1106,15 @@ class ComTestScreen(Screen):
         if self.station.data_waiting():
             self.station.receive()
         if self.station.io != '' and self.station.io != self.io.scrolling_label.text:
-            self.io.scrolling_label.text = self.station.io
+            '''This is a hack to work around an issue I had when changing the content of 
+            a scrollbox label.  It wouldn't let me go beyond the size of the original content.
+            So now I remove it and  rebuild it.
+            '''
+            self.layout.remove_widget(self.io)
+            self.layout.remove_widget(self.buttons)
+            self.io = e5_scrollview_label(self.station.io, popup = False, colors = self.colors)
+            self.layout.add_widget(self.io)
+            self.layout.add_widget(self.buttons)
 
     def build_screen(self):
         self.settings = GridLayout(cols = 2, spacing = 5, padding = 5, size_hint = (.2, None))
@@ -1136,14 +1148,16 @@ class ComTestScreen(Screen):
                                         'Email the results here to him.', popup = False, colors = self.colors)
         self.layout.add_widget(self.io)
 
-        self.layout.add_widget(e5_side_by_side_buttons(text = ['Back', 'Clear', 'Copy'],
+        self.buttons = e5_side_by_side_buttons(text = ['Back', 'Clear', 'Copy'],
                                                         id = ['back', 'clear', 'copy'],
                                                         call_back = [self.close, self.clear_io, self.copy_io],
                                                         selected = [False, False, False],
-                                                        colors = self.colors))
+                                                        colors = self.colors)
+        self.layout.add_widget(self.buttons)
 
     def clear_io(self, instance):
         self.station.clear_io()
+        self.station.clear_serial_buffers()
         self.io.scrolling_label.text = ''
 
     def copy_io(self, instance):
@@ -1160,6 +1174,7 @@ class ComTestScreen(Screen):
         self.parent.current = 'StationConfigurationScreen'
 
     def record_point(self, instance):
+        self.station.stop_and_clear_geocom()
         self.station.take_shot()
 
     def close(self, instance):
@@ -1206,14 +1221,14 @@ class RecordDatumsScreen(Screen):
                                                         colors = self.colors))
 
     def check_for_duplicate(self, instance):
-        if self.data.get_datum(self.datum_name.txt.text).name is not None:
-            message = '\nOverwrite existing datum %s?' % self.datum_name.txt.text
+        if self.data.get_datum(self.datum_name.txt.textbox.text).name is not None:
+            message = '\nOverwrite existing datum %s?' % self.datum_name.txt.textbox.text
             self.popup = e5_MessageBox('Overwrite?', message,
                                         response_type = "YESNO",
                                         call_back = [self.delete_and_save, self.close_popup],
                                         colors = self.colors)
             self.popup.open()
-        elif self.datum_name.txt.text == "":
+        elif self.datum_name.txt.textbox.text == "":
             self.popup = e5_MessageBox('Error', '\nProvide a datum name before saving.', colors = self.colors)
             self.popup.open()
         else:
@@ -1221,12 +1236,12 @@ class RecordDatumsScreen(Screen):
 
     def delete_and_save(self, instance):
         self.popup.dismiss()
-        self.data.delete_datum(self.datum_name.txt.text)
+        self.data.delete_datum(self.datum_name.txt.texbox.text)
         self.save_datum()
 
     def save_datum(self):
         error_message = ''
-        if self.datum_name.txt.text == '':
+        if self.datum_name.txt.textbox.text == '':
             error_message = '\nProvide a datum name.'
         if self.recorder.result.xyz_global.x is None or self.recorder.result.xyz_global.y is None or self.recorder.result.xyz_global.z is None:
             error_message = '\nThe point was not properly recorded.  Try again.'
@@ -1236,14 +1251,14 @@ class RecordDatumsScreen(Screen):
             return
 
         insert_record = {}
-        insert_record['NAME'] = self.datum_name.txt.text
-        insert_record['NOTES'] = self.datum_notes.txt.text
+        insert_record['NAME'] = self.datum_name.txt.textbox.text
+        insert_record['NOTES'] = self.datum_notes.txt.textbox.text
         insert_record['X'] = str(round(self.recorder.result.xyz_global.x, 3))
         insert_record['Y'] = str(round(self.recorder.result.xyz_global.y, 3))
         insert_record['Z'] = str(round(self.recorder.result.xyz_global.z, 3))
         self.data.db.table('datums').insert(insert_record)
-        self.datum_name.txt.text = ''
-        self.datum_notes.txt.text = ''
+        self.datum_name.txt.textbox.text = ''
+        self.datum_notes.txt.textbox.text = ''
         self.recorder.result.text = ''
         self.recorder.result.xyz = None
         self.recorder.result.xyz_global = None
@@ -1368,18 +1383,18 @@ class record_button(e5_button):
                                                 'to {self.station.decimal_degrees_to_sexastr(angle)}.',
                                             call_back = self.now_take_shot, colors = self.colors)
                 self.popup.open()
-            elif self.station.make == 'Leica':
-                self.station.set_horizontal_angle_leica(self.station.decimal_degrees_to_dddmmss(angle))
-                self.station.take_shot()
+            elif self.station.make in ['Leica', 'Wild', 'Leica GeoCom', 'Sokkia', 'Topcon']:
                 self.popup = self.get_prism_height()
                 self.popup.open()
+                self.station.set_horizontal_angle(self.station.decimal_degrees_to_dddmmss(angle))
+                self.station.take_shot()
         else:
             if self.station.make in ['Microscribe', 'Manual XYZ', 'Manual VHD']:
                 self.wait_for_shot()
             else:
-                self.station.take_shot()
                 self.popup = self.get_prism_height()
                 self.popup.open()
+                self.station.take_shot()
 
     def now_take_shot(self, instance):
         self.popup.dismiss()
@@ -1449,9 +1464,9 @@ class record_button(e5_button):
     def have_shot(self, instance = None):
         self.popup.dismiss()
         # prism_height = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
-        if self.station.make in ['Leica']:
-            self.station.fetch_point()
-            self.station.make_global()
+        # if self.station.make in ['Leica', 'Leica GeoCom']:
+        #     self.station.fetch_point()
+        #     self.station.make_global()
 
         if instance:
             prism_name = instance.text
@@ -1472,20 +1487,34 @@ class record_button(e5_button):
         # except ValueError:
         #    self.station.prism = prism(None, 0.0, None)
         self.default_prism = self.station.prism
-        self.station.prism_adjust()
-        if self.station.xyz.x is not None and self.station.xyz.y is not None and self.station.xyz.z is not None:
-            if self.setup_type == 'verify' or self.setup_type == 'record_new':
-                self.result_label.text = self.station.point_pretty(self.station.xyz_global)
-            else:
-                self.result_label.text = self.station.point_pretty(self.station.xyz)
-            self.result_label.xyz = self.station.xyz
-            self.result_label.xyz_global = self.station.xyz_global
-            if self.on_record is not None:
-                self.on_record()
-        else:
-            self.result_label.text = 'Recording error.'
-            self.result_label.xyz = None
-            self.result_label.xyz_global = None
+
+        self.event = Clock.schedule_interval(self.check_for_station_response, .1)
+
+    def check_for_station_response(self, dt):
+        if self.station.data_waiting():
+            if self.station.make in ['Leica']:
+                self.station.fetch_point()
+            elif self.station.make in ['Leica GeoCom']:
+                self.station.fetch_point_leica_geocom()
+            elif self.station.make in ['Topcon']:
+                self.station.fetch_point_topcon()
+            if self.station.response:
+                self.station.prism_adjust()
+                if self.station.xyz.x is not None and self.station.xyz.y is not None and self.station.xyz.z is not None:
+                    self.station.make_global()
+                    if self.setup_type == 'verify' or self.setup_type == 'record_new':
+                        self.result_label.text = self.station.point_pretty(self.station.xyz_global)
+                    else:
+                        self.result_label.text = self.station.point_pretty(self.station.xyz)
+                    self.result_label.xyz = self.station.xyz
+                    self.result_label.xyz_global = self.station.xyz_global
+                    if self.on_record is not None:
+                        self.on_record()
+                else:
+                    self.result_label.text = 'Recording error.'
+                    self.result_label.xyz = None
+                    self.result_label.xyz_global = None
+                self.event.cancel()
 
 
 class record_result(e5_label):
@@ -1508,7 +1537,7 @@ class datum_recorder(GridLayout):
         self.results = []
         self.buttons = []
         self.size_hint_y = None
-        self.result = record_result('', colors = self.colors)
+        self.result = record_result('', colors = self.colors, label_height = 100)
         self.button = record_button(text = text if text else 'Record datum %s' % (datum_no),
                                     selected = True,
                                     id = 'datum%s' % (datum_no),
@@ -1552,7 +1581,7 @@ class datum_selector(GridLayout):
                                     colors = self.colors))
         if not self.datum.is_none():
             self.result = e5_label(f'Datum: {self.datum.name}\nX: {self.datum.x}\nY: {self.datum.y}\nZ: {self.datum.z}',
-                                    colors = self.colors)
+                                    colors = self.colors, label_height = 100)
         else:
             self.result = e5_label('Datum:\nX:\nY:\nZ:', colors = self.colors)
         self.add_widget(self.result)
@@ -1861,7 +1890,7 @@ class InitializeStationScreen(Screen):
                 txt = '\nThe location of the station has not been set.'
             else:
                 txt = f'\nThe location of the station is at {str(self.station.location)}.  '\
-                        'All measured points will be relative to that point and the horizontal angle uploaded here.'
+                      'All measured points will be relative to that point and the horizontal angle uploaded here.'
 
         elif self.setup_type.text == 'Over a datum':
             if self.setup_widgets.over_datum.datum is None:
@@ -1924,19 +1953,21 @@ class InitializeStationScreen(Screen):
                 angle_difference = defined_angle - measured_angle
 
                 # Based on this, compute the new datum.
-                self.new_station = point(round(-1 * self.setup_widgets.recorder[0].result.xyz.y * sin(d2r(angle_difference)) + self.setup_widgets.datum1.datum.x, 3),
-                                            round(-1 * self.setup_widgets.recorder[0].result.xyz.y * cos(d2r(angle_difference)) + self.setup_widgets.datum1.datum.y, 3),
-                                            round(((self.setup_widgets.datum1.datum.z - self.setup_widgets.recorder[0].result.xyz.z) + (self.setup_widgets.datum2.datum.z - self.setup_widgets.recorder[1].result.xyz.z)) / 2, 3))
+                x = round(-1 * self.setup_widgets.recorder[0].result.xyz.y * sin(d2r(angle_difference)) + self.setup_widgets.datum1.datum.x, 3)
+                y = round(-1 * self.setup_widgets.recorder[0].result.xyz.y * cos(d2r(angle_difference)) + self.setup_widgets.datum1.datum.y, 3)
+                z = round(((self.setup_widgets.datum1.datum.z - self.setup_widgets.recorder[0].result.xyz.z) + (
+                    self.setup_widgets.datum2.datum.z - self.setup_widgets.recorder[1].result.xyz.z)) / 2, 3)
+                self.new_station = point(x, y, z)
 
                 # Workout what angle needs to be uploaded to the station
                 self.foresight = self.station.angle_between_points(self.new_station, self.setup_widgets.datum2.datum.as_point())
                 txt = f'\nThe measured distance between {self.setup_widgets.datum1.datum.name} and {self.setup_widgets.datum2.datum.name} '\
-                        'was {round(measured_distance, 3)} m.  The distance based on the datum definitions should be {round(actual_distance, 3)} m.  '\
-                        'The error is {round(error_distance, 3)} m.\n'
+                      f'was {round(measured_distance, 3)} m.  The distance based on the datum definitions should be {round(actual_distance, 3)} m.  '\
+                      f'The error is {round(error_distance, 3)} m.\n'
                 txt += '\nIf the setup as measured is accepted, the new station coordinates will be \n'\
-                            f'X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
+                       f'X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
                 txt += f'\nAn angle of {self.station.decimal_degrees_to_sexa_pretty(self.foresight)} '\
-                            'will be uploaded (do not turn the station until this angle is set).'
+                        'will be uploaded (do not turn the station until this angle is set).'
                 self.foresight = self.station.decimal_degrees_to_dddmmss(self.foresight)
 
         elif self.setup_type.text == 'Three datum shift':
@@ -2309,7 +2340,7 @@ class StationConfigurationScreen(Screen):
 
 class AboutScreen(e5_InfoScreen):
     def on_pre_enter(self):
-        self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + VERSION + ' Alpha\nApple Pie\n\n'
+        self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + VERSION + ' Beta\nBlueberry Pie\n\n'
         self.content.text += f'Built using Python 3.8, Kivy {__kivy_version__} and TinyDB {__tinydb_version__}\n\n'
         self.content.text += 'An OldStoneAge.Com Production\n\n' + PRODUCTION_DATE
         self.content.halign = 'center'

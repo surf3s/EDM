@@ -3,3 +3,4 @@ tinydb==4.4.0
 pyserial==3.5
 angles==2.0
 appdata==2.2.0
+requests==2.28.1
