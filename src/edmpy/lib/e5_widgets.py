@@ -34,10 +34,10 @@ import urllib
 from threading import Thread
 from appdata import AppDataPaths
 
-from lib.constants import __SPLASH_HELP__
-from lib.constants import APP_NAME
-from lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS, MIDDLE_GREY, DARK_GREY
-from lib.misc import platform_name, locate_file
+from edmpy.lib.constants import __SPLASH_HELP__
+from edmpy.lib.constants import APP_NAME
+from edmpy.lib.colorscheme import ColorScheme, make_rgb, BLACK, WHITE, GOOGLE_COLORS, MIDDLE_GREY, DARK_GREY
+from edmpy.lib.misc import platform_name, locate_file
 
 
 SCROLLBAR_WIDTH = 5

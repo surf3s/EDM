@@ -1,8 +1,8 @@
 from kivy.properties import ObjectProperty
 import serial
 import os
-from geo import point, prism
-from constants import APP_NAME
+from edmpy.geo import point, prism
+from edmpy.constants import APP_NAME
 from math import sqrt
 from math import pi
 from math import cos

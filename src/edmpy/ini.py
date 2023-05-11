@@ -1,5 +1,5 @@
-from lib.blockdata import blockdata
-from constants import APP_NAME
+from edmpy.lib.blockdata import blockdata
+from edmpy.constants import APP_NAME
 
 
 class INI(blockdata):

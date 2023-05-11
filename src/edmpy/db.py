@@ -4,8 +4,8 @@ from typing import Dict
 from math import sqrt
 import logging
 
-from geo import datum, unit, prism
-from lib.dbs import dbs
+from edmpy.geo import datum, unit, prism
+from edmpy.lib.dbs import dbs
 
 
 class DB(dbs):

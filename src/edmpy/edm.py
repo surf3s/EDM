@@ -42,8 +42,14 @@ Changes for Version 1.0.31
 
 Changes for Version 1.0.32
   Fixing issues with GeoCom and station setup
-  
-Bugs/To Do
+
+Changes for Version 1.0.33
+  Fixed installation issues
+
+Changes for Version 1.0.34
+  Yet more fixes for Windows/PyPi installations
+
+  Bugs/To Do
   could make menus work better with keyboard (at least with tab)
   there is no error checking on duplicates in datagrid edits
   Do unitchecking after doing an offset shot on suffix 0 points
@@ -87,20 +93,20 @@ import logging
 from appdata import AppDataPaths
 
 # My libraries for this project
-from lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
-from lib.e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
-from lib.e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
-from lib.e5_widgets import e5_JSONScreen, DataGridLabelAndField
-from lib.colorscheme import ColorScheme
-from lib.misc import restore_window_size_position, filename_only, platform_name
+from edmpy.lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
+from edmpy.lib.e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
+from edmpy.lib.e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
+from edmpy.lib.e5_widgets import e5_JSONScreen, DataGridLabelAndField
+from edmpy.lib.colorscheme import ColorScheme
+from edmpy.lib.misc import restore_window_size_position, filename_only, platform_name
 
-from geo import point, prism
-from db import DB
-from ini import INI
-from cfg import CFG
-from totalstation import totalstation
-from constants import APP_NAME
-from lib.constants import __SPLASH_HELP__
+from edmpy.geo import point, prism
+from edmpy.db import DB
+from edmpy.ini import INI
+from edmpy.cfg import CFG
+from edmpy.totalstation import totalstation
+from edmpy.constants import APP_NAME
+from edmpy.lib.constants import __SPLASH_HELP__
 
 # The database - pure Python
 from tinydb import TinyDB
@@ -115,8 +121,15 @@ __plyer_version__ = 'None'
 from angles import d2r
 
 import serial
-import requests
-import serial.tools.list_ports_windows
+# import requests
+
+# if os.name == 'nt':  # sys.platform == 'win32':
+#     from serial.tools.list_ports_windows import comports
+# elif os.name == 'posix':
+#     from serial.tools.list_ports_posix import comports
+# # ~ elif os.name == 'java':
+# else:
+#     raise ImportError("Sorry: no implementation for your platform ('{}') available".format(os.name))
 
 """
 The explicit mention of this package here
@@ -130,7 +143,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.32'
+VERSION = '1.0.34'
 PRODUCTION_DATE = 'May, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13

@@ -1,5 +1,5 @@
 from kivy.core.window import Window
-from lib.misc import platform_name
+from edmpy.lib.misc import platform_name
 
 BLACK = 0x000000
 WHITE = 0xFFFFFF
