@@ -49,6 +49,11 @@ Changes for Version 1.0.33
 Changes for Version 1.0.34
   Yet more fixes for Windows/PyPi installations
 
+Changes for Version 1.0.35
+  Bug in file import fixed
+  Bug in CFG when no field type is specified fixed as well
+
+
   Bugs/To Do
   could make menus work better with keyboard (at least with tab)
   there is no error checking on duplicates in datagrid edits
@@ -143,7 +148,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.34'
+VERSION = '1.0.35'
 PRODUCTION_DATE = 'May, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
@@ -766,7 +771,8 @@ class MainScreen(e5_MainScreen):
                                 start_path = start_path,
                                 button_color = self.colors.button_color,
                                 button_background = self.colors.button_background,
-                                filters = ['*.csv', '*.CSV', '*.txt', '*.TXT', '*.json', '*.JSON'])
+                                filters = ['*.csv', '*.CSV', '*.txt', '*.TXT', '*.json', '*.JSON'],
+                                font_size = self.colors.button_font_size)
         self.popup = Popup(title = "Select CSV or JSON file to import from",
                             content = content,
                             size_hint = (0.9, 0.9))

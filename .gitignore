@@ -37,3 +37,8 @@ CFGs/default_cfg.cfg
 src/edmpy/EDM.ini
 *.csv
 *.geojson
+CFGs/FVJJ1.CFG
+CFGs/fwJj52 july 5 2022_datums.txt
+CFGs/fwJj52 july 5 2022_points.txt
+CFGs/fwJj52 july 5 2022_prisms.txt
+CFGs/fwJj52 july 5 2022_units.txt

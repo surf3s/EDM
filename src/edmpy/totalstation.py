@@ -511,7 +511,7 @@ class totalstation(object):
             self.initialize()
         except OSError as err:
             self.error_code = 1
-            self.error_message = str(err)
+            self.error_message = str(err) + '\n\n'
         return self.error_message
 
     def settings_pretty(self):

@@ -343,13 +343,13 @@ class CFG(blockdata):
 
         for field_name in field_names:
             if any((c in set(bad_characters)) for c in field_name):
-                self.errors.append(f"The field name '{field_name}' has non-standard characters in it that cause a problem in JSON files.  "\
-                                    "Do not use any of these '{bad_characters}' characters.  Change the name before collecting data.")
+                self.errors.append(f"The field name '{field_name}' has non-standard characters in it that cause a problem in JSON files.  "
+                                    f"Do not use any of these '{bad_characters}' characters.  Change the name before collecting data.")
                 self.has_errors = True
             f = self.get(field_name)
 
             if not self.is_numeric(f.length):
-                self.errors.append(f'The length specified for field {field_name} must be a valid number.  If you do not want to limit the length, '\
+                self.errors.append(f'The length specified for field {field_name} must be a valid number.  If you do not want to limit the length, '
                                      'delete the Length specification in the CFG.')
                 self.has_errors = True
 
@@ -357,9 +357,18 @@ class CFG(blockdata):
                 f.prompt = field_name
 
             f.inputtype = f.inputtype.upper()
+
+            if f.inputtype == '':
+                if field_name in ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'PRISM']:
+                    f.inputtype = 'NUMERIC'
+                elif field_name in ['DATE']:
+                    f.inputtype = 'DATETIME'
+                else:
+                    f.inputtype = 'TEXT'
+
             if f.inputtype not in ['TEXT', 'NOTE', 'NUMERIC', 'MENU', 'DATETIME', 'BOOLEAN', 'CAMERA', 'GPS', 'INSTRUMENT']:
-                self.errors.append(f"The value '{f.inputtype}' for the field {field_name} is not a valid TYPE.  \
-                                    Valid TYPES include Text, Note, Numeric, and Menu.")
+                self.errors.append(f"The value '{f.inputtype}' for the field {field_name} is not a valid TYPE. "
+                                    "Valid TYPES include Text, Note, Numeric, and Menu.")
                 self.has_errors = True
 
             if field_name in ['UNIT', 'ID', 'SUFFIX', 'X', 'Y', 'Z']:
@@ -373,7 +382,7 @@ class CFG(blockdata):
                 # uppercase the link fields
                 for link_field_name in f.link_fields:
                     if link_field_name not in field_names:
-                        self.errors.append(f"The field {field_name} is set to link to {link_field_name} but the field {link_field_name} "\
+                        self.errors.append(f"The field {field_name} is set to link to {link_field_name} but the field {link_field_name} "
                                             "does not exist in the CFG.")
                         self.has_errors = True
             self.put(field_name, f)
