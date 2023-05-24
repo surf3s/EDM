@@ -85,38 +85,38 @@ Short answer, I don't know.  I have simulated having 1000 points in the database
 I am working on this.  Once this program is working smoothly, I will add plot functionality.
 
 ##### Changes for Version 1.0.35 (May 24, 2023)
-  Bug in file import fixed
-  Bug in CFG when no field type is specified fixed as well
-  Bug in Filter records that crashed program is fixed
-  Importing CSV now takes seconds rather than many many minutes (tested on import of 3996 records)
-  Saving a point is now faster when record count is high
-  Reworked a number of features because JSON files are not in doc_id order
-  Add a "SIMULATION mode on" warning to maing screen when simulating points
-  Suffix values on import csv are retained as integers
-  Tried to improve open CFG so that if a non-EDM CFG is opened, it is not also trashed
-  Fixed important bugs in station setup when using Manual XYZ or Manual VHD options
-  Error trap continuation shot on an empty data file
+1.   Bug in file import fixed
+2.   Bug in CFG when no field type is specified fixed as well
+3.   Bug in Filter records that crashed program is fixed
+4.   Importing CSV now takes seconds rather than many many minutes (tested on import of 3996 records)
+5.   Saving a point is now faster when record count is high
+6.   Reworked a number of features because JSON files are not in doc_id order
+7.   Add a "SIMULATION mode on" warning to maing screen when simulating points
+8.   Suffix values on import csv are retained as integers
+9.   Tried to improve open CFG so that if a non-EDM CFG is opened, it is not also trashed
+10.  Fixed important bugs in station setup when using Manual XYZ or Manual VHD options
+11.  Error trap continuation shot on an empty data file
 
 ##### Changes for Version 1.0.34
-  Yet more fixes for Windows/PyPi installations
+1.   Yet more fixes for Windows/PyPi installations
 
 ##### Changes for Version 1.0.33
-  Fixed installation issues
+1.   Fixed installation issues
 
 ##### Changes for Version 1.0.32
-  Fixing issues with GeoCom and station setup
+1.   Fixing issues with GeoCom and station setup
 
 ##### Changes for Version 1.0.31
-  Fixed issue with numeric values saved as text in JSON after initial save
-  Added Help JSON to view raw data in JSON file
+1.   Fixed issue with numeric values saved as text in JSON after initial save
+2.   Added Help JSON to view raw data in JSON file
 
 ##### Changes for Version 1.0.31
-  BlueTooth tested with Leica GeoCom stations
-  UI fixes
-  Tested with 1000 records in DB
-  Made JSON files better formatted so that they are more human readable
-  Made geoJSON files work with QGIS (points and lines are separate layers)
-  Substantial refactoring of Python classes and file structure
+1.   BlueTooth tested with Leica GeoCom stations
+2.   UI fixes
+3.   Tested with 1000 records in DB
+4.   Made JSON files better formatted so that they are more human readable
+5.   Made geoJSON files work with QGIS (points and lines are separate layers)
+6.   Substantial refactoring of Python classes and file structure
 
 ##### Update (March 2, 2023)
 1.   Added and debugged Topcon stations
