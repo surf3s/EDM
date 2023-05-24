@@ -52,13 +52,20 @@ Changes for Version 1.0.34
 Changes for Version 1.0.35
   Bug in file import fixed
   Bug in CFG when no field type is specified fixed as well
+  Bug in Filter records that crashed program is fixed
+  Importing CSV now takes seconds rather than many many minutes (tested on import of 3996 records)
+  Saving a point is now faster when record count is high
+  Reworked a number of features because JSON files are not in doc_id order
+  Add a "SIMULATION mode on" warning to maing screen when simulating points
+  Suffix values on import csv are retained as integers
+  Tried to improve open CFG so that if a non-EDM CFG is opened, it is not also trashed
+  Fixed important bugs in station setup when using Manual XYZ or Manual VHD options
+  Error trap continuation shot on an empty data file
 
-
-  Bugs/To Do
+Bugs/To Do
   could make menus work better with keyboard (at least with tab)
   there is no error checking on duplicates in datagrid edits
   Do unitchecking after doing an offset shot on suffix 0 points
-  On import, integers (like Suffix) are being converted to float values
   Good way to get random hash IDs
   Offer to change Z when prism changes in datagrid edit cases
   Thoroughly test unit checking
@@ -68,6 +75,7 @@ Changes for Version 1.0.35
   *** Program asks for save record in all points even when having saved already
   Add move to top or bottom in Help JSON and others (like Log file)
   Check what gets logged
+  Deal more nicely with aftermath of a non-valid CFG being opened
 """
 
 
@@ -418,11 +426,19 @@ class MainScreen(e5_MainScreen):
         return e5_MessageBox('EDM', message)
 
     def ready_to_use(self):
-        return self.cfg is not None and self.data.filename != ''
+        return self.cfg is not None and self.data.filename != '' and self.data.filename is not None
 
     def take_shot(self, instance):
         if not self.ready_to_use() and instance.id != 'measure':
             self.popup = self.message_open_cfg_first()
+            self.popup.open()
+            return
+
+        if instance.id == 'continue' and len(self.data.db.table(self.data.table)) == 0:
+            message = 'Continue works only after you have saved at least one point.  Continue repeats the last point changing only the Suffix field '
+            message += 'and the new measured values.  All other values, such as layer, excavator, and so forth, carry over.  Continue is an easy '
+            message += 'way to link a series of measures to a single object or into one set of points.'
+            self.popup = e5_MessageBox('EDM', message)
             self.popup.open()
             return
 
@@ -456,9 +472,9 @@ class MainScreen(e5_MainScreen):
                 self.station.vhd_from_xyz()
         elif self.popup.hangle and self.popup.vangle and self.popup.sloped:
             try:
-                self.station.hangle = float(self.popup.hangle.text)
-                self.station.vangle = float(self.popup.vangle.text)
-                self.station.sloped = float(self.popup.sloped.text)
+                self.station.hangle = float(self.popup.hangle.textbox.text)
+                self.station.vangle = float(self.popup.vangle.textbox.text)
+                self.station.sloped = float(self.popup.sloped.textbox.text)
             except ValueError:
                 self.station.xyz = point()
             self.station.vhd_to_xyz()
@@ -617,13 +633,13 @@ class MainScreen(e5_MainScreen):
     def log_the_shot(self):
         logger = logging.getLogger(__name__)
         logger.info(f'{self.get_last_squid()} {self.station.vhd_to_sexa_pretty_compact()} with prism height {self.station.prism.height} '
-                        'from {self.station.location} ')
+                        f'from {self.station.location} ')
 
     def on_cancel(self):
         if self.data.db is not None:
-            last_record = self.data.db.table(self.data.table).all()[-1]
-            if last_record != []:
-                self.data.db.table(self.data.table).remove(doc_ids = [last_record.doc_id])
+            doc_ids = self.data.get_doc_ids(self.data.table)
+            if doc_ids is not None:
+                self.data.db.table(self.data.table).remove(doc_ids = [doc_ids[-1]])
 
     def get_last_squid(self):
         unit = self.get_last_value('UNIT')
@@ -634,36 +650,40 @@ class MainScreen(e5_MainScreen):
     def update_info_label(self):
         last_squid = self.get_last_squid()
         self.info.text = last_squid if last_squid else 'EDM'
+        if self.station.make in ['Simulate']:
+            self.info.text += " - SIMULATION mode on"
 
-    def same_coordinates(record1, record2):
+    def same_coordinates(self, record1, record2):
         return record1['X'] == record2['X'] and record1['Y'] == record2['Y'] and record1['Z'] == record2['Z']
 
     def check_for_duplicate_xyz(self):
-        if self.station.make == 'Microscribe' and self.data.db is not None:
+        if self.data.db is not None:
             if len(self.data.db.table(self.data.table)) > 1:
-                last_record = self.data.db.table(self.data.table).all()[-1]
-                next_to_last_record = self.data.db.table(self.data.table).all()[-2]
+                doc_ids = self.data.get_doc_ids(self.data.table)
+                last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-1])
+                next_to_last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-2])
                 if all(field in last_record.keys() for field in ['X', 'Y', 'Z']):
                     if self.same_coordinates(last_record, next_to_last_record):
-                        self.popup = e5_MessageBox(title = 'Warning',
-                                                    message = "\nThe last two recorded points have the exact same XYZ "
-                                                        f"coordinates ({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  "
-                                                        "Verify that the Microscribe is still properly recording points (green light is on).  "
-                                                        "If the red light is on, you need to re-initialize (Setup - Initialize Station) and "
-                                                        "re-shoot the last two points.")
+                        message = "\nThe last two recorded points have the exact same XYZ coordinates "
+                        message += f"({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  "
+                        if self.station.make == 'Microscribe':
+                            message += "Verify that the Microscribe is still properly recording points (green light is on).  "
+                            message += "If the red light is on, you need to re-initialize (Setup - Initialize Station) and "
+                            message += "re-shoot the last two points."
+                        self.popup = e5_MessageBox(title = 'Warning', message=message)
                         self.popup.open()
 
     def close_popup(self, instance):
         self.popup.dismiss()
 
     def save_default_cfg(self):
-        content = e5_SaveDialog(filename = '',
-                                start_path = self.cfg.path,
-                                save = self.save_default,
-                                cancel = self.dismiss_popup)
-        self.popup = Popup(title = "Create a new default CFG file",
-                            content = content,
-                            size_hint = (0.9, 0.9))
+        content = e5_SaveDialog(filename='',
+                                start_path=self.cfg.path,
+                                save=self.save_default,
+                                cancel=self.dismiss_popup)
+        self.popup = Popup(title="Create a new default CFG file",
+                            content=content,
+                            size_hint=(0.9, 0.9))
         self.popup.open()
         self.popup_open = True
 
@@ -715,12 +735,15 @@ class MainScreen(e5_MainScreen):
         warnings, errors = [], []
         self.data.close()
         self.dismiss_popup()
-        self.cfg.load(os.path.join(path, filename[0]))
-        if self.cfg.filename:
-            warnings, errors = self.open_db()
-            if errors == []:
-                self.set_new_data_to_true()
-        self.ini.update(self.colors, self.cfg)
+        has_errors, errors = self.cfg.load(os.path.join(path, filename[0]))
+        if not has_errors:
+            if self.cfg.filename:
+                warnings, errors = self.open_db()
+                if errors == []:
+                    self.set_new_data_to_true()
+            self.ini.update(self.colors, self.cfg)
+        else:
+            self.cfg = CFG()
         self.build_mainscreen()
         self.reset_screens()
         if warnings or errors:
@@ -778,14 +801,22 @@ class MainScreen(e5_MainScreen):
                             size_hint = (0.9, 0.9))
         self.popup.open()
 
+    def fix_suffix(self, data):
+        for record in data:
+            if 'SUFFIX' in record:
+                try:
+                    record['SUFFIX'] = int(record['SUFFIX'])
+                except ValueError:
+                    pass
+        return data
+
     def read_csv_file(self, full_filename):
         data = []
         with open(full_filename, newline='') as csvfile:
             reader = csv.DictReader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
             for row in reader:
                 data.append(row)
-        fields = [field.upper() for field in reader.fieldnames]
-        return fields, data
+        return [field.upper() for field in reader.fieldnames], self.fix_suffix(data)
 
     def read_json_table(self, full_filename, data_type):
         data = []
@@ -857,18 +888,32 @@ class MainScreen(e5_MainScreen):
                 hash[self.get_unique_key(record)] = record.doc_id
         return hash
 
+    def fix_date_time(self, date, time):
+        if " " in date:
+            new_date = date[:date.find(' ')]
+        else:
+            new_date = date
+        if " " in time:
+            new_time = time[time.find(" "):]
+        else:
+            new_time = time
+        return new_date + new_time
+
     def import_these(self, data):
         record_count = 0
         replacements = 0
-        hash_unique_ids = self.build_hash_unique_ids()
         if self.data.db is not None:
+            hash_unique_ids = self.build_hash_unique_ids()
+            data_to_insert = []
             for item in data:
                 insert_record = {}
                 for key, value in item.items():
                     if key.upper() == "UNIT" and self.csv_data_type == "Units":
                         insert_record['NAME'] = value
-                    elif key.upper() == "DATE" and "TIME" in item:
-                        insert_record['DATE'] = value + " " + item['TIME']
+                    elif (key.upper() == "DATE" or key.upper() == "DAY") and "TIME" in item:
+                        insert_record['DATE'] = self.fix_date_time(value, item['TIME'])
+                    elif (key.upper() == "DATE" or key.upper() == "DAY") and "time" in item:
+                        insert_record['DATE'] = self.fix_date_time(value, item['time'])
                     else:
                         insert_record[key.upper()] = value
                 if self.csv_data_type in ['Datums', 'Prisms', 'Units']:
@@ -876,16 +921,21 @@ class MainScreen(e5_MainScreen):
                         if len(self.data.get_by_name(self.csv_data_type.lower(), insert_record['NAME'])) > 0:
                             self.data.delete_by_name(self.csv_data_type.lower(), insert_record['NAME'])
                             replacements += 1
-                        self.data.db.table(self.csv_data_type.lower()).insert(insert_record)
+                        data_to_insert.append(insert_record)
                 if self.csv_data_type == 'Points':
-                    new_docid = self.data.db.table(self.data.table).insert(insert_record)
+                    # new_docid = self.data.db.table(self.data.table).insert(insert_record)
                     hash_key = self.get_unique_key(insert_record)
                     if hash_key in hash_unique_ids:
                         duplicate_doc_id = hash_unique_ids[hash_key]
                         self.data.db.table(self.data.table).remove(doc_ids = [duplicate_doc_id])
                         replacements += 1
-                    hash_unique_ids[hash_key] = new_docid
+                    # hash_unique_ids[hash_key] = new_docid
+                    data_to_insert.append(insert_record)
                 record_count += 1
+            if self.csv_data_type == 'Points':
+                self.data.db.table(self.data.table).insert_multiple(data_to_insert)
+            else:
+                self.data.db.table(self.csv_data_type.lower()).insert_multiple(data_to_insert)
         return (record_count, replacements)
 
     def load_csv(self, path, filename):
@@ -923,12 +973,12 @@ class MainScreen(e5_MainScreen):
         new_record = {}
         new_record = self.fill_default_fields(new_record)
         if self.station.shot_type != 'continue':
+            new_record = self.fill_button_defaults(new_record)
             new_record = self.find_unit_and_fill_fields(new_record)
             new_record = self.fill_carry_fields(new_record)
             new_record = self.fill_link_fields(new_record)
             new_record = self.do_increments(new_record)
             new_record['SUFFIX'] = 0
-            new_record = self.fill_button_defaults(new_record)
         else:
             new_record = self.fill_empty_with_last(new_record)
             new_record['SUFFIX'] = int(self.get_last_value('SUFFIX')) + 1
@@ -1025,7 +1075,8 @@ class MainScreen(e5_MainScreen):
     def get_last_value(self, field_name):
         if self.data.db is not None:
             if len(self.data.db.table(self.data.table)) > 0:
-                last_record = self.data.db.table(self.data.table).all()[-1]
+                doc_ids = self.data.get_doc_ids(self.data.table)
+                last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-1])
                 if last_record != []:
                     if field_name in last_record.keys():
                         return last_record[field_name]
@@ -1034,7 +1085,9 @@ class MainScreen(e5_MainScreen):
     def get_last_numeric_value(self, field_name):
         if self.data.db is not None:
             if len(self.data.db.table(self.data.table)) > 0:
-                for record in reversed(self.data.db.table(self.data.table).all()):
+                doc_ids = self.data.get_doc_ids(self.data.table)
+                for doc_id in reversed(doc_ids):
+                    record = self.data.db.table(self.data.table).get(doc_id = doc_id)
                     if record != []:
                         if field_name in record.keys():
                             if self.is_numeric(record[field_name]):
@@ -1378,6 +1431,13 @@ class record_button(e5_button):
         self.data = data
         self.default_prism = prism()
 
+    def is_numeric(self, value):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+
     def record_datum(self, instance):
         self.set_angle()
 
@@ -1399,7 +1459,7 @@ class record_button(e5_button):
             if self.station.make in ['Manual XYZ', 'Manual VHD']:
                 self.popup = e5_MessageBox('Set horizonal angle',
                                             f'\nAim at {self.datum1.datum.name} and set the horizontal angle '
-                                                'to {self.station.decimal_degrees_to_sexastr(angle)}.',
+                                                f'to {self.station.decimal_degrees_to_sexa_pretty(angle)}.',
                                             call_back = self.now_take_shot, colors = self.colors)
                 self.popup.open()
             elif self.station.make in ['Leica', 'Wild', 'Leica GeoCom', 'Sokkia', 'Topcon']:
@@ -1429,23 +1489,28 @@ class record_button(e5_button):
                                             button_text = ['Cancel', 'Next'],
                                             call_back = self.microscribe,
                                             colors = self.colors)
-            self.popup.open()
+            self.popup.open()   
         elif self.station.make in ['Manual XYZ', 'Manual VHD']:
-            self.popup = edm_manual(call_back = self.have_shot_manual, colors = self.colors)
+            self.popup = edm_manual(type = self.station.make, call_back = self.have_shot_manual, colors = self.colors)
             self.popup.open()
 
     def have_shot_manual(self, instance):
-        # check that next was pressed and get values
-        p = self.station.text_to_point(f'{self.popup.xcoord.text},{self.popup.ycoord.text},{self.popup.zcoord.text}')
-        if p:
-            self.station.xyz = p
-            self.station.make_global()
-            self.station.vhd_from_xyz()
+        if self.station.make in ['Manual XYZ']:
+            if self.popup.valid_data():
+                p = self.station.text_to_point(f'{self.popup.xcoord.textbox.text},{self.popup.ycoord.textbox.text},{self.popup.zcoord.textbox.text}')
+                self.station.xyz = p
+                self.station.make_global()
+                self.station.vhd_from_xyz()
+            else:
+                self.station.xyz = point()
         else:
-            self.station.hangle = self.popup.hangle.text if isinstance(self.popup.hangle.text, int) or isinstance(self.popup.hangle.text, float) else ''
-            self.station.vangle = self.popup.vangle.text if isinstance(self.popup.vangle.text, int) or isinstance(self.popup.vangle.text, float) else ''
-            self.station.sloped = self.popup.sloped.text if isinstance(self.popup.sloped.text, int) or isinstance(self.popup.sloped.text, float) else ''
-            self.station.vhd_to_xyz()
+            if self.popup.valid_data():
+                self.station.hangle = self.station.dms_to_decdeg(self.popup.hangle.textbox.text)
+                self.station.vangle = self.station.dms_to_decdeg(self.popup.vangle.textbox.text)
+                self.station.sloped = float(self.popup.sloped.textbox.text)
+                self.station.vhd_to_xyz()
+            else:
+                self.station.xyz = point()
         self.popup.dismiss()
         self.popup = self.get_prism_height()
         self.popup.open()
@@ -1510,14 +1575,14 @@ class record_button(e5_button):
         self.event = Clock.schedule_interval(self.check_for_station_response, .1)
 
     def check_for_station_response(self, dt):
-        if self.station.data_waiting():
+        if self.station.data_waiting() or self.station.make in ['Manual XYZ', 'Manual VHD']:
             if self.station.make in ['Leica']:
                 self.station.fetch_point()
             elif self.station.make in ['Leica GeoCom']:
                 self.station.fetch_point_leica_geocom()
             elif self.station.make in ['Topcon']:
                 self.station.fetch_point_topcon()
-            if self.station.response:
+            if self.station.response or self.station.make in ['Manual XYZ', 'Manual VHD']:
                 self.station.prism_adjust()
                 if self.station.xyz.x is not None and self.station.xyz.y is not None and self.station.xyz.z is not None:
                     self.station.make_global()
@@ -1594,34 +1659,31 @@ class datum_selector(GridLayout):
         self.datum = default_datum
         self.call_back = call_back
         self.size_hint_y = None
-        self.add_widget(e5_button(text = text,
-                                    selected = True,
-                                    call_back = self.show_select_datum,
-                                    colors = self.colors))
-        if not self.datum.is_none():
-            self.result = e5_label(f'Datum: {self.datum.name}\nX: {self.datum.x}\nY: {self.datum.y}\nZ: {self.datum.z}',
-                                    colors = self.colors, label_height = 100)
-        else:
-            self.result = e5_label('Datum:\nX:\nY:\nZ:', colors = self.colors)
+        self.add_widget(e5_button(text=text,
+                                    selected=True,
+                                    call_back=self.show_select_datum,
+                                    colors=self.colors))
+        label = f'Datum: {self.datum.name}\nX: {self.datum.x}\nY: {self.datum.y}\nZ: {self.datum.z}' if not self.datum.is_none() else 'Datum:\nX:\nY:\nZ:'
+        self.result = e5_label(label, colors=self.colors, label_height=100)
         self.add_widget(self.result)
 
     def show_select_datum(self, instance):
-        self.popup = DataGridMenuList(title = "Datum",
-                                        menu_list = self.data.names('datums'),
-                                        menu_selected = '',
-                                        call_back = self.datum_selected,
-                                        colors = self.colors)
+        self.popup = DataGridMenuList(title="Datum",
+                                        menu_list=self.data.names('datums'),
+                                        menu_selected='',
+                                        call_back=self.datum_selected,
+                                        colors=self.colors)
         self.popup.open()
 
     def datum_selected(self, instance):
         self.popup.dismiss()
         self.datum = self.data.get_datum(instance.text)
-        if not self.datum.is_none():
-            self.result.text = f'Datum: {self.datum.name}\nX: {self.datum.x}\nY: {self.datum.y}\nZ: {self.datum.z}'
-            if self.call_back:
-                self.call_back(self)
-        else:
+        if self.datum.is_none():
             self.result.text = 'Search error'
+            return
+        self.result.text = f'Datum: {self.datum.name}\nX: {self.datum.x}\nY: {self.datum.y}\nZ: {self.datum.z}'
+        if self.call_back:
+            self.call_back(self)
 
 
 class setups(ScrollView):
@@ -1798,15 +1860,15 @@ class setups(ScrollView):
         # self.bind(pos = draw_background)
 
     def datum1_selected(self, instance):
-        self.recorder[0].children[1].text = 'Record ' + instance.datum.name
+        self.recorder[0].children[1].text = 'Record\n' + instance.datum.name
         self.recorder[0].children[1].datum_name = instance.datum.name
 
     def datum2_selected(self, instance):
-        self.recorder[1].children[1].text = 'Record ' + instance.datum.name
+        self.recorder[1].children[1].text = 'Record\n' + instance.datum.name
         self.recorder[1].children[1].datum_name = instance.datum.name
 
     def datum3_selected(self, instance):
-        self.recorder[2].children[1].text = 'Record ' + instance.datum.name
+        self.recorder[2].children[1].text = 'Record\n' + instance.datum.name
         self.recorder[2].children[1].datum_name = instance.datum.name
 
     def set_hangle(self, instance):

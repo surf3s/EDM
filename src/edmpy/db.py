@@ -117,3 +117,6 @@ class DB(dbs):
             if r != []:
                 return r[0]
         return None
+
+    def get_doc_ids(self, table_name):
+        return sorted([r.doc_id for r in self.db.table(table_name).all()] if self.db is not None else [])

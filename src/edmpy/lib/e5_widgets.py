@@ -186,7 +186,21 @@ class edm_manual(Popup):
         self.title = 'Manual Input'
         self.size_hint = (.9, height_calculator(280))
         self.auto_dismiss = True
+        self.type = type
 
+    def is_numeric(self, value):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+
+    def valid_data(self):
+        if self.type == 'Manual XYZ':
+            return all([self.is_numeric(txt) for txt in [self.xcoord.textbox.text, self.ycoord.textbox.text, self.zcoord.textbox.text]])
+        elif self.type == 'Manual VHD':
+            return all([self.is_numeric(txt) for txt in [self.hangle.textbox.text, self.vangle.textbox.text, self.sloped.textbox.text]])
+        
     def on_open(self):
         if self.xcoord is not None:
             self.xcoord.focus = True
@@ -1086,10 +1100,15 @@ class e5_JSONScreen(e5_InfoScreen):
 
     def on_pre_enter(self):
         self.content.text = 'The last 150 lines:\n\n'
-        with open(self.data.filename, 'r') as f:
-            content = f.readlines()
-        # self.content.text += ''.join(list(reversed(content))[0:150])
-        self.content.text += ''.join(list(content)[-150:])
+        try:
+            with open(self.data.filename, 'r') as f:
+                content = f.readlines()
+            # self.content.text += ''.join(list(reversed(content))[0:150])
+            self.content.text += ''.join(list(content)[-150:])
+        except TypeError:
+            self.content.text = "\nA database file has not yet been opened."
+        except OSError:
+            self.content.text = "\nAn error occurred when reading the data file '%s'." % (self.data.filename)
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
         self.back_button.color = self.colors.button_color
@@ -1290,7 +1309,7 @@ class e5_RecordEditScreen(Screen):
         self.loading = True
         if self.data.table is not None and self.e5_cfg is not None:
             self.reset_doc_ids()
-            self.doc_id = self.doc_ids[-1] if self.doc_ids else None
+            self.doc_id = max(self.doc_ids) if self.doc_ids else None
         else:
             self.doc_ids = []
             self.doc_id = None
@@ -1309,7 +1328,8 @@ class e5_RecordEditScreen(Screen):
         self.loading = True
 
     def reset_doc_ids(self):
-        self.doc_ids = [r.doc_id for r in self.data.db.table(self.data.table).all()] if self.data.db is not None else []
+        print('reset ids')
+        self.doc_ids = sorted([r.doc_id for r in self.data.db.table(self.data.table).all()] if self.data.db is not None else [])
 
     def filter(self, instance):
         if instance.text == 'Clear Filter':
@@ -1333,13 +1353,14 @@ class e5_RecordEditScreen(Screen):
                         matches.append(record.doc_id)
         else:
             for record in self.data.db.table(self.data.table):
-                if str(record[filter_field]).lower() == filter_value.lower():
-                    matches.append(record.doc_id)
+                if filter_field in record:
+                    if str(record[filter_field]).lower() == filter_value.lower():
+                        matches.append(record.doc_id)
         return matches
 
     def apply_filter(self, instance):
         self.filter_field = self.popup.fields_dropdown.text
-        filter_value = self.popup.value_input.text
+        filter_value = self.popup.value_input.textbox.text
         if filter_value and self.filter_field:
             self.doc_ids = self.get_matching_doc_ids(self.filter_field, filter_value)
             if self.doc_ids:
@@ -1507,7 +1528,9 @@ class e5_RecordEditScreen(Screen):
                     if hasattr(widget, 'id'):
                         if widget.id == field:
                             if self.e5_cfg.save_as_numeric_field(field):
-                                if '.' in widget.text:
+                                if widget.text == '':
+                                    update[widget.id] = 0
+                                elif '.' in widget.text:
                                     update[widget.id] = float(widget.text)
                                 else:
                                     update[widget.id] = int(widget.text)
@@ -1565,14 +1588,22 @@ class e5_RecordEditScreen(Screen):
     def check_unique_together(self):
         save_errors = []
         if self.e5_cfg.unique_together and len(self.data.db.table(self.data.table)) > 1:
-            doc_ids = self.data.doc_ids()
+            # doc_ids = self.data.doc_ids()
             unique_key = self.get_unique_key(self.convert_widgets_to_record())
-            for doc_id in doc_ids[0:-1]:
-                if unique_key == self.get_unique_key(self.data.db.table(self.data.table).get(doc_id = doc_id)):
-                    save_errors.append("Based on the unique together field(s) %s, this record's unique key of %s duplicates the record with a doc_id of %s." %
-                                        (",".join(self.e5_cfg.unique_together), unique_key, doc_id))
-                    break
-        return save_errors
+            hits = []
+            for item in self.data.db.table(self.data.table).all():
+                if self.get_unique_key(item) == unique_key:
+                    hits.append(item)
+                    if len(hits) > 1:
+                        save_errors.append("Based on the unique together field(s) %s, this record's unique key of %s duplicates an existing record." %
+                                            (",".join(self.e5_cfg.unique_together), unique_key))
+                        return save_errors
+            if len(hits) == 1:
+                if hits[0] != self.data.db.table(self.data.table).get(doc_id = self.doc_id):
+                    save_errors.append("Based on the unique together field(s) %s, this record's unique key of %s duplicates an existing record." %
+                                        (",".join(self.e5_cfg.unique_together), unique_key))
+                    return save_errors
+        return []
 
     def check_numeric_fields(self):
         save_errors = []
@@ -3507,8 +3538,8 @@ class DataGridWidget(TabbedPanel):
             for record in self.data.all():
                 if record.doc_id != current_doc_id:
                     if unique_key == self.get_unique_key(record):
-                        unique_error = f'Based on the unique together field(s) {",".join(self.cfg.unique_together)}, '\
-                                        f'this record\'s unique key of {unique_key} duplicates another record.  This is not allowed.'
+                        unique_error = f'Based on the unique together field(s) {",".join(self.cfg.unique_together)}, '
+                        unique_error += f'this record\'s unique key of {unique_key} duplicates another record.  This is not allowed.'
                         break
         return unique_error
 
