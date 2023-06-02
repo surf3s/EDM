@@ -311,7 +311,8 @@ class CFG(blockdata):
         unit_fields = self.get_value('EDM', 'UNITFIELDS')
         if unit_fields:
             unit_fields = unit_fields.upper().split(',')
-            unit_fields.remove('UNIT')
+            if 'UNIT' in unit_fields:
+                unit_fields.remove('UNIT')
             unit_fields = ','.join(unit_fields)
             self.update_value('UNIT', 'LINKED', unit_fields)
             self.delete_key('EDM', 'UNITFIELDS')

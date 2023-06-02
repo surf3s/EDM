@@ -62,6 +62,10 @@ Changes for Version 1.0.35
   Fixed important bugs in station setup when using Manual XYZ or Manual VHD options
   Error trap continuation shot on an empty data file
 
+Changes for Vesion 1.0.36
+  Redid font sizing for buttons and text
+  Trapped a bug with units when switching CFGs
+
 Bugs/To Do
   could make menus work better with keyboard (at least with tab)
   there is no error checking on duplicates in datagrid edits
@@ -156,8 +160,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.35'
-PRODUCTION_DATE = 'May, 2023'
+VERSION = '1.0.36'
+PRODUCTION_DATE = 'June, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -1126,14 +1130,15 @@ class OptionsScreen(Screen):
         self.build_screen()
 
     def build_screen(self):
-        prism = GridLayout(cols = 2, size_hint_y = .1, spacing = 5, padding = 5)
+        prism = GridLayout(cols = 2, size_hint_y = None, spacing = 5, padding = 5)
         prism.add_widget(e5_label('Prompt for prism height after each point', colors = self.colors))
         prism_switch = Switch(active = self.station.prism_prompt)
         prism_switch.bind(active = self.prism_prompt)
         prism.add_widget(prism_switch)
+        prism.height = 100
         self.layout.add_widget(prism)
 
-        self.back_button = e5_button('Back', selected = True,
+        self.back_button = e5_button('Back', selected = True, 
                                              call_back = self.go_back,
                                              colors = self.colors)
         self.layout.add_widget(self.back_button)
@@ -1197,9 +1202,9 @@ class ComTestScreen(Screen):
         self.layout.add_widget(self.settings)
 
         self.horizontal_angle = GridLayout(cols = 2, spacing = 5, padding = 5, size_hint = (.2, None))
-        self.leftside = GridLayout(cols = 1, spacing = 5, padding = 5)
+        self.leftside = GridLayout(cols = 1, spacing = 2, padding =0)
         self.leftside.add_widget(e5_label('Enter angle as ddd.mmss', colors = self.colors))
-        self.hangle_input = e5_textinput(write_tab = False)
+        self.hangle_input = e5_textinput(write_tab = False, colors=self.colors)
         self.hangle_input.bind(minimum_height = self.hangle_input.setter('height'))
         self.leftside.add_widget(self.hangle_input)
         self.horizontal_angle.add_widget(self.leftside)
@@ -1274,9 +1279,9 @@ class RecordDatumsScreen(Screen):
 
         self.content.add_widget(e5_label('Provide a name and notes (optional), then record and save.', colors = self.colors))
 
-        self.datum_name = DataGridLabelAndField('Name', colors = self.colors)
+        self.datum_name = DataGridLabelAndField('Name : ', colors=self.colors)
         self.content.add_widget(self.datum_name)
-        self.datum_notes = DataGridLabelAndField('Notes', colors = self.colors)
+        self.datum_notes = DataGridLabelAndField('Notes : ', colors=self.colors, note_field=True)
         self.content.add_widget(self.datum_notes)
 
         self.recorder = datum_recorder('Record datum', station = self.station,
@@ -1526,7 +1531,8 @@ class record_button(e5_button):
             return DataGridTextBox(title = 'Enter a Prism Height',
                                         text = str(self.default_prism.height) if self.default_prism.height else '',
                                         call_back = self.have_shot,
-                                        button_text = ['Back', 'Next'])
+                                        button_text = ['Back', 'Next'],
+                                        colors=self.colors)
 
     def microscribe(self, instance):
         result = self.popup.result
@@ -1891,38 +1897,39 @@ class InitializeStationScreen(Screen):
         lastsetup_type = self.ini.get_value('SETUPS', 'LASTSETUP_TYPE')
         self.setup = lastsetup_type if lastsetup_type else 'Horizontal Angle Only'
 
-        self.content = BoxLayout(orientation = 'vertical',
-                                    size_hint_y = 1,
-                                    size_hint_max_x = MAX_SCREEN_WIDTH,
-                                    pos_hint = {'center_x': .5, 'center_y': .5},
-                                    padding = 5,
-                                    spacing = 5)
+        self.content = BoxLayout(orientation='vertical',
+                                    size_hint_y=1,
+                                    size_hint_max_x=MAX_SCREEN_WIDTH,
+                                    pos_hint={'center_x': .5, 'center_y': .5},
+                                    padding=5,
+                                    spacing=5)
         self.add_widget(self.content)
 
-        setup_type_box = GridLayout(cols = 2,
-                                    size_hint_y = None,
-                                    pos_hint = {'center_x': .5, 'center_y': .5})
+        setup_type_box = GridLayout(cols=1, padding=2, spacing=2, size_hint_y=None)
+
+        setup_type_label = e5_label('Select a setup type from this dropdown', colors=self.colors)
+        setup_type_box.add_widget(setup_type_label)
 
         spinner_dropdown_button = SpinnerOptions
         spinner_dropdown_button.font_size = colors.button_font_size.replace("sp", '') if colors.button_font_size else None
         spinner_dropdown_button.background_color = (0, 0, 0, 1)
 
-        self.setup_type = Spinner(text = self.setup,
+        self.setup_type = Spinner(text=self.setup,
                                     values=["Horizontal Angle Only",
                                             "Over a datum",
                                             "Over a datum + Record a datum",
                                             "Record two datums",
                                             "Three datum shift"],
-                                    option_cls = spinner_dropdown_button)
+                                    option_cls=spinner_dropdown_button)
         if colors.button_font_size:
             self.setup_type.font_size = colors.button_font_size
         setup_type_box.add_widget(self.setup_type)
         self.setup_type.bind(text = self.rebuild)
         self.content.add_widget(setup_type_box)
 
-        self.scroll_content = BoxLayout(orientation = 'vertical',
-                                        size_hint = (1, .9),
-                                        spacing = 5, padding = 5)
+        self.scroll_content = BoxLayout(orientation='vertical',
+                                        size_hint=(1, .9),
+                                        spacing=5, padding=5)
 
         self.content.add_widget(self.scroll_content)
 
@@ -2203,7 +2210,7 @@ class station_setting(GridLayout):
         self.cols = 2
         self.pos_hint = {'center_x': .5},
         self.colors = colors
-        self.label = e5_label(text = label_text, colors = colors)
+        self.label = e5_label(text=label_text + ' : ', colors=colors, halign='right')
         self.add_widget(self.label)
 
         # Create a default dropdown button and then modify its properties

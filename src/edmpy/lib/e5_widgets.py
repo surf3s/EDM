@@ -19,6 +19,9 @@ from kivy.uix.slider import Slider
 from kivy.uix.behaviors.focus import FocusBehavior
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.progressbar import ProgressBar
+from kivy.core.text import Text
+
+from kivy.graphics import Color, Rectangle
 
 from decimal import DivisionByZero
 
@@ -138,36 +141,36 @@ class db_filter(Popup):
 
 class edm_manual(Popup):
 
-    def __init__(self, type = "Manual XYZ", call_back = None, colors = None, **kwargs):
+    def __init__(self, type="Manual XYZ", call_back=None, colors=None, **kwargs):
         super(edm_manual, self).__init__(**kwargs)
 
-        pop_content = GridLayout(cols = 1, spacing = 5, padding = 5)
+        pop_content = GridLayout(cols=1, spacing=5, padding=5)
         if type == "Manual XYZ":
-            input = DataGridLabelAndField(col = 'X', colors = colors, popup = True)
+            input = DataGridLabelAndField(col='X', colors=colors, popup=True)
             input.txt.bind(on_text_validate = self.next_field)
             self.xcoord = input.txt
             pop_content.add_widget(input)
-            input = DataGridLabelAndField(col = 'Y', colors = colors, popup = True)
+            input = DataGridLabelAndField(col='Y', colors=colors, popup=True)
             input.txt.bind(on_text_validate = self.next_field)
             self.ycoord = input.txt
             pop_content.add_widget(input)
-            input = DataGridLabelAndField(col = 'Z', colors = colors, popup = True)
-            input.txt.bind(on_text_validate = self.next_field)
+            input = DataGridLabelAndField(col='Z', colors=colors, popup=True)
+            input.txt.bind(on_text_validate=self.next_field)
             self.zcoord = input.txt
             pop_content.add_widget(input)
             self.hangle = None
             self.vangle = None
             self.sloped = None
         else:
-            input = DataGridLabelAndField(col = 'Horizontal angle', colors = colors, popup = True)
+            input = DataGridLabelAndField(col='Horizontal angle', colors=colors, popup=True)
             input.txt.bind(on_text_validate = self.next_field)
             self.hangle = input.txt
             pop_content.add_widget(input)
-            input = DataGridLabelAndField(col = 'Vertical angle', colors = colors, popup = True)
+            input = DataGridLabelAndField(col='Vertical angle', colors=colors, popup=True)
             input.txt.bind(on_text_validate = self.next_field)
             self.vangle = input.txt
             pop_content.add_widget(input)
-            input = DataGridLabelAndField(col = 'Slope distance', colors = colors, popup = True)
+            input = DataGridLabelAndField(col='Slope distance', colors=colors, popup=True)
             input.txt.bind(on_text_validate = self.next_field)
             self.sloped = input.txt
             pop_content.add_widget(input)
@@ -217,14 +220,24 @@ class e5_textinput_without_clear(TextInput):
     id = ObjectProperty('')
     text_length = ObjectProperty(0)
 
-    def __init__(self, **kwargs):
-        super(e5_textinput_without_clear, self).__init__(**kwargs)
+    def __init__(self, colors=None, multiline=False, **kwargs):
+        super(e5_textinput_without_clear, self).__init__()
+        self.size_hint_y = None
+        if colors is not None:
+            self.font_size = colors.text_font_size
         if 'id' in kwargs:
             self.id = kwargs.get('id')
             if self.id in ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ'] and APP_NAME == 'EDM':
                 self.bind(on_text_validate = self.do_coordinate_math)
         if 'text_length' in kwargs:
             self.text_length = kwargs.get('text_length')
+
+        instance = Text(text = 'Shannon', font_size = self.font_size)
+        width, height = instance.render()
+        if multiline:
+            self.height = (height * 4 + self.border[0] + self.border[2]) * 1.2
+        else:
+            self.height = (height + self.border[0] + self.border[2]) * 1.2
 
     def do_coordinate_math(self, instance):
         if instance.text:
@@ -243,21 +256,26 @@ class e5_textinput_without_clear(TextInput):
 
 class e5_textinput(GridLayout):
 
-    def __init__(self, **kwargs):
+    def __init__(self, colors=None, multiline=False, **kwargs):
         super(e5_textinput, self).__init__()
 
         self.cols = 2
         self.spacing = 0
         self.size_hint = (1, None)
-        self.height = TEXTBOX_HEIGHT
+        # self.height = TEXTBOX_HEIGHT - june 1
 
-        self.textbox = e5_textinput_without_clear(**kwargs, height = 30)
+        self.textbox = e5_textinput_without_clear(colors=colors, multiline=multiline, **kwargs)
         # self.textbox.bind(text = self.update_text)
         # self.text = self.textbox.text
         self.add_widget(self.textbox)
 
-        self.clear_button = Button(text = 'X', width = TEXTBOX_HEIGHT,
-                                    size_hint=(None, None), height = TEXTBOX_HEIGHT,
+        if multiline:
+            button_height = (self.textbox.height - self.textbox.border[0] - self.textbox.border[2]) / 1.2
+            button_height = (button_height / 4 + self.textbox.border[0] + self.textbox.border[2]) * 1.2
+        else:
+            button_height = self.textbox.height
+        self.clear_button = Button(text = 'X', width = button_height,
+                                    size_hint=(None, None), height = button_height,
                                     background_normal = '',
                                     background_color = (.2, .2, .2, 1),
                                     on_press = self.clear_text_box)
@@ -280,12 +298,13 @@ class e5_label(Label):
         if colors:
             if colors.text_font_size:
                 self.font_size = colors.text_font_size
-        if label_height is None:
-            self.bind(size = self.setter('text_size'))
+        # if label_height is None:
+        self.bind(size = self.setter('text_size'))
         # else:
         #     self.height = label_height
-        self.height = 30 if label_height is None else label_height
-        self.valign = 'center'
+        # self.height = 30 if label_height is None else label_height
+        # self.halign = 'center'
+        self.valign = 'top'
 
 
 class e5_label_wrapped(e5_label):
@@ -982,12 +1001,12 @@ class e5_SettingsScreen(Screen):
 
         text_font_size = GridLayout(cols = 2, size_hint_y = .1, spacing = 5, padding = 5)
         text_font_size_value = int(self.colors.text_font_size.replace("sp", '')) if self.colors.text_font_size else 12
-        self.text_font_size_label = e5_label('Text font size is %s' % text_font_size_value,
+        self.text_font_size_label = e5_label('Text font\nsize is %s' % text_font_size_value,
                                                 id = 'label_font_size',
                                                 colors = self.colors)
         self.labels.append(self.text_font_size_label)
         text_font_size.add_widget(self.text_font_size_label)
-        text_font_slide = Slider(min = 12, max = 26, step = 1, value = text_font_size_value,
+        text_font_slide = Slider(min = 8, max = 20, step = 1, value = text_font_size_value,
                                     orientation = 'horizontal',
                                     value_track = True, value_track_color = self.colors.button_background)
         text_font_size.add_widget(text_font_slide)
@@ -996,12 +1015,12 @@ class e5_SettingsScreen(Screen):
 
         button_font_size = GridLayout(cols = 2, size_hint_y = .1, spacing = 5, padding = 5)
         button_font_size_value = int(self.colors.button_font_size.replace("sp", '')) if self.colors.button_font_size else 12
-        self.button_font_size_label = e5_label('Button font size is %s' % button_font_size_value,
+        self.button_font_size_label = e5_label('Button font\nsize is %s' % button_font_size_value,
                                                 id = 'label_font_size',
                                                 colors = self.colors)
         self.labels.append(self.button_font_size_label)
         button_font_size.add_widget(self.button_font_size_label)
-        button_font_slide = Slider(min = 12, max = 26, step = 1, value = button_font_size_value,
+        button_font_slide = Slider(min = 8, max = 20, step = 1, value = button_font_size_value,
                                     orientation = 'horizontal',
                                     value_track = True, value_track_color = self.colors.button_background)
         button_font_size.add_widget(button_font_slide)
@@ -1258,6 +1277,7 @@ class e5_RecordEditScreen(Screen):
                         one_record_only = False,
                         **kwargs):
         super(e5_RecordEditScreen, self).__init__(**kwargs)
+
         self.colors = colors if colors is not None else ColorScheme()
         self.e5_cfg = e5_cfg
         self.data = data
@@ -1328,7 +1348,6 @@ class e5_RecordEditScreen(Screen):
         self.loading = True
 
     def reset_doc_ids(self):
-        print('reset ids')
         self.doc_ids = sorted([r.doc_id for r in self.data.db.table(self.data.table).all()] if self.data.db is not None else [])
 
     def filter(self, instance):
@@ -1385,9 +1404,10 @@ class e5_RecordEditScreen(Screen):
                 field_type = self.e5_cfg.get_value(col, 'TYPE')
                 field_length = self.e5_cfg.get_value(col, 'LENGTH')
                 field_length = int(field_length) if self.is_numeric(field_length) else 0
-                widget = DataGridLabelAndField(col = col, prompt = self.e5_cfg.get_value(col, 'PROMPT'),
-                                                colors = self.colors, note_field = (field_type == 'NOTE'),
-                                                text_length = field_length)
+                widget = DataGridLabelAndField(col=col, prompt=self.e5_cfg.get_value(col, 'PROMPT'),
+                                                colors=self.colors,
+                                                note_field=(field_type == 'NOTE'),
+                                                text_length=field_length)
                 self.data_fields.add_widget(widget)
                 if first_field:
                     if field_type not in ['MENU', 'BOOLEAN']:
@@ -1974,29 +1994,29 @@ class DataUploadScreen(Screen):
         instructions += 'A local backup of your JSON datafile is made before the upload.  '
         instructions += 'Select Delete to remove the data here after the upload (this is good practice).'
         self.scroll_grid.add_widget(e5_label_wrapped(text = instructions, colors = self.colors))
-        self.url = DataGridLabelAndField(col = 'URL', colors = self.colors)
+        self.url = DataGridLabelAndField(col='URL', colors=self.colors)
         if url:
             self.url.txt.text = url
         self.scroll_grid.add_widget(self.url)
-        self.username = DataGridLabelAndField(col = 'Username', colors = self.colors)
+        self.username = DataGridLabelAndField(col='Username', colors=self.colors)
         if username:
             self.username.txt.text = username
         self.scroll_grid.add_widget(self.username)
-        self.password = DataGridLabelAndField(col = 'Password', colors = self.colors)
+        self.password = DataGridLabelAndField(col='Password', colors=self.colors)
         password = ''
         if password:
             self.password.txt.text = password
         self.password.txt.password = True
         self.scroll_grid.add_widget(self.password)
-        self.dbname = DataGridLabelAndField(col = 'Database name', colors = self.colors)
+        self.dbname = DataGridLabelAndField(col='Database name', colors=self.colors)
         self.scroll_grid.add_widget(self.dbname)
-        self.tablename = DataGridLabelAndField(col = 'Table name', colors = self.colors)
+        self.tablename = DataGridLabelAndField(col='Table name', colors=self.colors)
         self.scroll_grid.add_widget(self.tablename)
-        self.overwrite = DataGridLabelAndToggle(col = 'Overwrite existing records?')
+        self.overwrite = DataGridLabelAndToggle(col='Overwrite existing records?')
         self.scroll_grid.add_widget(self.overwrite)
-        self.deleteafter = DataGridLabelAndToggle(col = 'Delete uploaded/updated?')
+        self.deleteafter = DataGridLabelAndToggle(col='Delete uploaded/updated?')
         self.scroll_grid.add_widget(self.deleteafter)
-        self.progress = DataGridLabelAndProgressBar(col = 'Progress\n')
+        self.progress = DataGridLabelAndProgressBar(col='Progress\n')
         self.scroll_grid.add_widget(self.progress)
         self.scroll_grid.add_widget(e5_side_by_side_buttons(text = ['Back', 'Test', 'Upload'],
                                                             id = ['back', 'test', 'upload'],
@@ -2817,7 +2837,7 @@ class DataGridTextInput(e5_textinput):
 
     id = ObjectProperty(None)
 
-    def __init__(self, call_back = None, **kwargs):
+    def __init__(self, call_back=None, **kwargs):
         super(DataGridTextInput, self).__init__(**kwargs)
         self.call_back = call_back
 
@@ -2840,16 +2860,17 @@ class DataGridTextBox(Popup):
             # e5_label(text = col, id = '__label', colors = colors)
             # content.add_widget(Label(text = label, text_size = (None, 30)))
             content.add_widget(e5_label(text = label, colors = self.colors, popup = True))
-        self.txt = DataGridTextInput(text = text, size_hint_y = None,
-                                        text_length = text_length,
+        self.txt = DataGridTextInput(text=text, size_hint_y=None,
+                                        text_length=text_length,
+                                        colors=self.colors,
                                         # height = 30 if not multiline else 90,
-                                        multiline = multiline, id = 'new_item')
-        if self.colors:
-            if self.colors.text_font_size:
-                self.txt.font_size = self.colors.text_font_size
-            if not multiline:
-                if self.colors.text_font_size:
-                    self.txt.height = int(self.colors.text_font_size.replace('sp', '')) * 1.8
+                                        multiline=multiline, id='new_item')
+        # if self.colors:
+            # if self.colors.text_font_size:
+            #     self.txt.textbox.font_size = self.colors.text_font_size
+            # if not multiline:
+            #     if self.colors.text_font_size:
+            #         self.txt.height = int(self.colors.text_font_size.replace('sp', '')) * 1.8
         self.result = text
         self.txt.textbox.bind(text = self.update)
         self.txt.textbox.bind(on_text_validate = self.accept_value)
@@ -3149,7 +3170,7 @@ class DataGridCasePanel(BoxLayout):
             self.edit_list.bind(minimum_height = self.edit_list.setter('height'))
             self.edit_list.clear_widgets()
             for col in fields.fields():
-                label_and_text = DataGridLabelAndField(col = col, prompt = fields.get(col).prompt, colors = self.colors)
+                label_and_text = DataGridLabelAndField(col=col, prompt=fields.get(col).prompt, colors=self.colors)
                 label_and_text.txt.textbox.bind(on_text_validate = self.next_field)
                 self.edit_list.add_widget(label_and_text)
                 label_and_text.txt.textbox.bind(text = self.changes)
@@ -3197,38 +3218,48 @@ class DataGridLabelAndToggle(BoxLayout):
         self.add_widget(self.check)
 
 
-class DataGridLabelAndField(BoxLayout):
+class DataGridLabelAndField(GridLayout):
 
     popup = ObjectProperty(None)
     sorted_result = None
 
-    def __init__(self, col, colors, prompt = '', note_field = False, popup = False, text_length = 0, height = None, **kwargs):
+    def __init__(self, col, colors, prompt='', note_field=False, popup=False, text_length=0, height=None, **kwargs):
         super(DataGridLabelAndField, self).__init__(**kwargs)
         self.update_db = False
         self.widget_type = 'data'
-        if not note_field:
-            if colors:
-                if colors.text_font_size:
-                    self.height = int(colors.text_font_size.replace('sp', '')) * 1.9
+        self.cols = 2
+        # if not note_field:
+        #     if colors:
+        #         if colors.text_font_size:
+        #             self.height = int(colors.text_font_size.replace('sp', '')) * 1.9
         self.size_hint = (0.9, None)
-        self.bind(minimum_height = self.setter('height'))
-        self.spacing = 10
-        label = e5_label(text = prompt if prompt else col, id = '__label',
-                            colors = colors, popup = popup, size_hint_y = None,
-                            halign = 'right', label_height = height)
-        label.bind(texture_size = label.setter('size'))
-        self.txt = e5_textinput(multiline = note_field,
-                                size_hint = (0.75, None),
-                                id = col,
-                                # size_hint_y = 1,
-                                text_length = text_length,
-                                write_tab = False)
-        self.txt.bind(minimum_height = self.txt.setter('height'))
-        if colors:
-            if colors.text_font_size:
-                self.txt.font_size = colors.text_font_size
-        self.add_widget(label)
+        self.spacing = 1
+        self.label = e5_label(text=prompt if prompt else col, id='__label',
+                                colors=colors,
+                                popup=popup,
+                                size_hint_y=None,
+                                halign='right')
+        # self.label.bind(text_size = self.label.setter('size'))
+        # self.label.bind(texture_size = self.fix_height)
+        self.txt = e5_textinput(multiline=note_field,
+                                size_hint=(0.75, None),
+                                id=col,
+                                size_hint_y=None,
+                                text_length=text_length,
+                                write_tab=False,
+                                colors=colors)
+        # if colors:
+        #     if colors.text_font_size:
+        #         self.txt.font_size = colors.text_font_size
+        # self.txt.height = 10
+        self.add_widget(self.label)
         self.add_widget(self.txt)
+        # self.label.height = 20
+        # self.txt.textbox.height = self.label.height
+        # self.label.height = self.txt.textbox.height
+        self.height = self.txt.textbox.height
+        self.label.padding = [10, self.txt.textbox.border[2] * 2]
+        # self.bind(minimum_height = self.txt.textbox.setter('height'))
 
 
 class DataGridDeletePanel(GridLayout):
@@ -3260,7 +3291,7 @@ class DataGridAddNewPanel(GridLayout):
                 self.addnew_list.bind(minimum_height = self.addnew_list.setter('height'))
                 self.addnew_list.clear_widgets()
                 for col in fields.fields():
-                    label_and_text = DataGridLabelAndField(col = col, colors = self.colors)
+                    label_and_text = DataGridLabelAndField(col=col, colors=self.colors)
                     label_and_text.txt.bind(on_text_validate = self.next_field)
                     self.addnew_list.add_widget(label_and_text)
                 self.button = e5_button('Add record',
