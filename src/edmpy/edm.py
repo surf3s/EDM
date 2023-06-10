@@ -724,6 +724,7 @@ class MainScreen(e5_MainScreen):
         start_path = self.cfg.path if self.cfg.path else self.app_paths.app_data_path
         if not os.path.exists(start_path):
             start_path = os.path.abspath(os.path.dirname(__file__))
+        print(start_path)
         content = e5_LoadDialog(load = self.load_cfg,
                                 cancel = self.dismiss_popup,
                                 start_path = start_path,
@@ -734,6 +735,7 @@ class MainScreen(e5_MainScreen):
                             content = content,
                             size_hint = (0.9, 0.9))
         self.popup.open()
+        print('popup open')
 
     def load_cfg(self, path, filename):
         warnings, errors = [], []
