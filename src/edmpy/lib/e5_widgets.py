@@ -224,6 +224,8 @@ class e5_textinput_without_clear(TextInput):
         super(e5_textinput_without_clear, self).__init__()
         self.size_hint_y = None
         if colors is not None:
+            if colors.text_font_size is None:
+                colors.text_font_size = 12
             self.font_size = colors.text_font_size
         if 'id' in kwargs:
             self.id = kwargs.get('id')
