@@ -225,11 +225,11 @@ class totalstation(object):
             value = self.coordinate_pretty(self.xyz_global.y)
         if widget == 'Z':
             value = self.coordinate_pretty(self.xyz_global.z)
-        if widget == 'STATIONX':
+        if widget in ['STATIONX', 'DATUMX']:
             value = self.coordinate_pretty(self.location.x)
-        if widget == 'STATIONY':
+        if widget in ['STATIONY', 'DATUMY']:
             value = self.coordinate_pretty(self.location.y)
-        if widget == 'STATIONZ':
+        if widget in ['STATIONZ', 'DATUMZ']:
             value = self.coordinate_pretty(self.location.z)
         if widget == 'LOCALX':
             value = self.coordinate_pretty(self.xyz.x)

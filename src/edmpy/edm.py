@@ -65,8 +65,11 @@ Changes for Version 1.0.35
 Changes for Vesion 1.0.36
   Redid font sizing for buttons and text
   Trapped a bug with units when switching CFGs
+  Various bugs having to do with entering/editing data
+  Add support for datumx, datumy, datumz (which is now called stationx, stationy, stationz)
 
 Bugs/To Do
+  need to move load_dialog out of kv and into code and error trap bad paths
   could make menus work better with keyboard (at least with tab)
   there is no error checking on duplicates in datagrid edits
   Do unitchecking after doing an offset shot on suffix 0 points
@@ -162,7 +165,7 @@ except ModuleNotFoundError:
 
 VERSION = '1.0.36'
 PRODUCTION_DATE = 'June, 2023'
-__DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
+__DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
 MAX_SCREEN_WIDTH = 400
@@ -658,7 +661,10 @@ class MainScreen(e5_MainScreen):
             self.info.text += " - SIMULATION mode on"
 
     def same_coordinates(self, record1, record2):
-        return record1['X'] == record2['X'] and record1['Y'] == record2['Y'] and record1['Z'] == record2['Z']
+        if all([field in record1 and field in record2 for field in ['X', 'Y', 'Z']]):
+            return record1['X'] == record2['X'] and record1['Y'] == record2['Y'] and record1['Z'] == record2['Z']
+        else:
+            return False
 
     def check_for_duplicate_xyz(self):
         if self.data.db is not None:
@@ -724,7 +730,6 @@ class MainScreen(e5_MainScreen):
         start_path = self.cfg.path if self.cfg.path else self.app_paths.app_data_path
         if not os.path.exists(start_path):
             start_path = os.path.abspath(os.path.dirname(__file__))
-        print(start_path)
         content = e5_LoadDialog(load = self.load_cfg,
                                 cancel = self.dismiss_popup,
                                 start_path = start_path,
@@ -735,7 +740,6 @@ class MainScreen(e5_MainScreen):
                             content = content,
                             size_hint = (0.9, 0.9))
         self.popup.open()
-        print('popup open')
 
     def load_cfg(self, path, filename):
         warnings, errors = [], []

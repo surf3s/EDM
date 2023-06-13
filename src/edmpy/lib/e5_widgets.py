@@ -229,7 +229,7 @@ class e5_textinput_without_clear(TextInput):
             self.font_size = colors.text_font_size
         if 'id' in kwargs:
             self.id = kwargs.get('id')
-            if self.id in ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ'] and APP_NAME == 'EDM':
+            if self.id in ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ'] and APP_NAME == 'EDM':
                 self.bind(on_text_validate = self.do_coordinate_math)
         if 'text_length' in kwargs:
             self.text_length = kwargs.get('text_length')
@@ -3054,6 +3054,8 @@ class DataGridTableData(RecycleView):
         cfg_field = self.e5_cfg.get(field)
         self.inputtype = cfg_field.inputtype.upper()
         text_length = int(cfg_field.length) if self.is_numeric(cfg_field.length) else 0
+        if field == 'doc_id':
+            return
         if self.inputtype in ['MENU', 'BOOLEAN']:
             self.popup = DataGridMenuList(field, cfg_field.menu,
                                             editcell_widget.text, self.menu_selection,
@@ -3077,7 +3079,7 @@ class DataGridTableData(RecycleView):
         elif self.inputtype in ['MENU', 'BOOLEAN']:
             new_data = {self.field: instance.text if not instance.text == 'Add' else self.datatable_widget.popup_textbox.text}
         elif self.inputtype == 'NUMERIC':
-            if self.field in ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ'] and APP_NAME == 'EDM':
+            if self.field in ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ'] and APP_NAME == 'EDM':
                 try:
                     self.datatable_widget.popup_textbox.text = str(eval(self.datatable_widget.popup_textbox.text))
                 except (DivisionByZero, NameError, SyntaxError):
@@ -3489,7 +3491,7 @@ class DataGridWidget(TabbedPanel):
             if hasattr(widget, 'id'):
                 if widget.id in self.fields.fields():
                     if widget.id in record.keys():
-                        widget.text = record[widget.id]
+                        widget.text = str(record[widget.id])
                     else:
                         widget.text = ''
 
