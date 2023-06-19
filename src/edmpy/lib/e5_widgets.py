@@ -840,19 +840,22 @@ class e5_MainScreen(Screen):
 
         self.popup.dismiss()
 
-        if APP_NAME == 'EDM' and self.csv_data_type != 'points':
-            router = {'datums': self.cfg_datums, 'units': self.cfg_units, 'prisms': self.cfg_prisms}
-            response = router[self.csv_data_type].write_csvs(filename, self.data.db.table(self.csv_data_type))
-        else:
-            table = self.data.db.table(self.data.table)
-            response = self.cfg.write_csvs(filename, table)
-
+        response = self.do_save_csv(filename)
+        
         if not response:
             response = f'\n The table {self.csv_data_type} was successfully written as the file {filename}.'
         self.popup = e5_MessageBox('CSV Export', response, call_back = self.close_popup, colors = self.colors)
         self.popup.open()
         self.popup_open = True
 
+    def do_save_csv(self, filename):
+        if APP_NAME == 'EDM' and self.csv_data_type != 'points':
+            router = {'datums': self.cfg_datums, 'units': self.cfg_units, 'prisms': self.cfg_prisms}
+            return router[self.csv_data_type].write_csvs(filename, self.data.db.table(self.csv_data_type))
+        else:
+            table = self.data.db.table(self.data.table)
+            return self.cfg.write_csvs(filename, table)
+    
     def show_save_geojson(self):
         if self.cfg.filename and self.data.filename:
             geojson_compatible = 0

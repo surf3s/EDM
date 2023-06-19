@@ -1,14 +1,18 @@
 # from edmpy.edm import MainScreen
-from edmpy.edm import totalstation
-from edmpy.edm import point
-from edmpy.edm import datum
-from edmpy.edm import prism
-from edmpy.edm import unit
+from edmpy.totalstation import totalstation
+from edmpy.geo import point
+from edmpy.geo import datum
+from edmpy.geo import prism
+from edmpy.geo import unit
+from edmpy.cfg import CFG
+
+from edmpy.edm import MainScreen, EditLastRecordScreen
 
 import unittest
 
-from os import path
-from os import remove
+import os
+
+from kivy.uix.popup import Popup
 
 
 class Test_TotalStation(unittest.TestCase):
@@ -41,14 +45,65 @@ class Test_DataClasses(unittest.TestCase):
 
 class Test_FileMenu(unittest.TestCase):
     def setUp(self):
-        if path.exists('Import_from_EDM-Mobile/examples/BachoKiro.json'):
-            remove('Import_from_EDM-Mobile/examples/BachoKiro.json')
-        if path.exists('Import_from_EDM-Mobile/examples/ranis_2021.json'):
-            remove('Import_from_EDM-Mobile/examples/ranis_2021.json')
+        if os.path.exists('Import_from_EDM-Mobile/examples/BachoKiro.json'):
+            os.remove('Import_from_EDM-Mobile/examples/BachoKiro.json')
+        if os.path.exists('Import_from_EDM-Mobile/examples/ranis_2021.json'):
+            os.remove('Import_from_EDM-Mobile/examples/ranis_2021.json')
+        self.mainscreen = MainScreen()
+
         return
-        self.mainscreen = MainScreen(user_data_dir = '')
+        # self.mainscreen = MainScreen(user_data_dir = '')
 
     def test_imports(self):
+
+        # Try read in every CFG in the CFG folder one after the other (maybe randomize the order)
+        # Try to export CSV for each CFG
+        # Try to write a GeoJSON for each CFG
+        # Try to create a default CFG
+
+        path = 'CFGs/'
+        cfg_files = []
+
+        # Get test CFGs
+        for filename in os.listdir(path):
+            if os.path.isfile(os.path.join(path, filename)):
+                cfg_files.append(os.path.join(path, filename))
+
+        # Try to open each one
+        # for cfg_file in cfg_files:
+        #     has_errors, errors = self.mainscreen.cfg.load(os.path.join(path, filename[0]))
+        #     self.assertEqual(has_errors, False)
+        #     self.assertEqual(errors, [])
+        #     self.mainscreen.open_db()
+        #     for data_type in ['points', 'datums', 'prisms', 'units']:
+        #         self.mainscreen.csv_data_type = data_type
+        #         self.mainscreen.do_save_csv('test.csv')
+        #     self.popup = Popup()
+        #     self.popup.status = ''
+        #     self.mainscreen.cfg.write_geojson('test.geojson', self.mainscreen.data.db.table(self.mainscreen.data.table), self.popup)
+
+        # Need to make a default CFG
+        # Switch to simulation mode
+        # Insert some data
+        self.mainscreen.do_default_cfg(path, 'test.cfg')
+        self.mainscreen.station = totalstation('SIMULATE')
+
+        # Test the edit last record screen
+        self.editrecord = EditLastRecordScreen(name = 'EditLastRecordScreen',
+                                                colors = self.mainscreen.colors,
+                                                data = self.mainscreen.data,
+                                                doc_id = None,
+                                                e5_cfg = self.mainscreen.cfg)
+        self.editrecord.on_pre_enter()
+        self.editrecord.on_enter()
+        self.editrecord.first_record(None)
+        self.editrecord.last_record(None)
+        self.editrecord.previous_record(None)
+        self.editrecord.previous_record(None)
+        self.editrecord.next_record(None)
+        self.editrecord.reset_doc_ids()
+        self.editrecord.save_record(None)
+
         return
         for data_set in ['BK', 'RANIS']:
             if data_set == 'BK':

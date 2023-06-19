@@ -68,6 +68,9 @@ Changes for Vesion 1.0.36
   Various bugs having to do with entering/editing data
   Add support for datumx, datumy, datumz (which is now called stationx, stationy, stationz)
 
+Changes for Version 1.0.37
+  Fixed a bug in simulation mode
+  
 Bugs/To Do
   need to move load_dialog out of kv and into code and error trap bad paths
   could make menus work better with keyboard (at least with tab)
@@ -163,7 +166,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.36'
+VERSION = '1.0.37'
 PRODUCTION_DATE = 'June, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
@@ -543,6 +546,7 @@ class MainScreen(e5_MainScreen):
                 return
             if self.station.make in ['Manual XYZ', 'Manual VHD', 'Simulate']:
                 self.station.prism_adjust()
+
         if self.popup:
             self.popup.dismiss()
 
@@ -562,7 +566,8 @@ class MainScreen(e5_MainScreen):
                 self.data.db.table(self.data.table).on_save = self.on_save
                 self.data.db.table(self.data.table).on_cancel = self.on_cancel
             self.parent.current = 'EditPointScreen'
-            self.event = Clock.schedule_interval(self.check_for_station_response_edit_record, .1)
+            if self.station.make not in ['Simulate']:
+                self.event = Clock.schedule_interval(self.check_for_station_response_edit_record, .1)
 
     def cancel_x_shot(self, instance):
         self.popup.dismiss()
@@ -702,6 +707,12 @@ class MainScreen(e5_MainScreen):
         filename = self.popup.content.filename
         if '.cfg' not in filename.lower():
             filename = filename + '.cfg'
+        self.do_default_cfg(path, filename)
+        self.dismiss_popup()
+        self.build_mainscreen()
+        self.reset_screens()
+
+    def do_default_cfg(self, path, filename):
         self.cfg.initialize()
         self.cfg.build_default()
         self.ini.update_value(APP_NAME, 'CFG', os.path.join(path, filename))
@@ -713,9 +724,6 @@ class MainScreen(e5_MainScreen):
         self.cfg.filename = os.path.join(path, filename)
         self.cfg.save()
         self.ini.update(self.colors, self.cfg)
-        self.dismiss_popup()
-        self.build_mainscreen()
-        self.reset_screens()
 
     def set_new_data_to_true(self, table_name = None):
         if table_name is None:
