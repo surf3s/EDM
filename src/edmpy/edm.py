@@ -70,7 +70,8 @@ Changes for Vesion 1.0.36
 
 Changes for Version 1.0.37
   Fixed a bug in simulation mode
-  
+  Fixed very bad bug with popup window sizing that meant that sometimes prism didn't advance to edit screen
+
 Bugs/To Do
   need to move load_dialog out of kv and into code and error trap bad paths
   could make menus work better with keyboard (at least with tab)
@@ -566,7 +567,7 @@ class MainScreen(e5_MainScreen):
                 self.data.db.table(self.data.table).on_save = self.on_save
                 self.data.db.table(self.data.table).on_cancel = self.on_cancel
             self.parent.current = 'EditPointScreen'
-            if self.station.make not in ['Simulate']:
+            if self.station.make not in ['Manual XYZ', 'Manual VHD', 'Simulate', '']:
                 self.event = Clock.schedule_interval(self.check_for_station_response_edit_record, .1)
 
     def cancel_x_shot(self, instance):
@@ -576,6 +577,7 @@ class MainScreen(e5_MainScreen):
             self.station.cancel()
 
     def check_for_station_response_edit_record(self, dt):
+        # print('.', end = "")
         if self.station.data_waiting():
             if self.station.make in ['Leica']:
                 self.station.fetch_point()
@@ -590,6 +592,7 @@ class MainScreen(e5_MainScreen):
                 self.event.cancel()
 
     def check_for_station_response_x_shot(self, dt):
+        # print('.', end = "")
         if self.station.data_waiting():
             if self.station.make in ['Leica']:
                 self.station.fetch_point()
@@ -1194,6 +1197,7 @@ class ComTestScreen(Screen):
         self.event = Clock.schedule_interval(self.check_io, .2)
 
     def check_io(self, dt):
+        # print('.', end = "")
         if self.station.data_waiting():
             self.station.receive()
         if self.station.io != '' and self.station.io != self.io.scrolling_label.text:
@@ -1595,6 +1599,7 @@ class record_button(e5_button):
         self.event = Clock.schedule_interval(self.check_for_station_response, .1)
 
     def check_for_station_response(self, dt):
+        # print('.', end = "")
         if self.station.data_waiting() or self.station.make in ['Manual XYZ', 'Manual VHD']:
             if self.station.make in ['Leica']:
                 self.station.fetch_point()
@@ -2267,6 +2272,7 @@ class station_setting(GridLayout):
             self.event2 = Clock.schedule_interval(self.check_comports, .2)
 
     def show_popup_message(self, dt):
+        # print('.', end = "")
         self.popup = e5_MessageBox('COM Ports', '\nLooking for valid COM ports...This can take several seconds...'
                                                     'And the Cancel button might appear non-responsive...',
                                     response_type = "CANCEL",
@@ -2294,6 +2300,7 @@ class station_setting(GridLayout):
             return None
 
     def check_comports(self, dt):
+        # print('.', end = "")
         if self.comport_to_test is None:
             self.comport_to_test = 0
             self.valid_comports = []

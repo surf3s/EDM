@@ -343,7 +343,8 @@ class totalstation(object):
                                 round(random.uniform(0, 1), 3))
         self.make_global()
         self.vhd_from_xyz()
-
+        return False
+    
     def take_shot(self):
 
         error = False
@@ -364,7 +365,7 @@ class totalstation(object):
             self.launch_point_sokkia()
 
         elif self.make == 'Simulate':
-            self.launch_point_simulate()
+            error = self.launch_point_simulate()
 
         else:
             pass

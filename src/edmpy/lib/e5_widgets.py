@@ -110,6 +110,9 @@ class db_filter(Popup):
     def __init__(self, default_field = '', fields = [], call_back = None, colors = None, **kwargs):
         super(db_filter, self).__init__(**kwargs)
 
+        self.size_hint_x = .7
+        self.size_hint_y = None
+
         spinner_dropdown_button = SpinnerOptions
         spinner_dropdown_button.font_size = colors.button_font_size.replace("sp", '') if colors.button_font_size else None
         spinner_dropdown_button.background_color = (0, 0, 0, 1)
@@ -135,14 +138,21 @@ class db_filter(Popup):
                                             colors = colors)
         pop_content.add_widget(buttons)
         self.content = pop_content
+        self.content.bind(minimum_height = self.fix_height)
         self.title = 'Filter dataset'
-        self.size_hint = (.9, .38)
+
+    def fix_height(self, *args):
+        instance = Text(text = self.title, font_size = self.title_size)
+        width, height = instance.render()
+        self.height = self.content.minimum_height * 2 + height + 40
 
 
 class edm_manual(Popup):
 
     def __init__(self, type="Manual XYZ", call_back=None, colors=None, **kwargs):
         super(edm_manual, self).__init__(**kwargs)
+        self.size_hint_x = .7
+        self.size_hint_y = None
 
         pop_content = GridLayout(cols=1, spacing=5, padding=5)
         if type == "Manual XYZ":
@@ -186,10 +196,16 @@ class edm_manual(Popup):
         self.call_back = call_back
         pop_content.add_widget(buttons)
         self.content = pop_content
+        self.content.bind(minimum_height = self.fix_height)
         self.title = 'Manual Input'
-        self.size_hint = (.9, height_calculator(280))
+        # self.size_hint = (.9, height_calculator(280))
         self.auto_dismiss = True
         self.type = type
+
+    def fix_height(self, *args):
+        instance = Text(text = self.title, font_size = self.title_size)
+        width, height = instance.render()
+        self.height = self.content.minimum_height + height + 40
 
     def is_numeric(self, value):
         try:
@@ -203,7 +219,7 @@ class edm_manual(Popup):
             return all([self.is_numeric(txt) for txt in [self.xcoord.textbox.text, self.ycoord.textbox.text, self.zcoord.textbox.text]])
         elif self.type == 'Manual VHD':
             return all([self.is_numeric(txt) for txt in [self.hangle.textbox.text, self.vangle.textbox.text, self.sloped.textbox.text]])
-        
+
     def on_open(self):
         if self.xcoord is not None:
             self.xcoord.focus = True
@@ -607,6 +623,7 @@ class e5_MainScreen(Screen):
         return e5_MessageBox('Warnings and errors', message_txt, colors = self.colors)
 
     def show_popup_message(self, dt):
+        # print('.', end='')
         self.event.cancel()
         if self.cfg.has_errors or self.cfg.has_warnings:
             if self.cfg.has_errors:
@@ -2859,6 +2876,8 @@ class DataGridTextBox(Popup):
     def __init__(self, title, label = None, text = '', multiline = False, call_back = None,
                         button_text = ['Back', 'Save'], colors = None, text_length = 0, **kwargs):
         super(DataGridTextBox, self).__init__(**kwargs)
+        self.size_hint_x = .6
+        self.size_hint_y = None
         self.colors = colors if colors else ColorScheme()
         content = GridLayout(cols = 1, spacing = 5, padding = 10)
         if label:
@@ -2890,13 +2909,19 @@ class DataGridTextBox(Popup):
         content.add_widget(buttons)
         self.title = title
         self.content = content
-        if not multiline:
-            self.size_hint = (width_calculator(.8, 800), .35 if label is None else .5)
-        else:
-            self.size_hint = (width_calculator(.8, 800), .45 if label is None else .6)
+        # if not multiline:
+        #     self.size_hint = (width_calculator(.8, 800), .35 if label is None else .5)
+        # else:
+        #     self.size_hint = (width_calculator(.8, 800), .45 if label is None else .6)
+        self.content.bind(minimum_height = self.fix_height)
         self.auto_dismiss = True
 
         self.event = Clock.schedule_once(self.set_focus, .35)
+
+    def fix_height(self, *args):
+        instance = Text(text = self.title, font_size = self.title_size)
+        width, height = instance.render()
+        self.height = self.content.minimum_height + height + 40
 
     def set_focus(self, instance):
         self.txt.textbox.focus = True
