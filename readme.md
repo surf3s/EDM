@@ -14,7 +14,7 @@ A Windows exe file can be found in the Windows folder listed above or [click her
 
 I have tested EDMpy thus far on several Windows 10 and 11 computers.  I also have it running on an ARM ChromeBook (non-ARM ChromeBooks should work as well).  One user has reported that it runs on a Microsoft tablet running Windows 11.  Another  user is running it on Topcon tablets without issues.  I doubt it works on Windows 7 and it almost certainly does not work on Windows XP, but you really, really should not be using computers with either of those operating systems.
 
-If you get a Windows error telling you that the program is incompatible with Windows 10 or 11, be sure that you have downloaded the complete program.  I have found that you can run a partially downloaded exe, in which case Windows will give an incompatability error.
+If you get a Windows error telling you that the program is incompatible with Windows 10 or 11, be sure that you have downloaded the complete program.  I have found that you can run a partially downloaded exe, in which case Windows will give an incompatability error.  Also, when you first run the program, Windows may tell you the program is dangerous.  Just work your way around these blocks and run it anyway.
 
 ##### Mac OS
 
@@ -50,6 +50,19 @@ If you already have edm-arch installed, you can upgrade it as follows.
 pip install --upgrade edm-arch
 ```
 
+
+#### When it crashes.
+
+For me, this version works without crashing.  But I know that other people using the program in different ways on different computers with different total stations will find bugs that crash the program.  To help me fix these problems, I recommend the following.  
+
+First, send me the output from the program.  If you are running directly from Python, you will get an error messsage that you can capture and send to me.  If you are on Windows and using the EDM.EXE provided here, the error message appears on a screen that instantly closes and is lost.  In those cases there are two methods to get me the error.  One, you can run the program from the command prompt instead of double-clicking it.  To do this, open a command prompt (cmd on Windows computers), navigate to the folder with the program, and run it by typing edm.exe.  Replicate your error and you should see the output there in your command prompt window.  Send this to me.  Two, there may be log files in a folder that looks something like this -  C:\Users\username\.kivy\logs\ where username is the name you use to log into Windows.  Note that the . before kivy may make the folder invisible.  You can get by that by telling Windows Explorer to show hidden files or by typing the path directly into the navigation box.  Have a look at the txt files in the log folder and the latest one should contain information on the program crash.
+
+Second, when you write me, it is usually best to have the CFG and JSON file as well so I can fully replicate the problem.
+
+Third, recently I have found that using your phone to record a video of what you are doing to crash the program saves a lot of time for you trying to explain to me what happened.  This step is optional though.
+
+I am sorry when the program crashes as I want this to be as stable and useful as possible.  And I am very appreciative when you contact me for help.  While you may be worried about bothering me, at the same time, you will be saving others a lot of wasted time trying to solve a problem.
+
 #### What total station should I use?
 
 Currently EDM is tested on Topcon and Leica.  For Topcon, I tested (in January of 2023) a model GM-55/EBL.  Topcon has kept their communication protocols very consistent over the last forty years.  The first version of this program was written for a Topcon GTS-3B, and I didn't change the code at all to work on the brand new GM-55.  My guess is that EDM will work on virtually any basic model of Topcon total station.  For Leica, I have tested an older Builder R200M, an older TCR403, a newer TS13 and a newer TS07.  Over the years, Leica introduced a new communications protocol called GeoCOM.  For a while I think some stations supported both the old protocol and the new GeoCOM.  Now I think they only support GeoCOM.  EDM supports both.
@@ -83,6 +96,17 @@ Short answer, I don't know.  I have simulated having 1000 points in the database
 #### Why can't I plot the points with this program?
 
 I am working on this.  Once this program is working smoothly, I will add plot functionality.
+
+
+##### Changes for Version 1.0.37 (June, 2023)
+1.  Fixed a bug in simulation mode
+2.  Fixed very bad bug with popup window sizing that meant that sometimes prism didn't advance to edit screen
+
+##### Changes for Vesion 1.0.36
+1.  Redid font sizing for buttons and text
+2.  Trapped a bug with units when switching CFGs
+3.  Various bugs having to do with entering/editing data
+4.  Add support for datumx, datumy, datumz (which is now called stationx, stationy, stationz)
 
 ##### Changes for Version 1.0.35 (May 24, 2023)
 1.   Bug in file import fixed

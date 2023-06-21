@@ -1,7 +1,7 @@
 """
 EDM by Shannon McPherron
 
-  This is now beta release.  I am still working on bugs and I am still implementing some features.
+  This is now beta release.  I am still working on bugs but not adding new features.
   It should be backwards compatible with EDM-Mobile and EDMWin (but there are still some issues).
 
 Changes for Version 1.0.30
@@ -1244,10 +1244,10 @@ class ComTestScreen(Screen):
         self.layout.add_widget(self.io)
 
         self.buttons = e5_side_by_side_buttons(text = ['Back', 'Clear', 'Copy'],
-                                                        id = ['back', 'clear', 'copy'],
-                                                        call_back = [self.close, self.clear_io, self.copy_io],
-                                                        selected = [False, False, False],
-                                                        colors = self.colors)
+                                                    id = ['back', 'clear', 'copy'],
+                                                    call_back = [self.close, self.clear_io, self.copy_io],
+                                                    selected = [False, False, False],
+                                                    colors = self.colors)
         self.layout.add_widget(self.buttons)
 
     def clear_io(self, instance):
@@ -1317,7 +1317,7 @@ class RecordDatumsScreen(Screen):
 
     def check_for_duplicate(self, instance):
         if self.data.get_datum(self.datum_name.txt.textbox.text).name is not None:
-            message = '\nOverwrite existing datum %s?' % self.datum_name.txt.textbox.text
+            message = f'\nOverwrite existing datum {self.datum_name.txt.textbox.text}?'
             self.popup = e5_MessageBox('Overwrite?', message,
                                         response_type = "YESNO",
                                         call_back = [self.delete_and_save, self.close_popup],
@@ -1410,9 +1410,8 @@ class VerifyStationScreen(Screen):
 
     def on_enter(self, *args):
         if len(self.data.names('datums')) == 0:
-            self.popup = e5_MessageBox('Datums', '\nBefore you can use this option, you need to define some datums.  '
-                                                    'Go to the menu Edit Datums or to Setup Record Datums to add datums.',
-                                        call_back = self.close_popup)
+            message = '\nBefore you can use this option, you need to define some datums.  Go to the menu Edit Datums or to Setup Record Datums to add datums.'
+            self.popup = e5_MessageBox('Datums', message, call_back=self.close_popup)
             self.popup.open()
         return super().on_enter(*args)
 
@@ -1480,10 +1479,9 @@ class record_button(e5_button):
         angle = self.get_angle()
         if angle is not None:
             if self.station.make in ['Manual XYZ', 'Manual VHD']:
-                self.popup = e5_MessageBox('Set horizonal angle',
-                                            f'\nAim at {self.datum1.datum.name} and set the horizontal angle '
-                                                f'to {self.station.decimal_degrees_to_sexa_pretty(angle)}.',
-                                            call_back = self.now_take_shot, colors = self.colors)
+                message = f'\nAim at {self.datum1.datum.name} and set the horizontal angle to {self.station.decimal_degrees_to_sexa_pretty(angle)}.'
+                self.popup = e5_MessageBox('Set horizonal angle', message,
+                                            call_back=self.now_take_shot, colors=self.colors)
                 self.popup.open()
             elif self.station.make in ['Leica', 'Wild', 'Leica GeoCom', 'Sokkia', 'Topcon']:
                 self.popup = self.get_prism_height()
@@ -1969,16 +1967,16 @@ class InitializeStationScreen(Screen):
         self.setup = value
         self.scroll_content.clear_widgets()
         self.setup_widgets = setups(self.setup_type.text,
-                                                data = self.data,
-                                                ini = self.ini,
-                                                station = self.station,
-                                                colors = self.colors)
+                                        data=self.data,
+                                        ini=self.ini,
+                                        station=self.station,
+                                        colors=self.colors)
         self.scroll_content.add_widget(self.setup_widgets)
         if value not in ['Horizontal Angle Only']:
             if len(self.data.names('datums')) == 0:
-                self.popup = e5_MessageBox('Datums', '\nBefore you can use this option, you need to define some datums.  '
-                                                    'Go to the menu Edit Datums or to Setup Record Datums to add datums.',
-                                            call_back = self.close_popup)
+                message = '\nBefore you can use this option, you need to define some datums.  '
+                message += 'Go to the menu Edit Datums or to Setup Record Datums to add datums.'
+                self.popup = e5_MessageBox('Datums', message, call_back=self.close_popup)
                 self.popup.open()
 
     def go_back(self, instance):
@@ -2062,29 +2060,26 @@ class InitializeStationScreen(Screen):
                 # Based on this, compute the new datum.
                 x = round(-1 * self.setup_widgets.recorder[0].result.xyz.y * sin(d2r(angle_difference)) + self.setup_widgets.datum1.datum.x, 3)
                 y = round(-1 * self.setup_widgets.recorder[0].result.xyz.y * cos(d2r(angle_difference)) + self.setup_widgets.datum1.datum.y, 3)
-                z = round(((self.setup_widgets.datum1.datum.z - self.setup_widgets.recorder[0].result.xyz.z) + (
-                    self.setup_widgets.datum2.datum.z - self.setup_widgets.recorder[1].result.xyz.z)) / 2, 3)
+                z1 = self.setup_widgets.datum1.datum.z - self.setup_widgets.recorder[0].result.xyz.z
+                z2 = self.setup_widgets.datum2.datum.z - self.setup_widgets.recorder[1].result.xyz.z
+                z = round((z1 + z2) / 2, 3)
                 self.new_station = point(x, y, z)
 
                 # Workout what angle needs to be uploaded to the station
                 self.foresight = self.station.angle_between_points(self.new_station, self.setup_widgets.datum2.datum.as_point())
-                txt = f'\nThe measured distance between {self.setup_widgets.datum1.datum.name} and {self.setup_widgets.datum2.datum.name} '\
-                      f'was {round(measured_distance, 3)} m.  The distance based on the datum definitions should be {round(actual_distance, 3)} m.  '\
-                      f'The error is {round(error_distance, 3)} m.\n'
-                txt += '\nIf the setup as measured is accepted, the new station coordinates will be \n'\
-                       f'X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
-                txt += f'\nAn angle of {self.station.decimal_degrees_to_sexa_pretty(self.foresight)} '\
-                        'will be uploaded (do not turn the station until this angle is set).'
+                txt = f'\nThe measured distance between {self.setup_widgets.datum1.datum.name} and {self.setup_widgets.datum2.datum.name} '
+                txt += f'was {round(measured_distance, 3)} m.  The distance based on the datum definitions should be {round(actual_distance, 3)} m.  '
+                txt += f'The error is {round(error_distance, 3)} m.\n'
+                txt += '\nIf the setup as measured is accepted, the new station coordinates will be \n'
+                txt += f'X : {self.new_station.x}\nY : {self.new_station.y}\nZ : {self.new_station.z}\n'
+                txt += f'\nAn angle of {self.station.decimal_degrees_to_sexa_pretty(self.foresight)} '
+                txt += 'will be uploaded (do not turn the station until this angle is set).'
                 self.foresight = self.station.decimal_degrees_to_dddmmss(self.foresight)
 
         elif self.setup_type.text == 'Three datum shift':
-            if self.setup_widgets.datum1.datum.is_none() or \
-                self.setup_widgets.datum2.datum.is_none() or \
-                    self.setup_widgets.datum3.datum.is_none():
+            if any([widget.is_none() for widget in [self.setup_widgets.datum1.datum, self.setup_widgets.datum2.datum, self.setup_widgets.datum3.datum]]):
                 error_message = '\nSelect three datums to record.'
-            elif self.setup_widgets.recorder[0].result.xyz is None or \
-                    self.setup_widgets.recorder[1].result.xyz is None or \
-                        self.setup_widgets.recorder[2].result.xyz is None:
+            elif any([xyz.is_none() for xyz in [self.setup_widgets.recorder[n].result.xyz for n in range(3)]]):
                 error_message = '\nRecord each datum.'
             else:
                 dist_12_measured = self.station.distance(self.setup_widgets.recorder[0].result.xyz, self.setup_widgets.recorder[1].result.xyz)
@@ -2349,7 +2344,6 @@ class StationConfigurationScreen(Screen):
 
         self.communications = station_setting(label_text = 'Communications',
                                                 spinner_values = ("Serial", "Bluetooth"),
-                                                # call_back = self.update_ini,
                                                 id = 'communications',
                                                 colors = self.colors,
                                                 default = self.ini.get_value(APP_NAME, 'COMMUNICATIONS'))
@@ -2357,7 +2351,6 @@ class StationConfigurationScreen(Screen):
 
         self.comports = station_setting(label_text = 'Port Number',
                                             spinner_values = [f'COM{n + 1}' for n in range(20)],
-                                            # call_back = self.update_ini,
                                             id = 'comport',
                                             colors = self.colors, station = self.station,
                                             default = self.ini.get_value(APP_NAME, 'COMPORT'))
@@ -2365,7 +2358,6 @@ class StationConfigurationScreen(Screen):
 
         self.baud_rate = station_setting(label_text = 'Baud rate',
                                             spinner_values = ("1200", "2400", "4800", "9600", "14400", "19200", "115200"),
-                                            # call_back = self.update_ini,
                                             id = 'baudrate',
                                             colors = self.colors,
                                             default = self.ini.get_value(APP_NAME, 'BAUDRATE'))
@@ -2373,7 +2365,6 @@ class StationConfigurationScreen(Screen):
 
         self.parity = station_setting(label_text = 'Parity',
                                             spinner_values = ("Even", "Odd", "None"),
-                                            # call_back = self.update_ini,
                                             id = 'parity',
                                             colors = self.colors,
                                             default = self.ini.get_value(APP_NAME, 'PARITY'))
@@ -2381,7 +2372,6 @@ class StationConfigurationScreen(Screen):
 
         self.data_bits = station_setting(label_text = 'Databits',
                                             spinner_values = ("7", "8"),
-                                            # call_back = self.update_ini,
                                             id = 'databits',
                                             colors = self.colors,
                                             default = self.ini.get_value(APP_NAME, 'DATABITS'))
@@ -2389,7 +2379,6 @@ class StationConfigurationScreen(Screen):
 
         self.stop_bits = station_setting(label_text = 'Stopbits',
                                             spinner_values = ("0", "1", "2"),
-                                            # call_back = self.update_ini,
                                             id = 'stopbits',
                                             colors = self.colors,
                                             default = self.ini.get_value(APP_NAME, 'STOPBITS'))
@@ -2437,11 +2426,11 @@ class StationConfigurationScreen(Screen):
 
         self.ini.save()
         success = self.station.open()
-        if success != '':
+        if success == '':
+            self.close_screen(None)
+        else:
             self.popup = e5_MessageBox('Error', success)
             self.popup.open()
-        else:
-            self.close_screen(None)
 
     def close_screen(self, value):
         self.parent.current = self.call_back
