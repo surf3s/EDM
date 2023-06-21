@@ -1,6 +1,5 @@
 from tinydb import TinyDB, Query, where
 import re
-from typing import Dict
 from math import sqrt
 import logging
 

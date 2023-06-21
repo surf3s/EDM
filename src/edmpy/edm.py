@@ -1155,7 +1155,7 @@ class OptionsScreen(Screen):
         prism.height = 100
         self.layout.add_widget(prism)
 
-        self.back_button = e5_button('Back', selected = True, 
+        self.back_button = e5_button('Back', selected = True,
                                              call_back = self.go_back,
                                              colors = self.colors)
         self.layout.add_widget(self.back_button)
@@ -1201,7 +1201,7 @@ class ComTestScreen(Screen):
         if self.station.data_waiting():
             self.station.receive()
         if self.station.io != '' and self.station.io != self.io.scrolling_label.text:
-            '''This is a hack to work around an issue I had when changing the content of 
+            '''This is a hack to work around an issue I had when changing the content of
             a scrollbox label.  It wouldn't let me go beyond the size of the original content.
             So now I remove it and  rebuild it.
             '''
@@ -1510,7 +1510,7 @@ class record_button(e5_button):
                                             button_text = ['Cancel', 'Next'],
                                             call_back = self.microscribe,
                                             colors = self.colors)
-            self.popup.open()   
+            self.popup.open()
         elif self.station.make in ['Manual XYZ', 'Manual VHD']:
             self.popup = edm_manual(type = self.station.make, call_back = self.have_shot_manual, colors = self.colors)
             self.popup.open()

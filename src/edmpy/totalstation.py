@@ -344,7 +344,7 @@ class totalstation(object):
         self.make_global()
         self.vhd_from_xyz()
         return False
-    
+
     def take_shot(self):
 
         error = False
@@ -371,7 +371,7 @@ class totalstation(object):
             pass
 
         return error
-    
+
     def fetch_point(self):
         if self.make in ['WILD', 'Leica']:
             self.fetch_point_leica()
@@ -753,12 +753,9 @@ class totalstation(object):
             # by computing the surface normal of each and rotating on the first already rotated side
             local_datums_normal = self.normalize_vector(self.cross_product(self.normalize_vector(rotated_local[1]),
                                                         self.normalize_vector(rotated_local[2])))
-            global_datums_normal = self.normalize_vector(
-                                        self.cross_product(
-                                            self.normalize_vector(
-                                                self.vector_subtract(self.rotate_global[1], self.rotate_global[0])),
-                                            self.normalize_vector(
-                                                self.vector_subtract(self.rotate_global[2], self.rotate_global[0]))))
+            nv1 = self.normalize_vector(self.vector_subtract(self.rotate_global[1], self.rotate_global[0]))
+            nv2 = self.normalize_vector(self.vector_subtract(self.rotate_global[2], self.rotate_global[0]))
+            global_datums_normal = self.normalize_vector(self.cross_product(nv1, nv2))
             p_out2 = self.rotate_point_2d(global_datums_normal, local_datums_normal, p_out)
 
             # Finish the rotation for the local datums as well (not strictly needed for points 2 and 3)

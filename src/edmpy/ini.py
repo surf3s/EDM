@@ -58,5 +58,5 @@ class INI(blockdata):
         self.write_blocks()
 
     def status(self):
-        txt = f'\nThe INI file is {self.filename}.\n' 
+        txt = f'\nThe INI file is {self.filename}.\n'
         return txt

@@ -1,4 +1,3 @@
-from typing import List
 from tinydb import where
 import logging
 import os
@@ -320,8 +319,9 @@ class CFG(blockdata):
         table_name = self.get_value('EDM', 'TABLE')
         if table_name:
             if any((c in set(bad_characters)) for c in table_name):
-                self.errors.append(f"The table name {table_name} has non-standard characters in it that cause a problem in JSON files.  "\
-                                    "Do not use any of these '{bad_characters}' characters.  Change the name before collecting data.")
+                message = f"The table name {table_name} has non-standard characters in it that cause a problem in JSON files.  "
+                message += f"Do not use any of these '{bad_characters}' characters.  Change the name before collecting data."
+                self.errors.append(message)
                 self.has_errors = True
 
         unique_together = self.get_value('EDM', 'UNIQUE_TOGETHER')
@@ -405,10 +405,11 @@ class CFG(blockdata):
                     break
 
         if self.unique_together == []:
-            self.errors.append('Every CFG file should contain at least one field or a set of fields that together are unique.  '\
-                                'Normally, this will be something like Unit, ID and Suffix together.  '\
-                                'Set this value by either setting one field to UNIQUE=TRUE or by adding a UNIQUE_TOGETHER line in '\
-                                'the EDM block of the CFG file (e.g. something like UNIQUE_TOGETHER=UNIT,ID,SUFFIX).')
+            message = 'Every CFG file should contain at least one field or a set of fields that together are unique.  '
+            message += 'Normally, this will be something like Unit, ID and Suffix together.  '
+            message += 'Set this value by either setting one field to UNIQUE=TRUE or by adding a UNIQUE_TOGETHER line in '
+            message += 'the EDM block of the CFG file (e.g. something like UNIQUE_TOGETHER=UNIT,ID,SUFFIX).'
+            self.errors.append(message)
             self.has_errors = True
 
         return (self.has_errors, self.errors)

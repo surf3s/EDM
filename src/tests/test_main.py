@@ -4,15 +4,11 @@ from edmpy.geo import point
 from edmpy.geo import datum
 from edmpy.geo import prism
 from edmpy.geo import unit
-from edmpy.cfg import CFG
-
 from edmpy.edm import MainScreen, EditLastRecordScreen
 
 import unittest
 
 import os
-
-from kivy.uix.popup import Popup
 
 
 class Test_TotalStation(unittest.TestCase):
@@ -192,12 +188,12 @@ class Test_FileMenu(unittest.TestCase):
     def tearDown(self) -> None:
         return
         self.mainscreen.data.db.close()
-        if path.exists('EDM.ini'):
-            remove('EDM.ini')
-        if path.exists('Import_from_EDM-Mobile/examples/BachoKiro.json'):
-            remove('Import_from_EDM-Mobile/examples/BachoKiro.json')
-        if path.exists('Import_from_EDM-Mobile/examples/ranis_2021.json'):
-            remove('Import_from_EDM-Mobile/examples/ranis_2021.json')
+        if os.path.exists('EDM.ini'):
+            os.remove('EDM.ini')
+        if os.path.exists('Import_from_EDM-Mobile/examples/BachoKiro.json'):
+            os.remove('Import_from_EDM-Mobile/examples/BachoKiro.json')
+        if os.path.exists('Import_from_EDM-Mobile/examples/ranis_2021.json'):
+            os.remove('Import_from_EDM-Mobile/examples/ranis_2021.json')
 
 
 if __name__ == '__main__':
