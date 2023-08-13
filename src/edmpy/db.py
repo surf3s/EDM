@@ -12,9 +12,11 @@ class DB(dbs):
     db = None
     filename = None
     db_name = 'points'
-    new_data = {}  # type: Dict[str, bool]
+    new_data = {}
 
     def open(self, filename):
+        if self.db is not None:
+            self.db.close()
         try:
             if self.valid_format(filename):
                 self.db = TinyDB(filename, sort_keys = True, indent = 4, separators = (',', ': '))

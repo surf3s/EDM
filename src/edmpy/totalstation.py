@@ -104,6 +104,11 @@ class totalstation(object):
             if point1 is not None and point2 is not None and point3 is not None:
                 self.rotate_global = [point1.as_point(), point2.as_point(), point3.as_point()]
 
+        if ini.get_value('SETUPS', 'STATIONX'):
+            self.location.x = float(ini.get_value('SETUPS', 'STATIONX'))
+            self.location.y = float(ini.get_value('SETUPS', 'STATIONY'))
+            self.location.z = float(ini.get_value('SETUPS', 'STATIONZ'))
+
     def status(self):
         txt = '\nTotal Station:\n'
         txt += f'  Make is {self.make}\n'

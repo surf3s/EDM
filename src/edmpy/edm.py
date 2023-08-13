@@ -72,6 +72,9 @@ Changes for Version 1.0.37
   Fixed a bug in simulation mode
   Fixed very bad bug with popup window sizing that meant that sometimes prism didn't advance to edit screen
 
+Changes for Version 1.0.38
+  Recall last setup coordinates and resume with these (are stored in edm.ini now)
+
 Bugs/To Do
   need to move load_dialog out of kv and into code and error trap bad paths
   could make menus work better with keyboard (at least with tab)
@@ -167,8 +170,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.37'
-PRODUCTION_DATE = 'June, 2023'
+VERSION = '1.0.38'
+PRODUCTION_DATE = 'August, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -334,10 +337,13 @@ class MainScreen(e5_MainScreen):
                                         station = self.station,
                                         cfg = self.cfg))
 
-    def reset_screens(self):
+    def delete_screens(self):
         for screen in sm.screens[:]:
             if screen.name != 'MainScreen':
                 sm.remove_widget(screen)
+
+    def reset_screens(self):
+        self.delete_screens()
         self.add_screens()
 
     def build_mainscreen(self):
@@ -2169,6 +2175,9 @@ class InitializeStationScreen(Screen):
         if self.new_station.is_none() is False:
             self.station.location = self.new_station
             logger.info('Station location set to ' + str(self.station.location))
+            self.ini.update_value('SETUPS', 'STATIONX', self.station.location.x)
+            self.ini.update_value('SETUPS', 'STATIONY', self.station.location.y)
+            self.ini.update_value('SETUPS', 'STATIONZ', self.station.location.z)
         self.ini.update_value('SETUPS', 'LASTSETUP_TYPE', self.setup_type.text)
         self.ini.save()
         self.parent.current = 'MainScreen'

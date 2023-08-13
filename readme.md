@@ -98,6 +98,9 @@ Short answer, I don't know.  I have simulated having 1000 points in the database
 I am working on this.  Once this program is working smoothly, I will add plot functionality.
 
 
+##### Changes for Version 1.0.38 (August, 2023)
+1.  On startup program resumes with last setup coordinates for XYZ
+
 ##### Changes for Version 1.0.37 (June, 2023)
 1.  Fixed a bug in simulation mode
 2.  Fixed very bad bug with popup window sizing that meant that sometimes prism didn't advance to edit screen

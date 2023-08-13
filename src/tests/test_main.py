@@ -5,10 +5,13 @@ from edmpy.geo import datum
 from edmpy.geo import prism
 from edmpy.geo import unit
 from edmpy.edm import MainScreen, EditLastRecordScreen
+from kivy.uix.popup import Popup
+from kivy.uix.screenmanager import ScreenManager
 
 import unittest
-
 import os
+
+sm = ScreenManager()
 
 
 class Test_TotalStation(unittest.TestCase):
@@ -40,25 +43,10 @@ class Test_DataClasses(unittest.TestCase):
 
 
 class Test_FileMenu(unittest.TestCase):
-    def setUp(self):
-        if os.path.exists('Import_from_EDM-Mobile/examples/BachoKiro.json'):
-            os.remove('Import_from_EDM-Mobile/examples/BachoKiro.json')
-        if os.path.exists('Import_from_EDM-Mobile/examples/ranis_2021.json'):
-            os.remove('Import_from_EDM-Mobile/examples/ranis_2021.json')
-        self.mainscreen = MainScreen()
-
-        return
-        # self.mainscreen = MainScreen(user_data_dir = '')
-
-    def test_imports(self):
-
-        # Try read in every CFG in the CFG folder one after the other (maybe randomize the order)
-        # Try to export CSV for each CFG
-        # Try to write a GeoJSON for each CFG
-        # Try to create a default CFG
-
+    def test_open_cfg_and_export(self):
         path = 'CFGs/'
         cfg_files = []
+        self.mainscreen = MainScreen()
 
         # Get test CFGs
         for filename in os.listdir(path):
@@ -66,25 +54,34 @@ class Test_FileMenu(unittest.TestCase):
                 cfg_files.append(os.path.join(path, filename))
 
         # Try to open each one
-        # for cfg_file in cfg_files:
-        #     has_errors, errors = self.mainscreen.cfg.load(os.path.join(path, filename[0]))
-        #     self.assertEqual(has_errors, False)
-        #     self.assertEqual(errors, [])
-        #     self.mainscreen.open_db()
-        #     for data_type in ['points', 'datums', 'prisms', 'units']:
-        #         self.mainscreen.csv_data_type = data_type
-        #         self.mainscreen.do_save_csv('test.csv')
-        #     self.popup = Popup()
-        #     self.popup.status = ''
-        #     self.mainscreen.cfg.write_geojson('test.geojson', self.mainscreen.data.db.table(self.mainscreen.data.table), self.popup)
+        for cfg_file in cfg_files:
+            has_errors, errors = self.mainscreen.cfg.load(os.path.join(path, filename[0]))
+            self.assertEqual(has_errors, False)
+            self.assertEqual(errors, [])
+            self.mainscreen.open_db()
+            for data_type in ['points', 'datums', 'prisms', 'units']:
+                self.mainscreen.csv_data_type = data_type
+                self.mainscreen.do_save_csv('test.csv')
+            self.popup = Popup()
+            self.popup.status = ''
+            self.mainscreen.cfg.write_geojson('test.geojson', self.mainscreen.data.db.table(self.mainscreen.data.table), self.popup)
 
+    def test_default_cfg(self):
         # Need to make a default CFG
         # Switch to simulation mode
         # Insert some data
+        path = 'CFGs/'
+        self.mainscreen = MainScreen()
         self.mainscreen.do_default_cfg(path, 'test.cfg')
         self.mainscreen.station = totalstation('SIMULATE')
 
+    def test_edit_record(self):
+
         # Test the edit last record screen
+        path = 'CFGs/'
+        self.mainscreen = MainScreen()
+        self.mainscreen.do_default_cfg(path, 'test.cfg')
+        self.mainscreen.station = totalstation('SIMULATE')
         self.editrecord = EditLastRecordScreen(name = 'EditLastRecordScreen',
                                                 colors = self.mainscreen.colors,
                                                 data = self.mainscreen.data,
@@ -100,7 +97,14 @@ class Test_FileMenu(unittest.TestCase):
         self.editrecord.reset_doc_ids()
         self.editrecord.save_record(None)
 
-        return
+    def test_imports(self):
+
+        if os.path.exists('Import_from_EDM-Mobile/examples/BachoKiro.json'):
+            os.remove('Import_from_EDM-Mobile/examples/BachoKiro.json')
+        if os.path.exists('Import_from_EDM-Mobile/examples/ranis_2021.json'):
+            os.remove('Import_from_EDM-Mobile/examples/ranis_2021.json')
+        self.mainscreen = MainScreen()
+
         for data_set in ['BK', 'RANIS']:
             if data_set == 'BK':
                 self.mainscreen.load_cfg('Import_from_EDM-Mobile/examples/', ['BachoKiro.CFG'])
@@ -124,11 +128,11 @@ class Test_FileMenu(unittest.TestCase):
             self.mainscreen.csv_data_type = 'Prisms'
             self.assertEqual(self.mainscreen.load_csv('Import_from_EDM-Mobile/examples/', [f'{prefix}_prisms.txt']), '')
             self.assertEqual(len(self.mainscreen.data.db.table('prisms')), table_lengths['prisms'])
-            self.assertEqual(self.mainscreen.data.fields('prisms'), ['NAME', 'HEIGHT', 'OFFSET'])
+            self.assertEqual(self.mainscreen.data.fields('prisms'), ['HEIGHT', 'NAME', 'OFFSET'])
 
             # Do it twice to make sure duplicates are not created
             self.assertEqual(len(self.mainscreen.data.db.table('prisms')), table_lengths['prisms'])
-            self.assertEqual(self.mainscreen.data.fields('prisms'), ['NAME', 'HEIGHT', 'OFFSET'])
+            self.assertEqual(self.mainscreen.data.fields('prisms'), ['HEIGHT', 'NAME', 'OFFSET'])
 
             self.mainscreen.csv_data_type = 'Units'
             self.assertEqual(self.mainscreen.load_csv('Import_from_EDM-Mobile/examples/', [f'{prefix}_units.txt']), '')
@@ -179,21 +183,18 @@ class Test_FileMenu(unittest.TestCase):
             self.mainscreen.data.delete_all()
             self.assertEqual(len(self.mainscreen.data.db.table('_default')), 0)
 
-            self.mainscreen.data.db.close()
+            self.mainscreen.data.close()
 
-        # need a test of export of csvs
-        # need to test the LF data
-        # need to test the ranis data
-
-    def tearDown(self) -> None:
-        return
-        self.mainscreen.data.db.close()
         if os.path.exists('EDM.ini'):
             os.remove('EDM.ini')
         if os.path.exists('Import_from_EDM-Mobile/examples/BachoKiro.json'):
             os.remove('Import_from_EDM-Mobile/examples/BachoKiro.json')
         if os.path.exists('Import_from_EDM-Mobile/examples/ranis_2021.json'):
             os.remove('Import_from_EDM-Mobile/examples/ranis_2021.json')
+
+    def tearDown(self) -> None:
+        for screen in sm.screens[:]:
+            sm.remove_widget(screen)
 
 
 if __name__ == '__main__':
