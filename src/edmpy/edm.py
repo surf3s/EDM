@@ -174,7 +174,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.38'
+VERSION = '1.0.39'
 PRODUCTION_DATE = 'August, 2023'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
