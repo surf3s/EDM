@@ -20,6 +20,7 @@ from kivy.uix.behaviors.focus import FocusBehavior
 from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.progressbar import ProgressBar
 from kivy.core.text import Text
+from kivy.uix.bubble import Bubble, BubbleButton
 
 from decimal import DivisionByZero
 
@@ -32,6 +33,8 @@ import re
 import requests
 import json
 import urllib
+import random
+import string
 from threading import Thread
 from appdata import AppDataPaths
 
@@ -1285,6 +1288,29 @@ class e5_SaveDialog(BoxLayout):
         self.popup.dismiss()
 
 
+class inputBubbleButtons(BubbleButton):
+        def __init__(self, **kwargs):
+                super(inputBubbleButtons, self).__init__(**kwargs)
+  
+
+class id_bubble(Bubble):
+    def __init__(self, **kwargs):
+        super(id_bubble, self).__init__(**kwargs)
+        self.add_widget(self.id_button())
+
+    def hash(self, hashlen = 5):
+        hash = ""
+        for a in range(0, hashlen):
+            hash += random.choice(string.ascii_uppercase)
+        return hash
+
+    def id_button(self):
+        id = self.hash()
+        btn = inputBubbleButtons(text=str(id))
+        # btn.bind(on_press=partial(self.add_text, str(x)))
+        return btn
+
+
 class e5_RecordEditScreen(Screen):
 
     can_update_data_table = False
@@ -1667,6 +1693,33 @@ class e5_RecordEditScreen(Screen):
                             save_errors.append(f'The field {field_name} contains characters that are not recommended in a data file.  These include \" and \\.')
         return save_errors
 
+    def same_coordinates(self, record1, record2):
+        if all([field in record1 and field in record2 for field in ['X', 'Y', 'Z']]):
+            return record1['X'] == record2['X'] and record1['Y'] == record2['Y'] and record1['Z'] == record2['Z']
+        else:
+            return False
+
+    def check_for_duplicate_xyz(self):
+        if self.data.db is not None:
+            if len(self.data.db.table(self.data.table)) > 1:
+                doc_ids = self.data.get_doc_ids(self.data.table)
+                last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-1])
+                next_to_last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-2])
+                if all(field in last_record.keys() for field in ['X', 'Y', 'Z']):
+                    dup = self.same_coordinates(last_record, next_to_last_record)
+                    if dup:
+                        message = f"\nThe last two recorded points (doc_id={doc_ids[-1]} and doc_id={doc_ids[-2]}) have the exact same XYZ coordinates "
+                        message += f"of ({last_record['X']}, {last_record['Y']}, {last_record['Z']}) "
+                        message += f"and ({next_to_last_record['X']}, {next_to_last_record['Y']}, {next_to_last_record['Z']}).  "
+                        message += "This can mean that the data are not coming across from the total station correctly (or at all).  "
+                        message += "The point has been saved, but if this was not intended you need to examine the last points recorded "
+                        message += "and take a Measure shot to verify that the shots are being correctly transmitted.\n\n"
+                        message += "If you are using a Microscribe, check that the green light is on.  "
+                        message += "If the red light is on, you need to re-initialize (Setup - Initialize Station) and "
+                        message += "re-shoot the last two points."
+                        self.popup = e5_MessageBox(title = 'Warning', message=message)
+                        self.popup.open()
+
     def no_errors_before_save(self):
         save_errors = self.check_required_fields()
         save_errors += self.check_unique_together()
@@ -1693,6 +1746,7 @@ class e5_RecordEditScreen(Screen):
         if self.no_errors_before_save():
             self.update_db()
             self.update_link_fields()
+            self.check_for_duplicate_xyz()
             self.go_mainscreen()
 
     def close_popup(self, instance):
@@ -1744,6 +1798,10 @@ class e5_RecordEditScreen(Screen):
                     self.popup_scrollmenu = self.get_widget_by_id(self.popup, 'menu_scroll')
                     self.popup_textbox = self.get_widget_by_id(self.popup, 'new_item')
                     self.popup_addbutton = self.get_widget_by_id(self.popup, 'add_button')
+                elif cfg_field.name == 'ID':
+                    pass
+                    # self.bubblein = id_bubble()
+                    # instance.add_widget(self.bubblein)
         elif not instance.focus and not self.loading:
             self.refresh_linked_fields(instance.id, instance.text)
 
