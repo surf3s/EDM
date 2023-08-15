@@ -75,6 +75,10 @@ Changes for Version 1.0.37
 Changes for Version 1.0.38
   Recall last setup coordinates and resume with these (are stored in edm.ini now)
 
+Changes for Version 1.0.39
+  Fixed issue with Alpha default buttons not working
+  Changed way checking if last two points are the same works
+
 Bugs/To Do
   need to move load_dialog out of kv and into code and error trap bad paths
   could make menus work better with keyboard (at least with tab)
@@ -648,7 +652,7 @@ class MainScreen(e5_MainScreen):
         self.log_the_shot()
         self.update_info_label()
         self.make_backup()
-        self.check_for_duplicate_xyz()
+        # self.check_for_duplicate_xyz()
         return []
 
     def log_the_shot(self):
@@ -673,29 +677,6 @@ class MainScreen(e5_MainScreen):
         self.info.text = last_squid if last_squid else 'EDM'
         if self.station.make in ['Simulate']:
             self.info.text += " - SIMULATION mode on"
-
-    def same_coordinates(self, record1, record2):
-        if all([field in record1 and field in record2 for field in ['X', 'Y', 'Z']]):
-            return record1['X'] == record2['X'] and record1['Y'] == record2['Y'] and record1['Z'] == record2['Z']
-        else:
-            return False
-
-    def check_for_duplicate_xyz(self):
-        if self.data.db is not None:
-            if len(self.data.db.table(self.data.table)) > 1:
-                doc_ids = self.data.get_doc_ids(self.data.table)
-                last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-1])
-                next_to_last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-2])
-                if all(field in last_record.keys() for field in ['X', 'Y', 'Z']):
-                    if self.same_coordinates(last_record, next_to_last_record):
-                        message = "\nThe last two recorded points have the exact same XYZ coordinates "
-                        message += f"({last_record['X']}, {last_record['Y']}, {last_record['Z']}).  "
-                        if self.station.make == 'Microscribe':
-                            message += "Verify that the Microscribe is still properly recording points (green light is on).  "
-                            message += "If the red light is on, you need to re-initialize (Setup - Initialize Station) and "
-                            message += "re-shoot the last two points."
-                        self.popup = e5_MessageBox(title = 'Warning', message=message)
-                        self.popup.open()
 
     def close_popup(self, instance):
         self.popup.dismiss()
@@ -1000,10 +981,10 @@ class MainScreen(e5_MainScreen):
         new_record = {}
         new_record = self.fill_default_fields(new_record)
         if self.station.shot_type != 'continue':
-            new_record = self.fill_button_defaults(new_record)
             new_record = self.find_unit_and_fill_fields(new_record)
             new_record = self.fill_carry_fields(new_record)
             new_record = self.fill_link_fields(new_record)
+            new_record = self.fill_button_defaults(new_record)
             new_record = self.do_increments(new_record)
             new_record['SUFFIX'] = 0
         else:
