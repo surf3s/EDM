@@ -576,7 +576,7 @@ class MainScreen(e5_MainScreen):
             if self.data.db is not None:
                 self.data.db.table(self.data.table).on_save = self.on_save
                 self.data.db.table(self.data.table).on_cancel = self.on_cancel
-            self.parent.current = 'EditPointScreen'
+            self.parent.current = 'EditPointScreen'  # Had a crash here with a none type message - need to replicate
             if self.station.make not in ['Manual XYZ', 'Manual VHD', 'Simulate', '']:
                 self.event = Clock.schedule_interval(self.check_for_station_response_edit_record, .1)
 
