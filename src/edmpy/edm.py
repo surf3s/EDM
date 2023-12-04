@@ -115,6 +115,7 @@ from kivy.uix.switch import Switch
 from kivy import __version__ as __kivy_version__
 
 import os
+import sys
 from datetime import datetime
 import csv
 from math import cos
@@ -124,20 +125,21 @@ import logging
 from appdata import AppDataPaths
 
 # My libraries for this project
-from edmpy.lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
-from edmpy.lib.e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
-from edmpy.lib.e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
-from edmpy.lib.e5_widgets import e5_JSONScreen, DataGridLabelAndField
-from edmpy.lib.colorscheme import ColorScheme
-from edmpy.lib.misc import restore_window_size_position, filename_only, platform_name
+sys.path.append(os.path.join(sys.path[0], 'lib'))
+from e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
+from e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
+from e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
+from e5_widgets import e5_JSONScreen, DataGridLabelAndField
+from colorscheme import ColorScheme
+from misc import restore_window_size_position, filename_only, platform_name
 
-from edmpy.geo import point, prism
-from edmpy.db import DB
-from edmpy.ini import INI
-from edmpy.cfg import CFG
-from edmpy.totalstation import totalstation
-from edmpy.constants import APP_NAME
-from edmpy.lib.constants import __SPLASH_HELP__
+from geo import point, prism
+from db import DB
+from ini import INI
+from cfg import CFG
+from totalstation import totalstation
+from constants import APP_NAME
+from constants import __SPLASH_HELP__
 
 # The database - pure Python
 from tinydb import TinyDB
@@ -593,6 +595,8 @@ class MainScreen(e5_MainScreen):
                 self.station.fetch_point()
             elif self.station.make in ['Leica GeoCom']:
                 self.station.fetch_point_leica_geocom()
+            elif self.station.make in ['GeoMax']:
+                self.station.fetch_point_geomax()
             elif self.station.make in ['Topcon']:
                 self.station.fetch_point_topcon()
             if self.station.response:
@@ -608,6 +612,8 @@ class MainScreen(e5_MainScreen):
                 self.station.fetch_point()
             elif self.station.make in ['Leica GeoCom']:
                 self.station.fetch_point_leica_geocom()
+            elif self.station.make in ['GeoMax']:
+                self.station.fetch_point_geomax()
             elif self.station.make in ['Topcon']:
                 self.station.fetch_point_topcon()
             if self.station.response:
@@ -1470,7 +1476,7 @@ class record_button(e5_button):
                 self.popup = e5_MessageBox('Set horizonal angle', message,
                                             call_back=self.now_take_shot, colors=self.colors)
                 self.popup.open()
-            elif self.station.make in ['Leica', 'Wild', 'Leica GeoCom', 'Sokkia', 'Topcon']:
+            elif self.station.make in ['Leica', 'Wild', 'Leica GeoCom', 'Sokkia', 'Topcon', 'GeoMax']:
                 self.popup = self.get_prism_height()
                 self.popup.open()
                 self.station.set_horizontal_angle(self.station.decimal_degrees_to_dddmmss(angle))
@@ -1590,6 +1596,8 @@ class record_button(e5_button):
                 self.station.fetch_point()
             elif self.station.make in ['Leica GeoCom']:
                 self.station.fetch_point_leica_geocom()
+            elif self.station.make in ['GeoMax']:
+                self.station.fetch_point_geomax()  
             elif self.station.make in ['Topcon']:
                 self.station.fetch_point_topcon()
             if self.station.response or self.station.make in ['Manual XYZ', 'Manual VHD']:
@@ -2324,7 +2332,7 @@ class StationConfigurationScreen(Screen):
 
     def build_screen(self):
         self.station_type = station_setting(label_text = 'Station type',
-                                            spinner_values = ("Leica", "Leica GeoCom", "Wild", "Topcon", "Sokkia", "Microscribe",
+                                            spinner_values = ("Leica", "Leica GeoCom", "GeoMax", "Wild", "Topcon", "Sokkia", "Microscribe",
                                                                 "Manual XYZ", "Manual VHD", "Simulate"),
                                             call_back = self.toggle_buttons,
                                             id = 'station_type',

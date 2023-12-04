@@ -1,8 +1,8 @@
 from kivy.properties import ObjectProperty
 import serial
 import os
-from edmpy.geo import point, prism
-from edmpy.constants import APP_NAME
+from geo import point, prism
+from constants import APP_NAME
 from math import sqrt
 from math import pi
 from math import cos
@@ -276,6 +276,22 @@ class totalstation(object):
             return f'{sexa[1]}.{sexa[2]:02d}{int(sexa[3]):02d}'
         else:
             return ''
+        
+    def gon_to_decimal_degrees(self, angle):
+        if angle is not None:
+            return str(float(angle)*180/200)
+        else: 
+            return ''
+        
+    def decimal_degrees_to_gon(self, angle):
+        if angle is not None:
+            return str(float(angle)*200/180)
+        else: 
+            return ''
+        
+    def dddmmss_to_gon(self, dddmmss_angle):
+        angle, minutes, seconds = self.parse_dddmmss_angle(dddmmss_angle)
+        return (angle + minutes / 60.0 + seconds / 3600.0) *200 / 180
 
     def dddmmss_to_decimal_degrees(self, dddmmss_angle):
         angle, minutes, seconds = self.parse_dddmmss_angle(dddmmss_angle)
@@ -316,6 +332,9 @@ class totalstation(object):
         if self.is_numeric(angle):
             if self.make == 'Topcon':
                 self.set_horizontal_angle_topcon(angle)
+                time.sleep(1.5)
+            elif self.make == 'GeoMax':
+                self.set_horizontal_angle_geomax(angle)
                 time.sleep(1.5)
             elif self.make in ['WILD', 'Leica']:
                 self.set_horizontal_angle_leica(angle)
@@ -365,6 +384,9 @@ class totalstation(object):
 
         elif self.make == "Leica GeoCom":
             error = self.launch_point_leica_geocom()
+            
+        elif self.make == "GeoMax":
+            self.launch_point_geomax()
 
         elif self.make == "SOKKIA":
             self.launch_point_sokkia()
@@ -562,7 +584,6 @@ class totalstation(object):
             # angle_decdeg = self.dms_to_decdeg(self.vangle)
             z = self.sloped * cos(self.decdeg_to_radians(self.vangle))
             actual_distance = sqrt(self.sloped**2 - z**2)
-
             # angle_decdeg = self.dms_to_decdeg(self.hangle)
             angle_decdeg = 450 - self.hangle
             x = cos(self.decdeg_to_radians(angle_decdeg)) * actual_distance
@@ -1003,7 +1024,65 @@ class totalstation(object):
         self.send("SET/149/2")
         acknow2 = self.receive()
         return acknow1 + acknow2
-
+    
+    """
+    GeoMax specific functions
+    """
+    def launch_point_geomax(self):
+        self.send(b"meas/all\r\n")
+      
+    def pad_dms_geomax(self, angle):
+        degrees = ('000' + angle.split('.')[0])[-3:]
+        minutes_seconds = (angle.split('.')[1] + '0000')[0:4]
+        return degrees + minutes_seconds
+    
+    def set_horizontal_angle_geomax(self, angle):
+         # function expects angle as ddd.mmss input
+         # but decimal seconds are possible
+         # to do angel must be ddd.dddd
+        if angle.count('.') == 0:
+            angle = angle + '.0000'
+        elif angle.count('.') == 2:
+            dms = angle.split('.')
+            ms = '0000' + str(round(float(dms[1] + '.' + dms[2])))
+            ms = ms[-4:]
+            angle = str(dms[0] + '.' + ms)
+        set_angle_command = "SET/hz_angle/{:10.8f}\r\n".format(self.decdeg_to_radians(self.dms_to_decdeg(angle)))
+        self.send(set_angle_command.encode())
+        return self.receive()
+    
+    def fetch_point_geomax(self):
+        if self.data_waiting():
+            self.receive()
+            self.set_response_geomax()
+            if self.response:
+                     self.parce_geomax()
+                     self.vhd_to_xyz()
+    
+    def parce_geomax(self):
+        if self.response:
+            if self.response.count(',') == 3:
+                return False
+        self.sloped, self.hangle, self.vangle  = self.response.split(',')
+        self.hangle = float(self.gon_to_decimal_degrees(self.hangle))
+        self.vangle = float(self.gon_to_decimal_degrees(self.vangle))
+        self.sloped = float(self.sloped)
+        self.prism_constant = None  
+        
+    def initialize_geomax(self):
+        self.send("SET/distance_unit/0"+"\r\n") # meters
+        acknow1 = self.receive()
+        self.send("SET/angle_unit/1"+"\r\n") # degrees ddd.ddddddd
+        acknow2 = self.receive()
+        return acknow1 + acknow2
+    
+    def geomax_trim_crlf(self, value):
+        return value.replace('\r', '').replace('\n', '') if value else "" 
+    
+    def set_response_geomax(self):
+        self.response = self.geomax_trim_crlf(self.received) if self.received else ""
+        #self.set_error_code()
+        
     """
     Leica GeoCom specific functions
     """

@@ -3,8 +3,8 @@ import re
 from math import sqrt
 import logging
 
-from edmpy.geo import datum, unit, prism
-from edmpy.lib.dbs import dbs
+from geo import datum, unit, prism
+from dbs import dbs
 
 
 class DB(dbs):

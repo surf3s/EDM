@@ -4,7 +4,7 @@
 import logging
 import os
 
-from edmpy.lib.constants import APP_NAME
+from constants import APP_NAME
 
 
 class blockdata:

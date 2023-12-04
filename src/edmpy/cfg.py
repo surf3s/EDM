@@ -2,7 +2,7 @@ from tinydb import where
 import logging
 import os
 
-from edmpy.lib.blockdata import blockdata
+from blockdata import blockdata
 
 __BUTTONS__ = 13
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
