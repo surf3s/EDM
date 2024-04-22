@@ -1,4 +1,4 @@
-from blockdata import blockdata
+from lib.blockdata import blockdata
 from constants import APP_NAME
 
 

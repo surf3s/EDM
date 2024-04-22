@@ -4,7 +4,13 @@ from kivy_deps import sdl2, glew
 block_cipher = None
 
 
-a = Analysis(['..\\src\\edmpy\\edm.py'],
+a = Analysis(['..\\src\\edmpy\\edm.py',
+                '..\\src\\edmpy\\totalstation.py', 
+                '..\\src\\edmpy\\cfg.py', 
+                '..\\src\\edmpy\\db.py', 
+                '..\\src\\edmpy\\geo.py',
+                '..\\src\\edmpy\\ini.py',
+                '..\\src\\edmpy\\lib\\e5_widgets.py'],
              pathex=[],
              binaries=[],
              datas=[],
@@ -17,6 +23,7 @@ a = Analysis(['..\\src\\edmpy\\edm.py'],
              win_private_assemblies=False,
              cipher=block_cipher,
              noarchive=False)
+
 pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 

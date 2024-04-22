@@ -2,7 +2,7 @@ from tinydb import where
 import logging
 import os
 
-from blockdata import blockdata
+from lib.blockdata import blockdata
 
 __BUTTONS__ = 13
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
@@ -77,7 +77,7 @@ class CFG(blockdata):
                     return error_message
         return True
 
-    def validate_datarecord(self, data_to_insert, data_table):
+    def validate_datarecord(self, data_to_insert, data_table, new_record = False):
         # This validates one record (e.g. one a record is about to be inserted)
         for field in self.fields():
             f = self.get(field)
@@ -96,12 +96,11 @@ class CFG(blockdata):
                     except ValueError:
                         error_message = f'\nThe field {field} requires a valid number.  Correct to save this record.'
                         return error_message
-            if f.unique:
+            if f.unique and new_record:
                 if field in data_to_insert.keys():
                     result = data_table.search(where(field) == data_to_insert[field])
                     if result:
-                        error_message = f'\nThe field {field} is set to unique and the value {data_to_insert[field]} already exists \
-                                            for this field in this data table.'
+                        error_message = f'\nThe field {field} is set to unique and the value {data_to_insert[field]} already exists for this field in this data table.'
                         return error_message
                 else:
                     error_message = f'\nThe field {field} is set to unique and a value was not provided for this field.  Unique fields require a value.'
@@ -180,6 +179,7 @@ class CFG(blockdata):
 
         self.update_value('OFFSET', 'Prompt', 'Offset :')
         self.update_value('OFFSET', 'Type', 'Numeric')
+        self.filename = 'prisms'
 
     def build_unit(self):
         self.update_value('NAME', 'Prompt', 'Name :')
@@ -209,6 +209,7 @@ class CFG(blockdata):
 
         self.update_value('CENTERY', 'Prompt', 'and Center Y :')
         self.update_value('CENTERY', 'Type', 'Numeric')
+        self.filename = 'units'
 
     def build_datum(self):
         self.update_value('NAME', 'Prompt', 'Name :')
@@ -231,6 +232,7 @@ class CFG(blockdata):
 
         self.update_value('NOTES', 'Prompt', 'Note :')
         self.update_value('NOTES', 'Type', 'Note')
+        self.filename = 'datums'
 
     def build_default(self):
         self.update_value('UNIT', 'Prompt', 'Unit :')

@@ -4,3 +4,4 @@ pyserial==3.5
 angles==2.0
 appdata==2.2.0
 requests==2.31.0
+platformdirs>=4.0.0

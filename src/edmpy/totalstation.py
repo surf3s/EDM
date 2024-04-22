@@ -1,5 +1,8 @@
 from kivy.properties import ObjectProperty
+from kivy.clock import Clock
+
 import serial
+from serial.serialutil import SerialTimeoutException
 import os
 from geo import point, prism
 from constants import APP_NAME
@@ -12,8 +15,6 @@ from angles import r2d, deci2sexa, Angle
 import string
 import random
 import time
-from serial.serialutil import SerialTimeoutException
-from kivy.clock import Clock
 
 if os.name == 'nt':  # sys.platform == 'win32':
     from serial.tools.list_ports_windows import comports
@@ -35,7 +36,7 @@ class totalstation(object):
     # rotate_source = []
     # rotate_destination = []
 
-    def __init__(self, make = None, model = None):
+    def __init__(self, make=None, model=None):
         self.make = make if make else 'Manual XYZ'
         self.model = model
         self.communication = ''
@@ -276,22 +277,22 @@ class totalstation(object):
             return f'{sexa[1]}.{sexa[2]:02d}{int(sexa[3]):02d}'
         else:
             return ''
-        
+
     def gon_to_decimal_degrees(self, angle):
         if angle is not None:
-            return str(float(angle)*180/200)
-        else: 
+            return str(float(angle) * 180 / 200)
+        else:
             return ''
-        
+
     def decimal_degrees_to_gon(self, angle):
         if angle is not None:
-            return str(float(angle)*200/180)
-        else: 
+            return str(float(angle) * 200 / 180)
+        else:
             return ''
-        
+
     def dddmmss_to_gon(self, dddmmss_angle):
         angle, minutes, seconds = self.parse_dddmmss_angle(dddmmss_angle)
-        return (angle + minutes / 60.0 + seconds / 3600.0) *200 / 180
+        return (angle + minutes / 60.0 + seconds / 3600.0) * 200 / 180
 
     def dddmmss_to_decimal_degrees(self, dddmmss_angle):
         angle, minutes, seconds = self.parse_dddmmss_angle(dddmmss_angle)
@@ -315,7 +316,7 @@ class totalstation(object):
     def subtract_points(self, p1, p2):
         return point(p1.x - p2.x, p1.y - p2.y, p1.z - p2.z) if not p1.is_none() and not p2.is_none() else point()
 
-    def hash(self, hashlen = 5):
+    def hash(self, hashlen=5):
         hash = ""
         for a in range(0, hashlen):
             hash += random.choice(string.ascii_uppercase)
@@ -384,7 +385,7 @@ class totalstation(object):
 
         elif self.make == "Leica GeoCom":
             error = self.launch_point_leica_geocom()
-            
+
         elif self.make == "GeoMax":
             self.launch_point_geomax()
 
@@ -454,14 +455,14 @@ class totalstation(object):
     def clear_io(self):
         self.io = ''
 
-    def trim_io(self, length = 1024):
+    def trim_io(self, length=1024):
         self.io = self.io[-length:]
 
     def add_to_io(self, data):
         self.io = self.io + data
         self.trim_io()
 
-    def wait_for_received(self, seconds = 1):
+    def wait_for_received(self, seconds=1):
         time_one = time.time()
         while time.time() - time_one < seconds:
             if self.data_waiting():
@@ -747,7 +748,7 @@ class totalstation(object):
     # rather than pulled from existing libraries (like numpy) to avoid dependencies.  Dependencies make porting to
     # Apple and Android more difficult.
 
-    def rotate_point(self, p = None):
+    def rotate_point(self, p=None):
         # p is a point to be rotated
 
         if p is None:
@@ -806,6 +807,8 @@ class totalstation(object):
     def cancel(self):
         if self.make == 'Topcon':
             self.topcon_stop_tracking()
+        elif self.make == 'Leica GeoCom':
+            self.stop_and_clear_geocom()
 
     def initialize(self):
         if self.make == 'Topcon':
@@ -1024,22 +1027,22 @@ class totalstation(object):
         self.send("SET/149/2")
         acknow2 = self.receive()
         return acknow1 + acknow2
-    
+
     """
     GeoMax specific functions
     """
     def launch_point_geomax(self):
         self.send(b"meas/all\r\n")
-      
+
     def pad_dms_geomax(self, angle):
         degrees = ('000' + angle.split('.')[0])[-3:]
         minutes_seconds = (angle.split('.')[1] + '0000')[0:4]
         return degrees + minutes_seconds
-    
+
     def set_horizontal_angle_geomax(self, angle):
-         # function expects angle as ddd.mmss input
-         # but decimal seconds are possible
-         # to do angel must be ddd.dddd
+        # function expects angle as ddd.mmss input
+        # but decimal seconds are possible
+        # to do angel must be ddd.dddd
         if angle.count('.') == 0:
             angle = angle + '.0000'
         elif angle.count('.') == 2:
@@ -1050,39 +1053,39 @@ class totalstation(object):
         set_angle_command = "SET/hz_angle/{:10.8f}\r\n".format(self.decdeg_to_radians(self.dms_to_decdeg(angle)))
         self.send(set_angle_command.encode())
         return self.receive()
-    
+
     def fetch_point_geomax(self):
         if self.data_waiting():
             self.receive()
             self.set_response_geomax()
             if self.response:
-                     self.parce_geomax()
-                     self.vhd_to_xyz()
-    
+                self.parce_geomax()
+                self.vhd_to_xyz()
+
     def parce_geomax(self):
         if self.response:
             if self.response.count(',') == 3:
                 return False
-        self.sloped, self.hangle, self.vangle  = self.response.split(',')
+        self.sloped, self.hangle, self.vangle = self.response.split(',')
         self.hangle = float(self.gon_to_decimal_degrees(self.hangle))
         self.vangle = float(self.gon_to_decimal_degrees(self.vangle))
         self.sloped = float(self.sloped)
-        self.prism_constant = None  
-        
+        self.prism_constant = None
+
     def initialize_geomax(self):
-        self.send("SET/distance_unit/0"+"\r\n") # meters
+        self.send("SET/distance_unit/0" + "\r\n")  # meters
         acknow1 = self.receive()
-        self.send("SET/angle_unit/1"+"\r\n") # degrees ddd.ddddddd
+        self.send("SET/angle_unit/1" + "\r\n")  # degrees ddd.ddddddd
         acknow2 = self.receive()
         return acknow1 + acknow2
-    
+
     def geomax_trim_crlf(self, value):
-        return value.replace('\r', '').replace('\n', '') if value else "" 
-    
+        return value.replace('\r', '').replace('\n', '') if value else ""
+
     def set_response_geomax(self):
         self.response = self.geomax_trim_crlf(self.received) if self.received else ""
-        #self.set_error_code()
-        
+        # self.set_error_code()
+
     """
     Leica GeoCom specific functions
     """
@@ -1161,7 +1164,7 @@ class totalstation(object):
     def get_model_name(self):
         pass
 
-    def find_prism(self, horizontal_search = pi / 4, vertical_search = pi / 4):
+    def find_prism(self, horizontal_search=pi / 4, vertical_search=pi / 4):
         output = f'%R1Q,9037:{horizontal_search},{vertical_search},0\r\n'
         self.send(bytes(output, 'utf-8'))
         self.set_response_leica_geocom(self.receive())

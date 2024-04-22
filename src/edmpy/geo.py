@@ -1,5 +1,5 @@
 class point:
-    def __init__(self, x = None, y = None, z = None):
+    def __init__(self, x=None, y=None, z=None):
         self.x = x
         self.y = y
         self.z = z
@@ -30,7 +30,7 @@ class point:
 
 
 class datum:
-    def __init__(self, name = None, x = None, y = None, z = None, notes = ''):
+    def __init__(self, name=None, x=None, y=None, z=None, notes=''):
         self.name = name if name else None
         self.x = x
         self.y = y
@@ -60,7 +60,7 @@ class datum:
 
 
 class prism:
-    def __init__(self, name = None, height = None, offset = None):
+    def __init__(self, name=None, height=None, offset=None):
         self.name = name
         self.height = height
         self.offset = offset
@@ -100,7 +100,7 @@ class prism:
 
 
 class unit:
-    def __init__(self, name = None, minx = None, miny = None, maxx = None, maxy = None, centerx = None, centery = None, radius = None):
+    def __init__(self, name=None, minx=None, miny=None, maxx=None, maxy=None, centerx=None, centery=None, radius=None):
         self.name = name
         self.minx = minx
         self.miny = miny

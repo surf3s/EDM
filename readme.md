@@ -65,7 +65,7 @@ I am sorry when the program crashes as I want this to be as stable and useful as
 
 #### What total station should I use?
 
-Currently EDM is tested on Topcon and Leica.  For Topcon, I tested (in January of 2023) a model GM-55/EBL.  Topcon has kept their communication protocols very consistent over the last forty years.  The first version of this program was written for a Topcon GTS-3B, and I didn't change the code at all to work on the brand new GM-55.  My guess is that EDM will work on virtually any basic model of Topcon total station.  For Leica, I have tested an older Builder R200M, an older TCR403, a newer TS13 and a newer TS07.  Over the years, Leica introduced a new communications protocol called GeoCOM.  For a while I think some stations supported both the old protocol and the new GeoCOM.  Now I think they only support GeoCOM.  EDM supports both.
+Currently EDM is tested on Topcon and Leica.  For Topcon, I tested (in January of 2023) a model GM-55/EBL.  Topcon has kept their communication protocols very consistent over the last forty years.  The first version of this program was written for a Topcon GTS-3B, and I didn't change the code at all to work on the brand new GM-55.  My guess is that EDM will work on virtually any basic model of Topcon total station.  For Leica, I have tested an older Builder R200M, an older TCR403, a newer TS13 and a newer TS07.  Over the years, Leica introduced a new communications protocol called GeoCOM.  For a while I think some stations supported both the old protocol and the new GeoCOM.  Now I think they only support GeoCOM.  EDM supports both.  EDM now also works with GeoMax stations.
 
 In the past EDM also worked with Sokkia stations.  I think I could make it work again with Sokkia stations, but I need someone to help me test them.  The same is true for Nokkia stations, though here I think I never had a successful test.  If someone wants to work with me on it, I am willing to try again.  If you are a programmer, make the code work with these types, place a pull request, and I will put the code into the main program here.
 
@@ -81,9 +81,11 @@ The main issues with a field computer are battery life and durability.  Now that
 
 There are two ways to connect to a total station: serial and BlueTooth.  Up to now, I only have experience with serial.  However, serial is not easy these days, and one of the main reasons I rewrote the program was to provide better support for BlueTooth.  Serial on a modern computer really means USB.  By far the easiest solution is to purchase a USB cable designed to work with your total station (by two - cables can fail - and don't buy cheap cables).  In the past, these cables sometimes also required a driver.  Alternatively, if you already have a serial cable for your total station, you can buy a serial to USB converter cable.  These are inexpensive and relatively easy to find.  You can have them in both USB Type A and C formats.  It may be less of an issue today, but in the past some serial to USB cables used chipsets that were not compatible with some computers.  Solving this problem will just take a bit of Internet research.  When the total station and computer are cabled, you will need to set the communications parameters in the station and in the EDM program.  I suggest using something slow and simple like 2400 (or 1200), E, 7, 1 (I have used 1200 baud, 7 databits, 1 stopbit and even parity since 1987).  If it works and you want to experiment with higher speeds, you can.  But start slow.  You will need to put the same settings into EDM and you will need to specify the COM port.  This latter can be a bit tricky, but EDM will scan your system to find available COM ports and from there you can test them.  If you are good with Windows device manager, you can typically find the COM port assigned to the USB cable there.  You can also use the Setup Test COM screen to see what is being sent to and received from the total station.
 
-BlueTooth is also an option, and it works better and better these days.  First, of course, you need a BlueTooth equipped total station.  Enable BlueTooth in your station.  On the Leica TS07 there is no option to enter communications parameteres.  On the TS13 you could (but I am not sure it matters).  If you can set parameters, set them to something simple like 2400 baud, 7 databits, 1 stopbit, and even parity.  Second, enable BlueTooth on your computer and pair with the station.  For Leica, you might see more than one option for pairing.  When I tested it, the total station appeared as TS followed by a string of 7 digits (rather than an option like TPS radio LR BT).  Connecting to it might mean entering a code (it is 0000 for Leica).  Third, you will need to specify the COM port and the same protocol information (2400, E, 7, 1) in EDM (note: you don't need to set this in the Windows device manager - EDM will override these).  Trying to work out which COM port is the correct one can be challenging.  EDM will scan the available ports and report back.  Then you can try each.  To test the connection, use the Measure button on the main screen.  You can also use the Setup Test COM screen to see what is being sent to and received from the total station.
+BlueTooth is also an option, and it works better and better these days.  First, of course, you need a BlueTooth equipped total station.  Enable BlueTooth in your station.  On the Leica TS07 there is no option to enter communications parameteres.  On the TS13 you could (but I am not sure it matters).  If you can set parameters, set them to something simple like 2400 baud, 7 databits, 1 stopbit, and even parity.  Second, enable BlueTooth on your computer and pair with the station.  For Leica, you might see more than one option for pairing.  When I tested it, the total station appeared as TS followed by a string of 7 digits (rather than an option like TPS radio LR BT).  Connecting to it might mean entering a code (it is 0000 for Leica and 1111 for Topcon).  Third, you will need to specify the COM port and the same protocol information (2400, E, 7, 1) in EDM (note: you don't need to set this in the Windows device manager - EDM will override these).  Trying to work out which COM port is the correct one can be challenging.  EDM will scan the available ports and report back.  Then you can try each.  To test the connection, use the Measure button on the main screen.  You can also use the Setup Test COM screen to see what is being sent to and received from the total station.  Note that until you have communications working, the program will be extremely slow while it tries to access to the communication ports.  
 
 I don't have a lot of experience yet with BlueTooth but I know others that do use it with older version of this program.  For both BlueTooth and serial, making it work the first time can be a bit of a challenge, but once it works, it tends to work thereafter.  Note that BlueTooth will draw more power than serial.  If battery life is an issue, you might want to consider serial.  It is also good to have a serial option as a backup.
+
+Important - On Windows 11, when you scan for the total station to connect via BlueTooth, there is a new setting called "Bluetooth devices discovery".  This needs to be set to Advanced for the Bluetooth scan to find the total station.
 
 #### What data format does EDM use?
 
@@ -97,6 +99,20 @@ Short answer, I don't know.  I have simulated having 1000 points in the database
 
 I am working on this.  Once this program is working smoothly, I will add plot functionality.
 
+##### Changes for Version 1.0.40 (Decemeber, 2023)
+1.  GeoMax added by Tim Schueler
+2.  Multiple bugs traps in datagrid
+3.  Brought changes in E5 over and debugged more
+4.  Added message to communication settings to let user know program is trying
+5.  Fixed datum menu in setups (to not have add new)
+6.  Added message when trying to do setups without having added datums
+
+##### Changes for Version 1.0.39 
+1.  Fixed issue with Alpha default buttons not working
+2.  Changed way checking if last two points are the same works
+
+##### Changes for Version 1.0.38 (August, 2023)
+1.  On startup program resumes with last setup coordinates for XYZ
 
 ##### Changes for Version 1.0.38 (August, 2023)
 1.  On startup program resumes with last setup coordinates for XYZ

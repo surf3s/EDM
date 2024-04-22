@@ -12,7 +12,7 @@ class blockdata:
     filename = ''
     blocks = []
 
-    def update_value(self, blockname, varname, vardata, append = False):
+    def update_value(self, blockname, varname, vardata, append=False):
         block_exists = False
         for block in self.blocks:
             if block['BLOCKNAME'] == blockname.upper():
@@ -52,7 +52,7 @@ class blockdata:
                                     vardata = line.split("=")[1].strip()
                                     self.update_value(blockname, varname, vardata)
             else:
-                f = open(self.filename, mode = 'w')
+                f = open(self.filename, mode='w')
                 f.close()
         except Exception as ex:
             template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -101,7 +101,7 @@ class blockdata:
 
     def write_blocks(self):
         try:
-            with open(self.filename, mode = 'w') as f:
+            with open(self.filename, mode='w') as f:
                 for block in self.blocks:
                     f.write(f"[{block['BLOCKNAME']}]\n")
                     for item in block.keys():

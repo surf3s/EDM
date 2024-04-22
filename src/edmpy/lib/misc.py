@@ -3,7 +3,7 @@ from kivy.utils import platform
 from kivy.core.window import Window
 
 
-def locate_file(filename, cfg_path = None):
+def locate_file(filename, cfg_path=None):
     '''
     See if the file as given can be found.
     If not, try to find it in the same folder as the CFG file.
@@ -19,7 +19,7 @@ def locate_file(filename, cfg_path = None):
     return ''
 
 
-def filename_only(filename = None):
+def filename_only(filename=None):
     if filename:
         p, f = path.split(filename)
         return f
@@ -28,6 +28,7 @@ def filename_only(filename = None):
 
 
 def platform_name():
+    # return "Android"
     return (['Windows', 'Linux', 'Android', 'MacOSX', 'IOS', 'Unknown'][['win', 'linux', 'android', 'macosx', 'ios', 'unknown'].index(platform)])
 
 

@@ -1,5 +1,5 @@
 from kivy.core.window import Window
-from misc import platform_name
+from lib.misc import platform_name
 
 BLACK = 0x000000
 WHITE = 0xFFFFFF
@@ -36,22 +36,22 @@ def make_rgb(hex_color):
 
 class ColorScheme:
 
-    def __init__(self, color_name = 'light blue'):
+    def __init__(self, color_name='light blue'):
 
         if platform_name() == 'Android':
-            self.optionbutton_font_size = "10sp"
-            self.button_font_size = "5dp"
-            self.text_font_size = "15sp"
-            self.datagrid_font_size = "10sp"
-        if platform_name() == 'Linux':
+            self.optionbutton_font_size = "20sp"
+            self.button_font_size = "20sp"
+            self.text_font_size = "20sp"
+            self.datagrid_font_size = "20sp"
+        elif platform_name() == 'Linux':
             self.optionbutton_font_size = "15sp"
             self.button_font_size = "15sp"
             self.text_font_size = "15sp"
             self.datagrid_font_size = "15sp"
         else:
             self.optionbutton_font_size = None
-            self.button_font_size = '16sp'
-            self.text_font_size = '16sp'
+            self.button_font_size = '20sp'
+            self.text_font_size = None
             self.datagrid_font_size = None
 
         self.popup_background = (0, 0, 0, 1)

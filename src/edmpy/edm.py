@@ -77,20 +77,24 @@ Changes for Version 1.0.38
 
 Changes for Version 1.0.39
   Fixed issue with Alpha default buttons not working
-  Changed way checking if last two points are the same works
+  Changed the way checking if last two points are the same works
+
+Changes for Version 1.0.40
+  GeoMax added by Tim Schueler
+  Multiple bugs traps in datagrid
+  Brought changes in E5 over and debugged more
+  Added message to communication settings to let user know program is trying
+  Fixed datum menu in setups (to not have add new)
+  Added message when trying to do setups without having added datums
 
 Bugs/To Do
   need to move load_dialog out of kv and into code and error trap bad paths
   could make menus work better with keyboard (at least with tab)
-  there is no error checking on duplicates in datagrid edits
   Do unitchecking after doing an offset shot on suffix 0 points
   Good way to get random hash IDs
   Offer to change Z when prism changes in datagrid edit cases
   Thoroughly test unit checking
-  Thoroughly test setups (with and without prism)
   Add home/end page up/page down and control home/control end to datagrid movement
-  *** Keeping checking edit/save issues
-  *** Program asks for save record in all points even when having saved already
   Add move to top or bottom in Help JSON and others (like Log file)
   Check what gets logged
   Deal more nicely with aftermath of a non-valid CFG being opened
@@ -122,16 +126,17 @@ from math import cos
 from math import sin
 from platform import python_version
 import logging
+from platformdirs import user_data_dir, user_log_dir, user_documents_dir
 from appdata import AppDataPaths
 
 # My libraries for this project
 sys.path.append(os.path.join(sys.path[0], 'lib'))
-from e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
-from e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
-from e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
-from e5_widgets import e5_JSONScreen, DataGridLabelAndField
-from colorscheme import ColorScheme
-from misc import restore_window_size_position, filename_only, platform_name
+from lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
+from lib.e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
+from lib.e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
+from lib.e5_widgets import e5_JSONScreen, DataGridLabelAndField
+from lib.colorscheme import ColorScheme
+from lib.misc import restore_window_size_position, filename_only, platform_name
 
 from geo import point, prism
 from db import DB
@@ -176,12 +181,13 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.39'
-PRODUCTION_DATE = 'August, 2023'
+VERSION = '1.0.40'
+PRODUCTION_DATE = 'April, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
 MAX_SCREEN_WIDTH = 400
+__program__ = 'EDM'
 
 
 class MainScreen(e5_MainScreen):
@@ -213,12 +219,12 @@ class MainScreen(e5_MainScreen):
         self.cfg_units = CFG()
         self.cfg_units.build_unit()
 
-        self.layout = BoxLayout(orientation = 'vertical',
-                                size_hint_y = .9,
-                                size_hint_x = .8,
+        self.layout = BoxLayout(orientation='vertical',
+                                size_hint_y=.9,
+                                size_hint_x=.8,
                                 pos_hint={'center_x': .5},
-                                padding = 20,
-                                spacing = 20)
+                                padding=20,
+                                spacing=20)
         self.build_mainscreen()
         self.add_widget(self.layout)
         self.add_screens()
@@ -226,11 +232,11 @@ class MainScreen(e5_MainScreen):
 
     def on_enter(self, *args):
         if self.warnings or self.errors:
-            self.popup = self.warnings_and_errors_popup(self.warnings, self.errors)
+            self.popup = self.warnings_and_errors_popup(self.warnings, self.errors, auto_dismiss=False)
             self.popup.open()
             self.errors, self.warnings = [], []
         elif self.ini.first_time:
-            self.popup = e5_MessageBox('Welcome to EDM', __SPLASH_HELP__)
+            self.popup = e5_MessageBox('Welcome to EDM', __SPLASH_HELP__, colors=self.colors)
             self.popup.open()
             self.ini.first_time = False
         self.update_info_label()
@@ -238,110 +244,110 @@ class MainScreen(e5_MainScreen):
     def setup_logger(self):
         logger = logging.getLogger(__name__)
         logger.setLevel(logging.INFO)
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt = '%Y-%m-%d %H:%M:%S')
-        fh = logging.FileHandler(self.app_paths.log_file_path)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        fh = logging.FileHandler(os.path.join(user_log_dir(APP_NAME, 'OSA'), APP_NAME + '.log'))
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
         logger.addHandler(fh)
-        logger.info(APP_NAME + ' started, logger initialized, and application built.')
+        logger.info(__program__ + ' started, logger initialized, and application built.')
 
     def add_screens(self):
-        sm.add_widget(EditLastRecordScreen(name = 'EditLastRecordScreen',
-                                            colors = self.colors,
-                                            data = self.data,
-                                            doc_id = None,
-                                            e5_cfg = self.cfg))
+        sm.add_widget(EditLastRecordScreen(name='EditLastRecordScreen',
+                                            colors=self.colors,
+                                            data=self.data,
+                                            doc_id=None,
+                                            e5_cfg=self.cfg))
 
-        sm.add_widget(VerifyStationScreen(name = 'VerifyStationScreen',
-                                            id = 'verify_station',
-                                            data = self.data,
-                                            station = self.station,
-                                            colors = self.colors,
-                                            ini = self.ini))
+        sm.add_widget(VerifyStationScreen(name='VerifyStationScreen',
+                                            id='verify_station',
+                                            data=self.data,
+                                            station=self.station,
+                                            colors=self.colors,
+                                            ini=self.ini))
 
-        sm.add_widget(RecordDatumsScreen(name = 'RecordDatumsScreen',
-                                            data = self.data,
-                                            station = self.station,
-                                            colors = self.colors,
-                                            ini = self.ini))
+        sm.add_widget(RecordDatumsScreen(name='RecordDatumsScreen',
+                                            data=self.data,
+                                            station=self.station,
+                                            colors=self.colors,
+                                            ini=self.ini))
 
-        sm.add_widget(EditPointScreen(name = 'EditPointScreen',
-                                            colors = self.colors,
-                                            data = self.data,
-                                            # data_table = self.data.table,
-                                            doc_id = None,
-                                            e5_cfg = self.cfg,
-                                            one_record_only = True))
+        sm.add_widget(EditPointScreen(name='EditPointScreen',
+                                            colors=self.colors,
+                                            data=self.data,
+                                            # data_table=self.data.table,
+                                            doc_id=None,
+                                            e5_cfg=self.cfg,
+                                            one_record_only=True))
 
-        sm.add_widget(EditPointsScreen(name = 'EditPointsScreen',
-                                            colors = self.colors,
-                                            main_data = self.data,
-                                            main_tablename = self.data.table,
-                                            main_cfg = self.cfg))
+        sm.add_widget(EditPointsScreen(name='EditPointsScreen',
+                                            colors=self.colors,
+                                            main_data=self.data,
+                                            main_tablename=self.data.table,
+                                            main_cfg=self.cfg))
 
-        sm.add_widget(EditPointsScreen(name = 'EditDatumsScreen',
-                                            colors = self.colors,
-                                            main_data = self.data,
-                                            main_tablename = 'datums',
-                                            main_cfg = self.cfg_datums,
-                                            addnew = True))
+        sm.add_widget(EditPointsScreen(name='EditDatumsScreen',
+                                            colors=self.colors,
+                                            main_data=self.data,
+                                            main_tablename='datums',
+                                            main_cfg=self.cfg_datums,
+                                            addnew=True))
 
-        sm.add_widget(EditPointsScreen(name = 'EditPrismsScreen',
-                                            colors = self.colors,
-                                            main_data = self.data,
-                                            main_tablename = 'prisms',
-                                            main_cfg = self.cfg_prisms,
-                                            addnew = True))
+        sm.add_widget(EditPointsScreen(name='EditPrismsScreen',
+                                            colors=self.colors,
+                                            main_data=self.data,
+                                            main_tablename='prisms',
+                                            main_cfg=self.cfg_prisms,
+                                            addnew=True))
 
-        sm.add_widget(EditPointsScreen(name = 'EditUnitsScreen',
-                                            colors = self.colors,
-                                            main_data = self.data,
-                                            main_tablename = 'units',
-                                            main_cfg = self.cfg_units,
-                                            addnew = True))
+        sm.add_widget(EditPointsScreen(name='EditUnitsScreen',
+                                            colors=self.colors,
+                                            main_data=self.data,
+                                            main_tablename='units',
+                                            main_cfg=self.cfg_units,
+                                            addnew=True))
 
-        sm.add_widget(StatusScreen(name = 'StatusScreen',
-                                            colors = self.colors,
-                                            cfg = self.cfg,
-                                            ini = self.ini,
-                                            data = self.data,
-                                            station = self.station))
+        sm.add_widget(StatusScreen(name='StatusScreen',
+                                            colors=self.colors,
+                                            cfg=self.cfg,
+                                            ini=self.ini,
+                                            data=self.data,
+                                            station=self.station))
 
-        sm.add_widget(e5_LogScreen(name = 'LogScreen', colors = self.colors, logger = logging.getLogger(__name__)))
+        sm.add_widget(e5_LogScreen(name='LogScreen', colors=self.colors, logger=logging.getLogger(__name__)))
 
-        sm.add_widget(e5_CFGScreen(name = 'CFGScreen', colors = self.colors, cfg = self.cfg))
+        sm.add_widget(e5_CFGScreen(name='CFGScreen', colors=self.colors, cfg=self.cfg))
 
-        sm.add_widget(e5_INIScreen(name = 'INIScreen', colors = self.colors, ini = self.ini))
+        sm.add_widget(e5_INIScreen(name='INIScreen', colors=self.colors, ini=self.ini))
 
-        sm.add_widget(e5_JSONScreen(name = 'JSONScreen', colors = self.colors, data = self.data))
+        sm.add_widget(e5_JSONScreen(name='JSONScreen', colors=self.colors, data=self.data))
 
-        sm.add_widget(AboutScreen(name = 'AboutScreen', colors = self.colors))
+        sm.add_widget(AboutScreen(name='AboutScreen', colors=self.colors))
 
-        sm.add_widget(StationConfigurationScreen(name = 'StationConfigurationScreen',
-                                                    station = self.station,
-                                                    ini = self.ini,
-                                                    colors = self.colors))
+        sm.add_widget(StationConfigurationScreen(name='StationConfigurationScreen',
+                                                    station=self.station,
+                                                    ini=self.ini,
+                                                    colors=self.colors))
 
-        sm.add_widget(InitializeStationScreen(name = 'InitializeStationScreen',
-                                                    data = self.data,
-                                                    station = self.station,
-                                                    ini = self.ini,
-                                                    colors = self.colors))
+        sm.add_widget(InitializeStationScreen(name='InitializeStationScreen',
+                                                    data=self.data,
+                                                    station=self.station,
+                                                    ini=self.ini,
+                                                    colors=self.colors))
 
-        sm.add_widget(e5_SettingsScreen(name = 'EDMSettingsScreen',
-                                        colors = self.colors,
-                                        ini = self.ini,
-                                        cfg = self.cfg))
+        sm.add_widget(e5_SettingsScreen(name='EDMSettingsScreen',
+                                        colors=self.colors,
+                                        ini=self.ini,
+                                        cfg=self.cfg))
 
-        sm.add_widget(ComTestScreen(name = 'ComTestScreen',
-                                        colors = self.colors,
-                                        station = self.station,
-                                        cfg = self.cfg))
+        sm.add_widget(ComTestScreen(name='ComTestScreen',
+                                        colors=self.colors,
+                                        station=self.station,
+                                        cfg=self.cfg))
 
-        sm.add_widget(OptionsScreen(name = 'OptionsScreen',
-                                        colors = self.colors,
-                                        station = self.station,
-                                        cfg = self.cfg))
+        sm.add_widget(OptionsScreen(name='OptionsScreen',
+                                        colors=self.colors,
+                                        station=self.station,
+                                        cfg=self.cfg))
 
     def delete_screens(self):
         for screen in sm.screens[:]:
@@ -353,7 +359,6 @@ class MainScreen(e5_MainScreen):
         self.add_screens()
 
     def build_mainscreen(self):
-
         if platform_name() == 'Android':
             size_hints = {'info': .13,
                             'option_buttons': .8 - .13 - .2,
@@ -365,22 +370,22 @@ class MainScreen(e5_MainScreen):
 
         self.layout.clear_widgets()
 
-        self.info = e5_label(text = 'EDM',
-                                size_hint = (1, size_hints['info']),
-                                color = self.colors.text_color,
-                                id = 'lastshot',
-                                halign = 'center')
+        self.info = e5_label(text='EDM',
+                                size_hint=(1, size_hints['info']),
+                                color=self.colors.text_color,
+                                id='lastshot',
+                                halign='center')
         if self.colors:
             if self.colors.text_font_size:
                 self.info.font_size = self.colors.text_font_size
         self.layout.add_widget(self.info)
-        self.info.bind(texture_size = self.info.setter('size'))
-        self.info.bind(size_hint_min_x = self.info.setter('width'))
+        self.info.bind(texture_size=self.info.setter('size'))
+        self.info.bind(size_hint_min_x=self.info.setter('width'))
 
         # grid = GridLayout(cols = 3, spacing = 10)
-        scroll_content = BoxLayout(orientation = 'horizontal',
-                                    size_hint = (1, size_hints['option_buttons']),
-                                    spacing = 20)
+        scroll_content = BoxLayout(orientation='horizontal',
+                                    size_hint=(1, size_hints['option_buttons']),
+                                    spacing=20)
         self.layout.add_widget(scroll_content)
 
         button_count = 0
@@ -395,11 +400,11 @@ class MainScreen(e5_MainScreen):
 
         if button_count > 0:
             self.scroll_menu = e5_scrollview_menu(button_text,
-                                                        menu_selected = button_selected,
-                                                        widget_id = 'buttons',
-                                                        call_back = [self.take_shot],
-                                                        ncols = 3,
-                                                        colors = self.colors)
+                                                    menu_selected=button_selected,
+                                                    widget_id='buttons',
+                                                    call_back=[self.take_shot],
+                                                    ncols=3,
+                                                    colors=self.colors)
             scroll_content.add_widget(self.scroll_menu)
 
         # if button_count % 3 !=0:
@@ -414,16 +419,16 @@ class MainScreen(e5_MainScreen):
 
         # self.layout.add_widget(scroll_content)
 
-        shot_buttons = GridLayout(cols = 3, size_hint = (1, size_hints['shot_buttons']), spacing = 20)
+        shot_buttons = GridLayout(cols=3, size_hint=(1, size_hints['shot_buttons']), spacing=20)
 
-        shot_buttons.add_widget(e5_button(text = 'Record', id = 'record',
-                                            colors = self.colors, call_back = self.take_shot, selected = True))
+        shot_buttons.add_widget(e5_button(text='Record', id='record',
+                                            colors=self.colors, call_back=self.take_shot, selected=True))
 
-        shot_buttons.add_widget(e5_button(text = 'Continue', id = 'continue',
-                                            colors = self.colors, call_back = self.take_shot, selected = True))
+        shot_buttons.add_widget(e5_button(text='Continue', id='continue',
+                                            colors=self.colors, call_back=self.take_shot, selected=True))
 
-        self.measure_button = e5_button(text = 'Measure', id = 'measure',
-                                            colors = self.colors, call_back = self.take_shot, selected = True)
+        self.measure_button = e5_button(text='Measure', id='measure',
+                                            colors=self.colors, call_back=self.take_shot, selected=True)
         shot_buttons.add_widget(self.measure_button)
 
         self.layout.add_widget(shot_buttons)
@@ -446,7 +451,7 @@ class MainScreen(e5_MainScreen):
         message = '\nBefore you can do this, you need to open a CFG file (see option under File menu).  Opening a CFG file will also open your database. '
         message += 'If you do not have a CFG file already, you can use a default one (see option under File menu).  Later you can alter the default CFG to '
         message += 'add additional options specific to your work.'
-        return e5_MessageBox('EDM', message)
+        return e5_MessageBox('EDM', message, colors=self.colors)
 
     def ready_to_use(self):
         return self.cfg is not None and self.data.filename != '' and self.data.filename is not None
@@ -461,26 +466,28 @@ class MainScreen(e5_MainScreen):
             message = 'Continue works only after you have saved at least one point.  Continue repeats the last point changing only the Suffix field '
             message += 'and the new measured values.  All other values, such as layer, excavator, and so forth, carry over.  Continue is an easy '
             message += 'way to link a series of measures to a single object or into one set of points.'
-            self.popup = e5_MessageBox('EDM', message)
+            self.popup = e5_MessageBox('EDM', message, colors=self.colors)
             self.popup.open()
             return
 
         self.station.shot_type = instance.id
         self.station.clear_xyz()
         if self.station.make == 'Microscribe':
-            self.popup = DataGridTextBox(title = 'EDM', text = '<Microscribe>',
-                                            label = 'Waiting on...',
-                                            button_text = ['Cancel', 'Next'],
-                                            call_back = self.have_shot,
-                                            colors = self.colors)
+            self.popup = DataGridTextBox(title='EDM', text='<Microscribe>',
+                                            label='Waiting on...',
+                                            button_text=['Cancel', 'Next'],
+                                            call_back=self.have_shot,
+                                            colors=self.colors)
+            self.popup.auto_dismiss = False
             self.popup.open()
         elif self.station.make in ['Manual XYZ', 'Manual VHD']:
-            self.popup = edm_manual(type = self.station.make, call_back = self.have_shot_manual, colors = self.colors)
+            self.popup = edm_manual(type=self.station.make, call_back=self.have_shot_manual, colors=self.colors)
             self.popup.open()
         else:
             self.station.take_shot()
             if self.station.prism_prompt:
                 self.popup = self.get_prism_height()
+                self.popup.auto_dismiss = False
                 self.popup.open()
             else:
                 self.have_shot(instance)
@@ -505,12 +512,13 @@ class MainScreen(e5_MainScreen):
         self.station.pnt = None
         self.popup.dismiss()
         if self.station.xyz.x is None or self.station.xyz.y is None or self.station.xyz.z is None:
-            self.popup = e5_MessageBox('Recording error', '\nInvalid value(s) were given.  Point not recorded.', call_back = self.close_popup)
+            self.popup = e5_MessageBox('Recording error', '\nInvalid value(s) were given.  Point not recorded.', call_back=self.close_popup, colors=self.colors)
             self.popup.open()
             self.popup_open = True
         else:
             if self.station.prism_prompt:
                 self.popup = self.get_prism_height()
+                self.popup.auto_dismiss = False
                 self.popup.open()
                 self.popup_open = True
             else:
@@ -519,17 +527,19 @@ class MainScreen(e5_MainScreen):
     def get_prism_height(self):
         prism_names = self.data.names('prisms')
         if len(prism_names) > 0:
-            return DataGridMenuList(title = "Select or Enter a Prism Height",
-                                            menu_list = prism_names,
-                                            menu_selected = self.station.prism.name,
-                                            call_back = self.have_shot,
-                                            colors = self.colors)
+            return DataGridMenuList(title="Select or Enter a Prism Height",
+                                            menu_list=prism_names,
+                                            menu_selected=self.station.prism.name,
+                                            call_back=self.have_shot,
+                                            dismiss_call_back=self.cancel_x_shot,
+                                            colors=self.colors)
         else:
-            return DataGridTextBox(title = 'Enter a Prism Height',
-                                        text = str(self.station.prism.height) if self.station.prism.height else '0',
-                                        call_back = self.have_shot,
-                                        button_text = ['Back', 'Next'],
-                                        colors = self.colors)
+            return DataGridTextBox(title='Enter a Prism Height',
+                                        text=str(self.station.prism.height) if self.station.prism.height else '0',
+                                        call_back=self.have_shot,
+                                        dismiss_call_back=self.cancel_x_shot,
+                                        button_text=['Back', 'Next'],
+                                        colors=self.colors)
 
     def have_shot(self, instance):
         if self.station.make == 'Microscribe':
@@ -553,7 +563,7 @@ class MainScreen(e5_MainScreen):
                 self.station.prism = prism(None, 0.0, None)
             if self.station.prism.height is None:
                 self.popup.dismiss()
-                self.popup = e5_MessageBox('Error', '\nInvalid prism height provided.  Shot not recorded.', call_back = self.close_popup)
+                self.popup = e5_MessageBox('Error', '\nInvalid prism height provided.  Shot not recorded.', call_back=self.close_popup, colors=self.colors)
                 self.popup.open()
                 self.popup_open = True
                 return
@@ -566,10 +576,10 @@ class MainScreen(e5_MainScreen):
         if self.station.shot_type == 'measure':
             self.popup = e5_MessageBox('Measurement',
                                         self.make_x_shot_summary(),
-                                        response_type = "Other",
-                                        response_text = ['Close', 'Repeat'],
-                                        call_back = [self.cancel_x_shot, self.record_another_x_shot],
-                                        colors = self.colors)
+                                        response_type="Other",
+                                        response_text=['Close', 'Repeat'],
+                                        call_back=[self.cancel_x_shot, self.record_another_x_shot],
+                                        colors=self.colors)
             if self.station.make not in ['Manual XYZ', 'Manual VHD', 'Simulate', '']:
                 self.event = Clock.schedule_interval(self.check_for_station_response_x_shot, .1)
             self.popup.open()
@@ -578,7 +588,7 @@ class MainScreen(e5_MainScreen):
             if self.data.db is not None:
                 self.data.db.table(self.data.table).on_save = self.on_save
                 self.data.db.table(self.data.table).on_cancel = self.on_cancel
-            self.parent.current = 'EditPointScreen'  # Had a crash here with a none type message - need to replicate
+            sm.current = 'EditPointScreen'  # Had a crash here with a none type message - need to replicate
             if self.station.make not in ['Manual XYZ', 'Manual VHD', 'Simulate', '']:
                 self.event = Clock.schedule_interval(self.check_for_station_response_edit_record, .1)
 
@@ -586,7 +596,7 @@ class MainScreen(e5_MainScreen):
         self.popup.dismiss()
         if self.event:
             self.event.cancel()
-            self.station.cancel()
+        self.station.cancel()
 
     def check_for_station_response_edit_record(self, dt):
         # print('.', end = "")
@@ -670,7 +680,7 @@ class MainScreen(e5_MainScreen):
         if self.data.db is not None:
             doc_ids = self.data.get_doc_ids(self.data.table)
             if doc_ids is not None:
-                self.data.db.table(self.data.table).remove(doc_ids = [doc_ids[-1]])
+                self.data.db.table(self.data.table).remove(doc_ids=[doc_ids[-1]])
 
     def get_last_squid(self):
         unit = self.get_last_value('UNIT')
@@ -694,7 +704,7 @@ class MainScreen(e5_MainScreen):
                                 cancel=self.dismiss_popup)
         self.popup = Popup(title="Create a new default CFG file",
                             content=content,
-                            size_hint=(0.9, 0.9))
+                            size_hint=(0.9, 0.9), auto_dismiss=False)
         self.popup.open()
         self.popup_open = True
 
@@ -709,11 +719,15 @@ class MainScreen(e5_MainScreen):
         self.reset_screens()
 
     def do_default_cfg(self, path, filename):
+        self.data.close()
         self.cfg.initialize()
         self.cfg.build_default()
         self.ini.update_value(APP_NAME, 'CFG', os.path.join(path, filename))
         self.cfg.update_value(APP_NAME, 'DATABASE', os.path.join(path, filename.split('.')[0] + '.json'))
-        self.cfg.update_value(APP_NAME, 'TABLE', filename.split('.')[0])
+        tbname = filename.split('.')[0]
+        tbname = tbname.replace('-', '_')
+        tbname = tbname.replace(' ', '_')
+        self.cfg.update_value(APP_NAME, 'TABLE', tbname)
         self.data.open(os.path.join(path, filename.split('.')[0] + '.json'))
         self.open_db()
         self.set_new_data_to_true()
@@ -721,7 +735,7 @@ class MainScreen(e5_MainScreen):
         self.cfg.save()
         self.ini.update(self.colors, self.cfg)
 
-    def set_new_data_to_true(self, table_name = None):
+    def set_new_data_to_true(self, table_name=None):
         if table_name is None:
             self.data.new_data['prisms'] = True
             self.data.new_data['units'] = True
@@ -729,21 +743,6 @@ class MainScreen(e5_MainScreen):
             self.data.new_data[self.data.table] = True
         else:
             self.data.new_data[table_name] = True
-
-    def show_load_cfg(self):
-        start_path = self.cfg.path if self.cfg.path else self.app_paths.app_data_path
-        if not os.path.exists(start_path):
-            start_path = os.path.abspath(os.path.dirname(__file__))
-        content = e5_LoadDialog(load = self.load_cfg,
-                                cancel = self.dismiss_popup,
-                                start_path = start_path,
-                                button_color = self.colors.button_color,
-                                button_background = self.colors.button_background,
-                                font_size = self.colors.button_font_size)
-        self.popup = Popup(title = "Load CFG file",
-                            content = content,
-                            size_hint = (0.9, 0.9))
-        self.popup.open()
 
     def load_cfg(self, path, filename):
         warnings, errors = [], []
@@ -761,14 +760,8 @@ class MainScreen(e5_MainScreen):
         self.build_mainscreen()
         self.reset_screens()
         if warnings or errors:
-            self.popup = self.warnings_and_errors_popup(warnings, errors)
+            self.popup = self.warnings_and_errors_popup(warnings, errors, auto_dismiss=False)
             self.popup.open()
-
-    def reset_screen_defaults(self):
-        sm.get_screen('EditPointScreen').e5_cfg = self.cfg
-        sm.get_screen('EditPointScreen').data_table = self.data.table
-        sm.get_screen('EditPointScreen').data = self.data
-        sm.get_screen('EditLastRecordScreen').data_table = self.data.table
 
     def show_import_csv(self):
         if not self.ready_to_use():
@@ -781,38 +774,41 @@ class MainScreen(e5_MainScreen):
             instructions += '  The JSON option is for easy importing from EDM data files.'
             instructions += '  Importing points from JSON files is not yet available.'
             instructions += '  IMPORT: Imported data will overwrite existing data in the case of duplicates.'
-            self.popup = e5_PopUpMenu(title = "Load which kind of data", message = instructions,
-                                        menu_list = ['Points', 'Datums', 'Prisms', 'Units'],
-                                        menu_selected = '',
-                                        call_back = self.select_csv_file,
-                                        colors = self.colors)
+            self.popup = e5_PopUpMenu(title="Load which kind of data", message=instructions,
+                                        menu_list=['Points', 'Datums', 'Prisms', 'Units'],
+                                        menu_selected='',
+                                        call_back=self.select_csv_file,
+                                        colors=self.colors)
+        self.popup.auto_dismiss = False
         self.popup.open()
 
     def show_csv_datatype(self):
         if not self.ready_to_use():
             self.popup = self.message_open_cfg_first()
         else:
-            self.popup = e5_PopUpMenu(title = "Export which kind of data", message = '',
-                                            menu_list = ['Points', 'Datums', 'Prisms', 'Units'],
-                                            menu_selected = '',
-                                            call_back = self.show_save_csvs,
-                                            colors = self.colors)
+            self.popup = e5_PopUpMenu(title="Export which kind of data", message='',
+                                            menu_list=['Points', 'Datums', 'Prisms', 'Units'],
+                                            menu_selected='',
+                                            call_back=self.show_save_csvs,
+                                            colors=self.colors)
+        self.popup.auto_dismiss = False
         self.popup.open()
 
     def select_csv_file(self, instance):
         self.csv_data_type = instance.text
         self.popup.dismiss()
         start_path = self.cfg.path if self.cfg.path else self.app_paths.app_data_path
-        content = e5_LoadDialog(load = self.load_csv,
-                                cancel = self.dismiss_popup,
-                                start_path = start_path,
-                                button_color = self.colors.button_color,
-                                button_background = self.colors.button_background,
-                                filters = ['*.csv', '*.CSV', '*.txt', '*.TXT', '*.json', '*.JSON'],
-                                font_size = self.colors.button_font_size)
-        self.popup = Popup(title = "Select CSV or JSON file to import from",
-                            content = content,
-                            size_hint = (0.9, 0.9))
+        content = e5_LoadDialog(load=self.load_csv,
+                                cancel=self.dismiss_popup,
+                                start_path=start_path,
+                                button_color=self.colors.button_color,
+                                button_background=self.colors.button_background,
+                                filters=['*.csv', '*.CSV', '*.txt', '*.TXT', '*.json', '*.JSON'],
+                                font_size=self.colors.button_font_size)
+        self.popup = Popup(title="Select CSV or JSON file to import from",
+                           content=content,
+                           size_hint=(0.9, 0.9),
+                           auto_dismiss=False)
         self.popup.open()
 
     def fix_suffix(self, data):
@@ -827,7 +823,7 @@ class MainScreen(e5_MainScreen):
     def read_csv_file(self, full_filename):
         data = []
         with open(full_filename, newline='') as csvfile:
-            reader = csv.DictReader(csvfile, quoting = csv.QUOTE_NONNUMERIC)
+            reader = csv.DictReader(csvfile, quoting=csv.QUOTE_NONNUMERIC)
             for row in reader:
                 data.append(row)
         return [field.upper() for field in reader.fieldnames], self.fix_suffix(data)
@@ -861,7 +857,7 @@ class MainScreen(e5_MainScreen):
             if self.cfg.unique_together and len(self.data.db.table(self.data.table)) > 1:
                 unique_key = self.get_unique_key(data_record)
                 for doc_id in self.data.doc_ids():
-                    if unique_key == self.get_unique_key(self.data.db.table(self.data.table).get(doc_id = doc_id)):
+                    if unique_key == self.get_unique_key(self.data.db.table(self.data.table).get(doc_id=doc_id)):
                         return doc_id
         return ''
 
@@ -903,14 +899,8 @@ class MainScreen(e5_MainScreen):
         return hash
 
     def fix_date_time(self, date, time):
-        if " " in date:
-            new_date = date[:date.find(' ')]
-        else:
-            new_date = date
-        if " " in time:
-            new_time = time[time.find(" "):]
-        else:
-            new_time = time
+        new_date = date[:date.find(' ')] if " " in date else date
+        new_time = time[time.find(" "):] if " " in time else time
         return new_date + new_time
 
     def import_these(self, data):
@@ -941,7 +931,7 @@ class MainScreen(e5_MainScreen):
                     hash_key = self.get_unique_key(insert_record)
                     if hash_key in hash_unique_ids:
                         duplicate_doc_id = hash_unique_ids[hash_key]
-                        self.data.db.table(self.data.table).remove(doc_ids = [duplicate_doc_id])
+                        self.data.db.table(self.data.table).remove(doc_ids=[duplicate_doc_id])
                         replacements += 1
                     # hash_unique_ids[hash_key] = new_docid
                     data_to_insert.append(insert_record)
@@ -976,10 +966,7 @@ class MainScreen(e5_MainScreen):
             else:
                 message = '%s %s successfully imported.  Of these, %s updated an existing record.' % (record_count, self.csv_data_type, replacements)
 
-        self.popup = e5_MessageBox('CSV Import', message,
-                                    response_type = "OK",
-                                    call_back = self.close_popup,
-                                    colors = self.colors)
+        self.popup = e5_MessageBox('CSV Import', message, response_type="OK", call_back=self.close_popup, colors=self.colors)
         self.open_popup()
         return errors
 
@@ -1090,7 +1077,7 @@ class MainScreen(e5_MainScreen):
         if self.data.db is not None:
             if len(self.data.db.table(self.data.table)) > 0:
                 doc_ids = self.data.get_doc_ids(self.data.table)
-                last_record = self.data.db.table(self.data.table).get(doc_id = doc_ids[-1])
+                last_record = self.data.db.table(self.data.table).get(doc_id=doc_ids[-1])
                 if last_record != []:
                     if field_name in last_record.keys():
                         return last_record[field_name]
@@ -1101,7 +1088,7 @@ class MainScreen(e5_MainScreen):
             if len(self.data.db.table(self.data.table)) > 0:
                 doc_ids = self.data.get_doc_ids(self.data.table)
                 for doc_id in reversed(doc_ids):
-                    record = self.data.db.table(self.data.table).get(doc_id = doc_id)
+                    record = self.data.db.table(self.data.table).get(doc_id=doc_id)
                     if record != []:
                         if field_name in record.keys():
                             if self.is_numeric(record[field_name]):
@@ -1123,7 +1110,8 @@ class MainScreen(e5_MainScreen):
 
 
 class OptionsScreen(Screen):
-    def __init__(self, station = None, cfg = None, colors = None, **kwargs):
+
+    def __init__(self, station=None, cfg=None, colors=None, **kwargs):
         super(OptionsScreen, self).__init__(**kwargs)
 
         self.colors = colors if colors else ColorScheme()
@@ -1131,37 +1119,36 @@ class OptionsScreen(Screen):
         self.cfg = cfg
 
         self.clear_widgets()
-        self.layout = GridLayout(cols = 1,
-                                    spacing = 5, padding = 5,
-                                    size_hint_max_x = MAX_SCREEN_WIDTH,
-                                    size_hint_y = 1,
-                                    pos_hint = {'center_x': .5, 'center_y': .5})
+        self.layout = GridLayout(cols=1,
+                                    spacing=5, padding=5,
+                                    size_hint_max_x=MAX_SCREEN_WIDTH,
+                                    size_hint_y=1,
+                                    pos_hint={'center_x': .5, 'center_y': .5})
         self.add_widget(self.layout)
         self.build_screen()
 
     def build_screen(self):
-        prism = GridLayout(cols = 2, size_hint_y = None, spacing = 5, padding = 5)
-        prism.add_widget(e5_label('Prompt for prism height after each point', colors = self.colors))
-        prism_switch = Switch(active = self.station.prism_prompt)
-        prism_switch.bind(active = self.prism_prompt)
+        prism = GridLayout(cols=2, size_hint_y=None, spacing=5, padding=5)
+        prism.add_widget(e5_label('Prompt for prism height after each point', colors=self.colors))
+        prism_switch = Switch(active=self.station.prism_prompt)
+        prism_switch.bind(active=self.prism_prompt)
         prism.add_widget(prism_switch)
         prism.height = 100
         self.layout.add_widget(prism)
 
-        self.back_button = e5_button('Back', selected = True,
-                                             call_back = self.go_back,
-                                             colors = self.colors)
+        self.back_button = e5_button('Back', selected=True, call_back=self.go_back, colors=self.colors)
         self.layout.add_widget(self.back_button)
 
     def prism_prompt(self, instance, value):
         self.station.prism_prompt = value
 
     def go_back(self, instance):
-        self.parent.current = 'MainScreen'
+        sm.current = 'MainScreen'
 
 
 class ComTestScreen(Screen):
-    def __init__(self, station = None, cfg = None, colors = None, **kwargs):
+
+    def __init__(self, station=None, cfg=None, colors=None, **kwargs):
         super(ComTestScreen, self).__init__(**kwargs)
 
         self.colors = colors if colors else ColorScheme()
@@ -1169,18 +1156,16 @@ class ComTestScreen(Screen):
         self.cfg = cfg
 
         self.clear_widgets()
-        self.layout = GridLayout(cols = 1,
-                                    spacing = 5, padding = 5,
-                                    size_hint_max_x = MAX_SCREEN_WIDTH,
-                                    size_hint_y = 1,
-                                    pos_hint = {'center_x': .5, 'center_y': .5})
+        self.layout = GridLayout(cols=1, spacing=5, padding=5,
+                                    size_hint_max_x=MAX_SCREEN_WIDTH, size_hint_y=1,
+                                    pos_hint={'center_x': .5, 'center_y': .5})
         self.add_widget(self.layout)
         self.build_screen()
 
     def current_settings_pretty(self):
         txt = f'Current settings:\n{self.station.make}\n{self.station.settings_pretty()}'
         txt += '\nCOM port is '
-        txt += 'Open' if self.station.serialcom.is_open else 'Close'
+        txt += 'Open' if self.station.serialcom.is_open else 'Closed'
         return txt
 
     def on_enter(self):
@@ -1200,31 +1185,31 @@ class ComTestScreen(Screen):
             '''
             self.layout.remove_widget(self.io)
             self.layout.remove_widget(self.buttons)
-            self.io = e5_scrollview_label(self.station.io, popup = False, colors = self.colors)
+            self.io = e5_scrollview_label(self.station.io, popup=False, colors=self.colors)
             self.layout.add_widget(self.io)
             self.layout.add_widget(self.buttons)
 
     def build_screen(self):
-        self.settings = GridLayout(cols = 2, spacing = 5, padding = 5, size_hint = (.2, None))
-        self.current_settings = e5_label(self.current_settings_pretty(), colors = self.colors)
+        self.settings = GridLayout(cols=2, spacing=5, padding=5, size_hint=(.2, None))
+        self.current_settings = e5_label(self.current_settings_pretty(), colors=self.colors)
         self.settings.add_widget(self.current_settings)
-        self.change_settings = e5_button("Change Settings", call_back = self.settings_change, colors = self.colors)
+        self.change_settings = e5_button("Change Settings", call_back=self.settings_change, colors=self.colors)
         self.settings.add_widget(self.change_settings)
         self.layout.add_widget(self.settings)
 
-        self.horizontal_angle = GridLayout(cols = 2, spacing = 5, padding = 5, size_hint = (.2, None))
-        self.leftside = GridLayout(cols = 1, spacing = 2, padding =0)
-        self.leftside.add_widget(e5_label('Enter angle as ddd.mmss', colors = self.colors))
-        self.hangle_input = e5_textinput(write_tab = False, colors=self.colors)
-        self.hangle_input.bind(minimum_height = self.hangle_input.setter('height'))
+        self.horizontal_angle = GridLayout(cols=2, spacing=5, padding=5, size_hint=(.2, None))
+        self.leftside = GridLayout(cols=1, spacing=2, padding=0)
+        self.leftside.add_widget(e5_label('Enter angle as ddd.mmss', colors=self.colors))
+        self.hangle_input = e5_textinput(write_tab=False, colors=self.colors)
+        self.hangle_input.bind(minimum_height=self.hangle_input.setter('height'))
         self.leftside.add_widget(self.hangle_input)
         self.horizontal_angle.add_widget(self.leftside)
-        self.set_angle = e5_button("Set H-angle", call_back = self.set_hangle, colors = self.colors)
+        self.set_angle = e5_button("Set H-angle", call_back=self.set_hangle, colors=self.colors)
         self.horizontal_angle.add_widget(self.set_angle)
         self.layout.add_widget(self.horizontal_angle)
 
-        self.record = GridLayout(cols = 1, spacing = 5, padding = 5, size_hint = (.2, None))
-        self.measure = e5_button("Record Point", call_back = self.record_point, colors = self.colors)
+        self.record = GridLayout(cols=1, spacing=5, padding=5, size_hint=(.2, None))
+        self.measure = e5_button("Record Point", call_back=self.record_point, colors=self.colors)
         self.record.add_widget(self.measure)
         self.layout.add_widget(self.record)
 
@@ -1233,14 +1218,14 @@ class ComTestScreen(Screen):
                                         'If what is received is unreadable, then there is a problem with the speed, parity, data bits, and stop bits.  '
                                         'If everything looks fine, but the angle does not change or a point is not taken, '
                                         'then likely Shannon needs to have a look.  '
-                                        'Email the results here to him.', popup = False, colors = self.colors)
+                                        'Email the results here to him.', popup=False, colors=self.colors)
         self.layout.add_widget(self.io)
 
-        self.buttons = e5_side_by_side_buttons(text = ['Back', 'Clear', 'Copy'],
-                                                    id = ['back', 'clear', 'copy'],
-                                                    call_back = [self.close, self.clear_io, self.copy_io],
-                                                    selected = [False, False, False],
-                                                    colors = self.colors)
+        self.buttons = e5_side_by_side_buttons(text=['Back', 'Clear', 'Copy'],
+                                                    id=['back', 'clear', 'copy'],
+                                                    call_back=[self.close, self.clear_io, self.copy_io],
+                                                    selected=[False, False, False],
+                                                    colors=self.colors)
         self.layout.add_widget(self.buttons)
 
     def clear_io(self, instance):
@@ -1259,7 +1244,7 @@ class ComTestScreen(Screen):
     def settings_change(self, instance):
         sm.get_screen('StationConfigurationScreen').call_back = 'ComTestScreen'
         self.event.cancel()
-        self.parent.current = 'StationConfigurationScreen'
+        sm.current = 'StationConfigurationScreen'
 
     def record_point(self, instance):
         self.station.stop_and_clear_geocom()
@@ -1267,12 +1252,12 @@ class ComTestScreen(Screen):
 
     def close(self, instance):
         self.event.cancel()
-        self.parent.current = 'MainScreen'
+        sm.current = 'MainScreen'
 
 
 class RecordDatumsScreen(Screen):
 
-    def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
+    def __init__(self, data=None, station=None, ini=None, colors=None, **kwargs):
         super(RecordDatumsScreen, self).__init__(**kwargs)
 
         self.colors = colors if colors else ColorScheme()
@@ -1280,44 +1265,43 @@ class RecordDatumsScreen(Screen):
         self.data = data
         self.ini = ini
 
-        self.content = BoxLayout(orientation = 'vertical',
-                                    size_hint_y = 1,
-                                    size_hint_max_x = 400,
-                                    pos_hint = {'center_x': .5},
-                                    padding = 5,
-                                    spacing = 20)
+        self.content = BoxLayout(orientation='vertical',
+                                    size_hint_y=1, size_hint_max_x=400,
+                                    pos_hint={'center_x': .5},
+                                    padding=5, spacing=20)
         self.add_widget(self.content)
 
-        self.content.add_widget(e5_label('Provide a name and notes (optional), then record and save.', colors = self.colors))
+        self.content.add_widget(e5_label('Provide a name and notes (optional), then record and save.', colors=self.colors))
 
         self.datum_name = DataGridLabelAndField('Name : ', colors=self.colors)
         self.content.add_widget(self.datum_name)
         self.datum_notes = DataGridLabelAndField('Notes : ', colors=self.colors, note_field=True)
         self.content.add_widget(self.datum_notes)
 
-        self.recorder = datum_recorder('Record datum', station = self.station,
-                                        colors = self.colors, setup_type = 'record_new', data = self.data)
+        self.recorder = datum_recorder('Record datum', station=self.station,
+                                        colors=self.colors, setup_type='record_new', data=self.data)
         self.content.add_widget(self.recorder)
 
-        self.results = e5_label('', colors = self.colors)
+        self.results = e5_label('', colors=self.colors)
         self.content.add_widget(self.results)
 
-        self.content.add_widget(e5_side_by_side_buttons(text = ['Back', 'Save'],
-                                                        id = ['cancel', 'save'],
-                                                        call_back = [self.cancel, self.check_for_duplicate],
-                                                        selected = [False, False],
-                                                        colors = self.colors))
+        self.content.add_widget(e5_side_by_side_buttons(text=['Back', 'Save'],
+                                                        id=['cancel', 'save'],
+                                                        call_back=[self.cancel, self.check_for_duplicate],
+                                                        selected=[False, False],
+                                                        colors=self.colors))
 
     def check_for_duplicate(self, instance):
         if self.data.get_datum(self.datum_name.txt.textbox.text).name is not None:
             message = f'\nOverwrite existing datum {self.datum_name.txt.textbox.text}?'
             self.popup = e5_MessageBox('Overwrite?', message,
-                                        response_type = "YESNO",
-                                        call_back = [self.delete_and_save, self.close_popup],
-                                        colors = self.colors)
+                                        response_type="YESNO",
+                                        call_back=[self.delete_and_save, self.close_popup],
+                                        colors=self.colors,
+                                        auto_dismiss=False)
             self.popup.open()
         elif self.datum_name.txt.textbox.text == "":
-            self.popup = e5_MessageBox('Error', '\nProvide a datum name before saving.', colors = self.colors)
+            self.popup = e5_MessageBox('Error', '\nProvide a datum name before saving.', colors=self.colors)
             self.popup.open()
         else:
             self.save_datum()
@@ -1334,7 +1318,7 @@ class RecordDatumsScreen(Screen):
         if self.recorder.result.xyz_global.x is None or self.recorder.result.xyz_global.y is None or self.recorder.result.xyz_global.z is None:
             error_message = '\nThe point was not properly recorded.  Try again.'
         if error_message != '':
-            self.popup = e5_MessageBox('Error', error_message, colors = self.colors)
+            self.popup = e5_MessageBox('Error', error_message, colors=self.colors)
             self.popup.open()
             return
 
@@ -1356,13 +1340,14 @@ class RecordDatumsScreen(Screen):
         self.popup.dismiss()
 
     def cancel(self, instance):
-        self.parent.current = 'MainScreen'
+        sm.current = 'MainScreen'
 
 
 class VerifyStationScreen(Screen):
+
     id = ObjectProperty(None)
 
-    def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
+    def __init__(self, data=None, station=None, ini=None, colors=None, **kwargs):
         super(VerifyStationScreen, self).__init__(**kwargs)
 
         self.colors = colors if colors else ColorScheme()
@@ -1370,41 +1355,41 @@ class VerifyStationScreen(Screen):
         self.data = data
         self.ini = ini
 
-        self.content = BoxLayout(orientation = 'vertical',
-                                    size_hint_y = 1,
-                                    size_hint_max_x = 400,
+        self.content = BoxLayout(orientation='vertical',
+                                    size_hint_y=1,
+                                    size_hint_max_x=400,
                                     pos_hint={'center_x': .5},
-                                    padding = 5,
-                                    spacing = 20)
+                                    padding=5,
+                                    spacing=20)
         self.add_widget(self.content)
 
         # self.content.add_widget(e5_label('Select a datum to use as verification and record it.', colors = self.colors))
 
-        self.datum1 = datum_selector(text = 'Select\nverification\ndatum',
-                                            data = self.data,
-                                            colors = self.colors,
-                                            default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'VERIFICATION')))
+        self.datum1 = datum_selector(text='Select\nverification\ndatum',
+                                            data=self.data,
+                                            colors=self.colors,
+                                            default_datum=self.data.get_datum(self.ini.get_value('SETUPS', 'VERIFICATION')))
         self.content.add_widget(self.datum1)
 
-        self.recorder = datum_recorder('Record\nverification\ndatum', station = self.station,
-                                        colors = self.colors, setup_type = 'verify',
-                                        on_record = self.compute_error, data = self.data)
+        self.recorder = datum_recorder('Record\nverification\ndatum', station=self.station,
+                                        colors=self.colors, setup_type='verify',
+                                        on_record=self.compute_error, data=self.data)
         self.content.add_widget(self.recorder)
 
-        self.results = e5_label('', colors = self.colors)
+        self.results = e5_label('', colors=self.colors)
         self.content.add_widget(self.results)
 
-        self.back_button = e5_button(text = 'Back', size_hint_y = None,
-                                        size_hint_x = 1,
-                                        id = 'cancel',
-                                        colors = self.colors, selected = False)
+        self.back_button = e5_button(text='Back', size_hint_y=None,
+                                        size_hint_x=1,
+                                        id='cancel',
+                                        colors=self.colors, selected=False)
         self.content.add_widget(self.back_button)
-        self.back_button.bind(on_press = self.close_screen)
+        self.back_button.bind(on_press=self.close_screen)
 
     def on_enter(self, *args):
         if len(self.data.names('datums')) == 0:
             message = '\nBefore you can use this option, you need to define some datums.  Go to the menu Edit Datums or to Setup Record Datums to add datums.'
-            self.popup = e5_MessageBox('Datums', message, call_back=self.close_popup)
+            self.popup = e5_MessageBox('Datums', message, call_back=self.close_popup, colors=self.colors)
             self.popup.open()
         return super().on_enter(*args)
 
@@ -1423,7 +1408,7 @@ class VerifyStationScreen(Screen):
         if not self.datum1.datum.is_none():
             self.ini.update_value('SETUPS', 'VERIFICATION', self.datum1.datum.name)
             self.ini.save()
-        self.parent.current = 'MainScreen'
+        sm.current = 'MainScreen'
 
 
 class record_button(e5_button):
@@ -1431,12 +1416,12 @@ class record_button(e5_button):
     popup = ObjectProperty(None)
     datum_name = None
 
-    def __init__(self, station = None, result_label = None, setup_type = None, on_record = None,
-                        datum1 = None, datum2 = None, datum3 = None, data = None, **kwargs):
+    def __init__(self, station=None, result_label=None, setup_type=None, on_record=None,
+                        datum1=None, datum2=None, datum3=None, data=None, **kwargs):
         super(record_button, self).__init__(**kwargs)
         # self.colors = colors if colors is not None else ColorScheme()
         self.station = station
-        self.bind(on_press = self.record_datum)
+        self.bind(on_press=self.record_datum)
         self.result_label = result_label
         self.setup_type = setup_type
         self.on_record = on_record
@@ -1476,8 +1461,9 @@ class record_button(e5_button):
                 self.popup = e5_MessageBox('Set horizonal angle', message,
                                             call_back=self.now_take_shot, colors=self.colors)
                 self.popup.open()
-            elif self.station.make in ['Leica', 'Wild', 'Leica GeoCom', 'Sokkia', 'Topcon', 'GeoMax']:
+            elif self.station.make in ['Leica', 'Wild', 'Leica GeoCom', 'Sokkia', 'Topcon', 'GeoMax', 'Simulate']:
                 self.popup = self.get_prism_height()
+                self.popup.auto_dismiss = False
                 self.popup.open()
                 self.station.set_horizontal_angle(self.station.decimal_degrees_to_dddmmss(angle))
                 self.station.take_shot()
@@ -1486,6 +1472,7 @@ class record_button(e5_button):
                 self.wait_for_shot()
             else:
                 self.popup = self.get_prism_height()
+                self.popup.auto_dismiss = False
                 self.popup.open()
                 self.station.take_shot()
 
@@ -1497,15 +1484,16 @@ class record_button(e5_button):
     def wait_for_shot(self):
         if self.station.make == 'Microscribe':
             # self.popup = DataGridTextBox(title = self.text + '.  Waiting on Microscribe...', button_text = ['Cancel', 'Next'], call_back = self.microscribe)
-            self.popup = DataGridTextBox(title = 'EDM',
-                                            label = self.text + '.  Waiting on...',
-                                            text = '<Microscribe>',
-                                            button_text = ['Cancel', 'Next'],
-                                            call_back = self.microscribe,
-                                            colors = self.colors)
+            self.popup = DataGridTextBox(title='EDM',
+                                            label=self.text + '.  Waiting on...',
+                                            text='<Microscribe>',
+                                            button_text=['Cancel', 'Next'],
+                                            call_back=self.microscribe,
+                                            colors=self.colors)
+            self.popup.auto_dismiss = False
             self.popup.open()
         elif self.station.make in ['Manual XYZ', 'Manual VHD']:
-            self.popup = edm_manual(type = self.station.make, call_back = self.have_shot_manual, colors = self.colors)
+            self.popup = edm_manual(type=self.station.make, call_back=self.have_shot_manual, colors=self.colors)
             self.popup.open()
 
     def have_shot_manual(self, instance):
@@ -1527,20 +1515,21 @@ class record_button(e5_button):
                 self.station.xyz = point()
         self.popup.dismiss()
         self.popup = self.get_prism_height()
+        self.popup.auto_dismiss = False
         self.popup.open()
 
     def get_prism_height(self):
         prism_names = self.data.names('prisms') if self.data else []
         if len(prism_names) > 0:
-            return DataGridMenuList(title = "Select or Enter a Prism Height",
-                                        menu_list = prism_names,
-                                        menu_selected = self.default_prism.name if self.default_prism.name else '',
-                                        call_back = self.have_shot)
+            return DataGridMenuList(title="Select or Enter a Prism Height",
+                                        menu_list=prism_names,
+                                        menu_selected=self.default_prism.name if self.default_prism.name else '',
+                                        call_back=self.have_shot)
         else:
-            return DataGridTextBox(title = 'Enter a Prism Height',
-                                        text = str(self.default_prism.height) if self.default_prism.height else '',
-                                        call_back = self.have_shot,
-                                        button_text = ['Back', 'Next'],
+            return DataGridTextBox(title='Enter a Prism Height',
+                                        text=str(self.default_prism.height) if self.default_prism.height else '',
+                                        call_back=self.have_shot,
+                                        button_text=['Back', 'Next'],
                                         colors=self.colors)
 
     def microscribe(self, instance):
@@ -1548,9 +1537,9 @@ class record_button(e5_button):
         self.popup.dismiss()
         p = self.station.text_to_point(result)
         if not p:
-            self.popup = e5_MessageBox(title = 'Error',
-                                        message = '\n Data not formatted correctly.  EDM expects three floating point numbers separated by commas.',
-                                        colors = self.colors)
+            self.popup = e5_MessageBox(title='Error',
+                                        message='\n Data not formatted correctly.  EDM expects three floating point numbers separated by commas.',
+                                        colors=self.colors)
             self.popup.open()
             return
         self.station.xyz = self.station.mm_to_meters(p)
@@ -1560,7 +1549,7 @@ class record_button(e5_button):
             self.station.round_xyz()
         self.have_shot()
 
-    def have_shot(self, instance = None):
+    def have_shot(self, instance=None):
         self.popup.dismiss()
         # prism_height = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
         # if self.station.make in ['Leica', 'Leica GeoCom']:
@@ -1591,16 +1580,16 @@ class record_button(e5_button):
 
     def check_for_station_response(self, dt):
         # print('.', end = "")
-        if self.station.data_waiting() or self.station.make in ['Manual XYZ', 'Manual VHD']:
+        if self.station.data_waiting() or self.station.make in ['Manual XYZ', 'Manual VHD', 'Simulate']:
             if self.station.make in ['Leica']:
                 self.station.fetch_point()
             elif self.station.make in ['Leica GeoCom']:
                 self.station.fetch_point_leica_geocom()
             elif self.station.make in ['GeoMax']:
-                self.station.fetch_point_geomax()  
+                self.station.fetch_point_geomax()
             elif self.station.make in ['Topcon']:
                 self.station.fetch_point_topcon()
-            if self.station.response or self.station.make in ['Manual XYZ', 'Manual VHD']:
+            if self.station.response or self.station.make in ['Manual XYZ', 'Manual VHD', 'Simulate']:
                 self.station.prism_adjust()
                 if self.station.xyz.x is not None and self.station.xyz.y is not None and self.station.xyz.z is not None:
                     self.station.make_global()
@@ -1626,10 +1615,10 @@ class record_result(e5_label):
 
 class datum_recorder(GridLayout):
 
-    def __init__(self, text = '', datum_no = 1, station = None,
-                        colors = None, setup_type = None,
-                        on_record = None, datum1 = None, datum2 = None, datum3 = None,
-                        data = None, **kwargs):
+    def __init__(self, text='', datum_no=1, station=None,
+                        colors=None, setup_type=None,
+                        on_record=None, datum1=None, datum2=None, datum3=None,
+                        data=None, **kwargs):
         super(datum_recorder, self).__init__(**kwargs)
         self.padding = 10
         self.spacing = 10
@@ -1639,19 +1628,19 @@ class datum_recorder(GridLayout):
         self.results = []
         self.buttons = []
         self.size_hint_y = None
-        self.result = record_result('', colors = self.colors, label_height = 100)
-        self.button = record_button(text = text if text else 'Record datum %s' % (datum_no),
-                                    selected = True,
-                                    id = 'datum%s' % (datum_no),
-                                    colors = self.colors,
-                                    station = self.station,
-                                    result_label = self.result,
-                                    setup_type = setup_type,
-                                    on_record = on_record,
-                                    datum1 = datum1,
-                                    datum2 = datum2,
-                                    datum3 = datum3,
-                                    data = data)
+        self.result = record_result('', colors=self.colors, label_height=100)
+        self.button = record_button(text=text if text else 'Record datum %s' % (datum_no),
+                                    selected=True,
+                                    id='datum%s' % (datum_no),
+                                    colors=self.colors,
+                                    station=self.station,
+                                    result_label=self.result,
+                                    setup_type=setup_type,
+                                    on_record=on_record,
+                                    datum1=datum1,
+                                    datum2=datum2,
+                                    datum3=datum3,
+                                    data=data)
         self.add_widget(self.button)
         self.add_widget(self.result)
 
@@ -1662,10 +1651,10 @@ class datum_selector(GridLayout):
     popup = ObjectProperty(None)
     popup_open = False
 
-    def __init__(self, text = '',
-                        data = None, colors = None, default_datum = None,
-                        call_back = None,
-                        id = None,
+    def __init__(self, text='',
+                        data=None, colors=None, default_datum=None,
+                        call_back=None,
+                        id=None,
                         **kwargs):
         super(datum_selector, self).__init__(**kwargs)
         # self.orientation = 'horizontal'
@@ -1677,20 +1666,19 @@ class datum_selector(GridLayout):
         self.datum = default_datum
         self.call_back = call_back
         self.size_hint_y = None
-        self.add_widget(e5_button(text=text,
-                                    selected=True,
-                                    call_back=self.show_select_datum,
-                                    colors=self.colors))
+        self.add_widget(e5_button(text=text, selected=True, call_back=self.show_select_datum, colors=self.colors))
         label = f'Datum: {self.datum.name}\nX: {self.datum.x}\nY: {self.datum.y}\nZ: {self.datum.z}' if not self.datum.is_none() else 'Datum:\nX:\nY:\nZ:'
         self.result = e5_label(label, colors=self.colors, label_height=100)
         self.add_widget(self.result)
 
     def show_select_datum(self, instance):
-        self.popup = DataGridMenuList(title="Datum",
-                                        menu_list=self.data.names('datums'),
-                                        menu_selected='',
-                                        call_back=self.datum_selected,
-                                        colors=self.colors)
+        if len(self.data.names('datums')) > 0:
+            self.popup = e5_PopUpMenu(title="Select Datum", menu_list=self.data.names('datums'), menu_selected='', call_back=self.datum_selected, colors=self.colors)
+        else:
+            message = '\nBefore you can setup the station you need to first go back and define stations using the Edit Datums menu or Setup Record Datums menu. '
+            message += 'The former lets you add them by hand when you already know their coordinates.  The latter lets you use the station to record datums.'
+            self.popup = e5_MessageBox('Create Datums', message, call_back=self.datum_selected, colors=self.colors)
+        self.popup.auto_dismiss = False
         self.popup.open()
 
     def datum_selected(self, instance):
@@ -1711,7 +1699,7 @@ class setups(ScrollView):
     popup_open = False
     recorder = []
 
-    def __init__(self, setup_type, data = None, ini = None, station = None, colors = None, **kwargs):
+    def __init__(self, setup_type, data=None, ini=None, station=None, colors=None, **kwargs):
         super(setups, self).__init__(**kwargs)
 
         self.colors = colors if colors is not None else ColorScheme()
@@ -1721,14 +1709,12 @@ class setups(ScrollView):
         self.recorder = []
         self.bar_width = 10
 
-        self.scrollbox = GridLayout(cols = 1,
-                                    size_hint = (1, None),
-                                    spacing = 5)
-        self.scrollbox.bind(minimum_height = self.scrollbox.setter('height'))
+        self.scrollbox = GridLayout(cols=1, size_hint=(1, None), spacing=5)
+        self.scrollbox.bind(minimum_height=self.scrollbox.setter('height'))
 
-        instructions = Label(color = self.colors.text_color,
-                             size_hint_y = None,
-                             font_size = self.colors.text_font_size if self.colors.text_font_size else 12)
+        instructions = Label(color=self.colors.text_color,
+                             size_hint_y=None,
+                             font_size=self.colors.text_font_size if self.colors.text_font_size else 12)
 
         if setup_type == "Horizontal Angle Only":
             instructions.text = '\nEnter the horizontal angle to uploaded to the station.'
@@ -1740,15 +1726,12 @@ class setups(ScrollView):
             # content1.add_widget(self.hangle)
             # self.scrollbox.add_widget(content1)
 
-            widget = DataGridLabelAndField(col = '', prompt = 'Angle (ddd.mmss)',
-                                            colors = self.colors,
-                                            text_length = 8, padding = 5)
+            widget = DataGridLabelAndField(col='', prompt='Angle (ddd.mmss)', colors=self.colors, text_length=8, padding=5)
             self.hangle = widget.txt.textbox
             self.scrollbox.add_widget(widget)
 
-            content2 = GridLayout(cols = 1, padding = 5, size_hint_y = None)
-            content2.add_widget(e5_button(text = 'Upload angle', selected = True,
-                                call_back = self.set_hangle, colors = self.colors))
+            content2 = GridLayout(cols=1, padding=5, size_hint_y=None)
+            content2.add_widget(e5_button(text='Upload angle', selected=True, call_back=self.set_hangle, colors=self.colors))
             self.scrollbox.add_widget(content2)
 
         elif setup_type == "Over a datum":
@@ -1757,10 +1740,10 @@ class setups(ScrollView):
                                 'angle is already correct or will be otherwise set.'
             self.scrollbox.add_widget(instructions)
 
-            self.over_datum = datum_selector(text = 'Select a datum',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
+            self.over_datum = datum_selector(text='Select a datum',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
             self.scrollbox.add_widget(self.over_datum)
 
             # content2 = GridLayout(cols = 2, padding = 10, size_hint_y = None)
@@ -1768,9 +1751,9 @@ class setups(ScrollView):
             # self.station_height = TextInput(text = '', multiline = False,
             #                                 size_hint_max_y = 30)
 
-            widget = DataGridLabelAndField(col = '', prompt = 'Height (optional)',
-                                            colors = self.colors,
-                                            text_length = 8, padding = 5, spacing = 20)
+            widget = DataGridLabelAndField(col='', prompt='Height (optional)',
+                                            colors=self.colors,
+                                            text_length=8, padding=5, spacing=20)
             self.station_height = widget.txt.textbox
             # content2.add_widget(self.station_height)
 
@@ -1781,24 +1764,24 @@ class setups(ScrollView):
                                 "EDM will automatically set the correct horizontal angle and compute the station's XYZ coordinates."
             self.scrollbox.add_widget(instructions)
 
-            self.datum1 = datum_selector(text = 'Select datum\nunder the\nstation',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
+            self.datum1 = datum_selector(text='Select datum\nunder the\nstation',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', 'OVERDATUM')))
             self.scrollbox.add_widget(self.datum1)
 
-            self.datum2 = datum_selector(text = 'Select datum\nto record',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM')),
-                                                call_back = self.datum1_selected)
+            self.datum2 = datum_selector(text='Select datum\nto record',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM')),
+                                                call_back=self.datum1_selected)
             self.scrollbox.add_widget(self.datum2)
 
             datum_name = self.data.get_datum(self.ini.get_value('SETUPS', 'RECORDDATUM'))
             datum_name = f'Record\n{datum_name.name}' if datum_name else 'Record datum 1'
-            self.recorder.append(datum_recorder(datum_name, station = self.station, colors = self.colors,
-                                                setup_type = setup_type, datum1 = self.datum1, datum2 = self.datum2,
-                                                data = self.data))
+            self.recorder.append(datum_recorder(datum_name, station=self.station, colors=self.colors,
+                                                setup_type=setup_type, datum1=self.datum1, datum2=self.datum2,
+                                                data=self.data))
             self.scrollbox.add_widget(self.recorder[0])
 
         elif setup_type == "Record two datums":
@@ -1807,25 +1790,25 @@ class setups(ScrollView):
                                 "be set to 0.0.  When you accept the setup, the horizontal angle will be reset correctly on datum 2."
             self.scrollbox.add_widget(instructions)
 
-            self.datum1 = datum_selector(text = 'Select\ndatum\none',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_1')),
-                                                call_back = self.datum1_selected)
+            self.datum1 = datum_selector(text='Select\ndatum\none',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_1')),
+                                                call_back=self.datum1_selected)
             self.scrollbox.add_widget(self.datum1)
 
-            self.datum2 = datum_selector(text = 'Select\ndatum\ntwo',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_2')),
-                                                call_back = self.datum2_selected)
+            self.datum2 = datum_selector(text='Select\ndatum\ntwo',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_2')),
+                                                call_back=self.datum2_selected)
             self.scrollbox.add_widget(self.datum2)
 
             for n in range(2):
                 datum_name = self.data.get_datum(self.ini.get_value('SETUPS', '2DATUMS_DATUM_%s' % (n + 1)))
                 datum_name = f'Record\n{datum_name.name}' if datum_name else f'Record datum {n + 1}'
-                self.recorder.append(datum_recorder(datum_name, datum_no = n + 1, station = station, colors = colors,
-                                                    setup_type = setup_type, datum1 = self.datum1, datum2 = self.datum2, data = self.data))
+                self.recorder.append(datum_recorder(datum_name, datum_no=n + 1, station=station, colors=colors,
+                                                    setup_type=setup_type, datum1=self.datum1, datum2=self.datum2, data=self.data))
                 self.scrollbox.add_widget(self.recorder[n])
 
         elif setup_type == "Three datum shift":
@@ -1833,36 +1816,36 @@ class setups(ScrollView):
                                 "sediment is being excavated in a lab.  It requires three datums points."
             self.scrollbox.add_widget(instructions)
 
-            self.datum1 = datum_selector(text = 'Select datum 1',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1')),
-                                                call_back = self.datum1_selected)
+            self.datum1 = datum_selector(text='Select datum 1',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1')),
+                                                call_back=self.datum1_selected)
             self.scrollbox.add_widget(self.datum1)
 
-            self.datum2 = datum_selector(text = 'Select datum 2',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2')),
-                                                call_back = self.datum2_selected)
+            self.datum2 = datum_selector(text='Select datum 2',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2')),
+                                                call_back=self.datum2_selected)
             self.scrollbox.add_widget(self.datum2)
 
-            self.datum3 = datum_selector(text = 'Select datum 3',
-                                                data = self.data,
-                                                colors = self.colors,
-                                                default_datum = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3')),
-                                                call_back = self.datum3_selected)
+            self.datum3 = datum_selector(text='Select datum 3',
+                                                data=self.data,
+                                                colors=self.colors,
+                                                default_datum=self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3')),
+                                                call_back=self.datum3_selected)
             self.scrollbox.add_widget(self.datum3)
 
             for n in range(3):
                 datum_name = self.data.get_datum(self.ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_%s' % (n + 1)))
                 datum_name = f'Record {datum_name.name}' if datum_name else f'Record datum {n + 1}'
-                self.recorder.append(datum_recorder(datum_name, datum_no = n + 1, station = station,
-                                                                colors = self.colors, setup_type = setup_type))
+                self.recorder.append(datum_recorder(datum_name, datum_no=n + 1, station=station,
+                                                                colors=self.colors, setup_type=setup_type))
                 self.scrollbox.add_widget(self.recorder[n])
 
-        instructions.bind(texture_size = lambda instance, value: setattr(instance, 'height', value[1]))
-        instructions.bind(width = lambda instance, value: setattr(instance, 'text_size', (value * .95, None)))
+        instructions.bind(texture_size=lambda instance, value: setattr(instance, 'height', value[1]))
+        instructions.bind(width=lambda instance, value: setattr(instance, 'text_size', (value * .95, None)))
 
         self.size_hint = (1, .9)
         # self.size = (Window.width, Window.height / 2)
@@ -1878,15 +1861,15 @@ class setups(ScrollView):
         # self.bind(pos = draw_background)
 
     def datum1_selected(self, instance):
-        self.recorder[0].children[1].text = 'Record\n' + instance.datum.name
+        self.recorder[0].children[1].text = f'Record\n{instance.datum.name}'
         self.recorder[0].children[1].datum_name = instance.datum.name
 
     def datum2_selected(self, instance):
-        self.recorder[1].children[1].text = 'Record\n' + instance.datum.name
+        self.recorder[1].children[1].text = f'Record\n{instance.datum.name}'
         self.recorder[1].children[1].datum_name = instance.datum.name
 
     def datum3_selected(self, instance):
-        self.recorder[2].children[1].text = 'Record\n' + instance.datum.name
+        self.recorder[2].children[1].text = f'Record\n{instance.datum.name}'
         self.recorder[2].children[1].datum_name = instance.datum.name
 
     def set_hangle(self, instance):
@@ -1898,7 +1881,7 @@ class setups(ScrollView):
 
 class InitializeStationScreen(Screen):
 
-    def __init__(self, data = None, station = None, ini = None, colors = None, **kwargs):
+    def __init__(self, data=None, station=None, ini=None, colors=None, **kwargs):
         super(InitializeStationScreen, self).__init__(**kwargs)
 
         self.colors = colors if colors else ColorScheme()
@@ -1910,11 +1893,9 @@ class InitializeStationScreen(Screen):
         self.setup = lastsetup_type if lastsetup_type else 'Horizontal Angle Only'
 
         self.content = BoxLayout(orientation='vertical',
-                                    size_hint_y=1,
-                                    size_hint_max_x=MAX_SCREEN_WIDTH,
+                                    size_hint_y=1, size_hint_max_x=MAX_SCREEN_WIDTH,
                                     pos_hint={'center_x': .5, 'center_y': .5},
-                                    padding=5,
-                                    spacing=5)
+                                    padding=5, spacing=5)
         self.add_widget(self.content)
 
         setup_type_box = GridLayout(cols=1, padding=2, spacing=2, size_hint_y=None)
@@ -1936,7 +1917,7 @@ class InitializeStationScreen(Screen):
         if colors.button_font_size:
             self.setup_type.font_size = colors.button_font_size
         setup_type_box.add_widget(self.setup_type)
-        self.setup_type.bind(text = self.rebuild)
+        self.setup_type.bind(text=self.rebuild)
         self.content.add_widget(setup_type_box)
 
         self.scroll_content = BoxLayout(orientation='vertical',
@@ -1946,17 +1927,17 @@ class InitializeStationScreen(Screen):
         self.content.add_widget(self.scroll_content)
 
         self.setup_widgets = setups(self.setup_type.text,
-                                    data = self.data,
-                                    ini = self.ini,
-                                    station = self.station,
-                                    colors = self.colors)
+                                    data=self.data,
+                                    ini=self.ini,
+                                    station=self.station,
+                                    colors=self.colors)
         self.scroll_content.add_widget(self.setup_widgets)
 
-        self.content.add_widget(e5_side_by_side_buttons(text = ['Back', 'Accept Setup'],
-                                                        id = ['back', 'accept'],
-                                                        call_back = [self.go_back, self.accept_setup],
-                                                        selected = [False, False],
-                                                        colors = self.colors))
+        self.content.add_widget(e5_side_by_side_buttons(text=['Back', 'Accept Setup'],
+                                                        id=['back', 'accept'],
+                                                        call_back=[self.go_back, self.accept_setup],
+                                                        selected=[False, False],
+                                                        colors=self.colors))
 
     def rebuild(self, instance, value):
         self.setup = value
@@ -1971,15 +1952,14 @@ class InitializeStationScreen(Screen):
             if len(self.data.names('datums')) == 0:
                 message = '\nBefore you can use this option, you need to define some datums.  '
                 message += 'Go to the menu Edit Datums or to Setup Record Datums to add datums.'
-                self.popup = e5_MessageBox('Datums', message, call_back=self.close_popup)
+                self.popup = e5_MessageBox('Datums', message, call_back=self.close_popup, colors=self.colors)
                 self.popup.open()
 
     def go_back(self, instance):
         self.ini.update_value(APP_NAME, 'LASTSETUP_TYPE', self.setup_type.text)
-        self.parent.current = 'MainScreen'
+        sm.current = 'MainScreen'
 
     def accept_setup(self, instance):
-
         self.new_station = point()
         self.foresight = None
         txt = ''
@@ -2098,13 +2078,9 @@ class InitializeStationScreen(Screen):
                 txt += f'\n\nThis corresponds to errors of {dist_12_error}, {dist_23_error}, and {dist_13_error}, respectively.'
 
         if not self.new_station.is_none() or txt:
-            self.popup = e5_MessageBox('Accept setup?', txt,
-                                        response_type = "YESNO",
-                                        call_back = [self.set_and_close, self.close_popup],
-                                        colors = self.colors)
+            self.popup = e5_MessageBox('Accept setup?', txt, response_type="YESNO", call_back=[self.set_and_close, self.close_popup], colors=self.colors)
         else:
-            self.popup = e5_MessageBox('Error', error_message,
-                                        colors = self.colors)
+            self.popup = e5_MessageBox('Error', error_message, colors=self.colors)
 
         self.popup.open()
 
@@ -2169,7 +2145,7 @@ class InitializeStationScreen(Screen):
             self.ini.update_value('SETUPS', 'STATIONZ', self.station.location.z)
         self.ini.update_value('SETUPS', 'LASTSETUP_TYPE', self.setup_type.text)
         self.ini.save()
-        self.parent.current = 'MainScreen'
+        sm.current = 'MainScreen'
 
 
 class EditLastRecordScreen(e5_RecordEditScreen):
@@ -2207,14 +2183,15 @@ class EditDatumsScreen(e5_DatagridScreen):
 
 
 class station_setting(GridLayout):
+
     label = ObjectProperty(None)
     spinner = ObjectProperty(None)
     id = ObjectProperty(None)
     comport_to_test = None
     valid_comports = []
 
-    def __init__(self, label_text = '', spinner_values = (), default = '',
-                        id = None, call_back = None, colors = None, station = None, **kwargs):
+    def __init__(self, label_text='', spinner_values=(), default='',
+                        id=None, call_back=None, colors=None, station=None, **kwargs):
         super(station_setting, self).__init__(**kwargs)
 
         self.station = station
@@ -2231,21 +2208,21 @@ class station_setting(GridLayout):
         spinner_dropdown_button.font_size = colors.button_font_size.replace("sp", '') if colors.button_font_size else None
         spinner_dropdown_button.background_color = (0, 0, 0, 1)
 
-        self.spinner = Spinner(text = default if default is not None else '',
-                                values = spinner_values,
-                                font_size = colors.button_font_size if colors.button_font_size else None,
-                                option_cls = spinner_dropdown_button)
+        self.spinner = Spinner(text=default if default is not None else '',
+                                values=spinner_values,
+                                font_size=colors.button_font_size if colors.button_font_size else None,
+                                option_cls=spinner_dropdown_button)
         if label_text == 'Port Number':
-            comport = GridLayout(cols = 2, spacing = 5)
-            comport.bind(minimum_height = comport.setter('height'))
+            comport = GridLayout(cols=2, spacing=5)
+            comport.bind(minimum_height=comport.setter('height'))
             comport.add_widget(self.spinner)
-            scan_button = e5_button('Scan', colors = colors, call_back = self.scanner, button_height = comport.height)
+            scan_button = e5_button('Scan', colors=colors, call_back=self.scanner, button_height=comport.height)
             comport.add_widget(scan_button)
             self.add_widget(comport)
         else:
             self.add_widget(self.spinner)
         if call_back:
-            self.spinner.bind(text = call_back)
+            self.spinner.bind(text=call_back)
 
     def scanner(self, instance):
         if self.station:
@@ -2255,9 +2232,9 @@ class station_setting(GridLayout):
                 text += f"{port[0]['port']} - {port[0]['desc'][0:port[0]['desc'].find('(') - 1]}\n"
             self.spinner.values = list([port[0]['port'] for port in ports])
             self.popup = e5_MessageBox('COM Ports', text,
-                                        response_type = "OK",
-                                        call_back = self.close_popup_comports,
-                                        colors = self.colors)
+                                        response_type="OK",
+                                        call_back=self.close_popup_comports,
+                                        colors=self.colors)
             self.popup.open()
             self.popup_open = True
         else:
@@ -2268,9 +2245,9 @@ class station_setting(GridLayout):
         # print('.', end = "")
         self.popup = e5_MessageBox('COM Ports', '\nLooking for valid COM ports...This can take several seconds...'
                                                     'And the Cancel button might appear non-responsive...',
-                                    response_type = "CANCEL",
-                                    call_back = self.close_popup,
-                                    colors = self.colors)
+                                    response_type="CANCEL",
+                                    call_back=self.close_popup,
+                                    colors=self.colors)
         self.popup.open()
         self.popup_open = True
 
@@ -2286,7 +2263,7 @@ class station_setting(GridLayout):
 
     def comportIsUsable(self, portName):
         try:
-            ser = serial.Serial(port = portName)
+            ser = serial.Serial(port=portName)
             ser.close()
             return portName
         except:
@@ -2312,7 +2289,7 @@ class station_setting(GridLayout):
 
 class StationConfigurationScreen(Screen):
 
-    def __init__(self, station = None, ini = None, colors = None, **kwargs):
+    def __init__(self, station=None, ini=None, colors=None, **kwargs):
         super(StationConfigurationScreen, self).__init__(**kwargs)
 
         self.station = station
@@ -2322,77 +2299,75 @@ class StationConfigurationScreen(Screen):
 
     def on_enter(self):
         self.clear_widgets()
-        self.layout = GridLayout(cols = 1,
-                                    spacing = 5, padding = 5,
-                                    size_hint_max_x = MAX_SCREEN_WIDTH,
-                                    size_hint_y = 1,
-                                    pos_hint = {'center_x': .5, 'center_y': .5})
+        self.layout = GridLayout(cols=1, spacing=5, padding=5,
+                                    size_hint_max_x=MAX_SCREEN_WIDTH, size_hint_y=1,
+                                    pos_hint={'center_x': .5, 'center_y': .5})
         self.add_widget(self.layout)
         self.build_screen()
 
     def build_screen(self):
-        self.station_type = station_setting(label_text = 'Station type',
-                                            spinner_values = ("Leica", "Leica GeoCom", "GeoMax", "Wild", "Topcon", "Sokkia", "Microscribe",
+        self.station_type = station_setting(label_text='Station type',
+                                            spinner_values=("Leica", "Leica GeoCom", "GeoMax", "Wild", "Topcon", "Sokkia", "Microscribe",
                                                                 "Manual XYZ", "Manual VHD", "Simulate"),
-                                            call_back = self.toggle_buttons,
-                                            id = 'station_type',
-                                            colors = self.colors,
-                                            default = self.ini.get_value(APP_NAME, 'STATION'))
+                                            call_back=self.toggle_buttons,
+                                            id='station_type',
+                                            colors=self.colors,
+                                            default=self.ini.get_value(APP_NAME, 'STATION'))
         self.layout.add_widget(self.station_type)
 
-        self.communications = station_setting(label_text = 'Communications',
-                                                spinner_values = ("Serial", "Bluetooth"),
-                                                id = 'communications',
-                                                colors = self.colors,
-                                                default = self.ini.get_value(APP_NAME, 'COMMUNICATIONS'))
+        self.communications = station_setting(label_text='Communications',
+                                                spinner_values=("Serial", "Bluetooth"),
+                                                id='communications',
+                                                colors=self.colors,
+                                                default=self.ini.get_value(APP_NAME, 'COMMUNICATIONS'))
         self.layout.add_widget(self.communications)
 
-        self.comports = station_setting(label_text = 'Port Number',
-                                            spinner_values = [f'COM{n + 1}' for n in range(20)],
-                                            id = 'comport',
-                                            colors = self.colors, station = self.station,
-                                            default = self.ini.get_value(APP_NAME, 'COMPORT'))
+        self.comports = station_setting(label_text='Port Number',
+                                            spinner_values=[f'COM{n + 1}' for n in range(__LASTCOMPORT__)],
+                                            id='comport',
+                                            colors=self.colors, station=self.station,
+                                            default=self.ini.get_value(APP_NAME, 'COMPORT'))
         self.layout.add_widget(self.comports)
 
-        self.baud_rate = station_setting(label_text = 'Baud rate',
-                                            spinner_values = ("1200", "2400", "4800", "9600", "14400", "19200", "115200"),
-                                            id = 'baudrate',
-                                            colors = self.colors,
-                                            default = self.ini.get_value(APP_NAME, 'BAUDRATE'))
+        self.baud_rate = station_setting(label_text='Baud rate',
+                                            spinner_values=("1200", "2400", "4800", "9600", "14400", "19200", "38400", "115200"),
+                                            id='baudrate',
+                                            colors=self.colors,
+                                            default=self.ini.get_value(APP_NAME, 'BAUDRATE'))
         self.layout.add_widget(self.baud_rate)
 
-        self.parity = station_setting(label_text = 'Parity',
-                                            spinner_values = ("Even", "Odd", "None"),
-                                            id = 'parity',
-                                            colors = self.colors,
-                                            default = self.ini.get_value(APP_NAME, 'PARITY'))
+        self.parity = station_setting(label_text='Parity',
+                                            spinner_values=("Even", "Odd", "None"),
+                                            id='parity',
+                                            colors=self.colors,
+                                            default=self.ini.get_value(APP_NAME, 'PARITY'))
         self.layout.add_widget(self.parity)
 
-        self.data_bits = station_setting(label_text = 'Databits',
-                                            spinner_values = ("7", "8"),
-                                            id = 'databits',
-                                            colors = self.colors,
-                                            default = self.ini.get_value(APP_NAME, 'DATABITS'))
+        self.data_bits = station_setting(label_text='Databits',
+                                            spinner_values=("7", "8"),
+                                            id='databits',
+                                            colors=self.colors,
+                                            default=self.ini.get_value(APP_NAME, 'DATABITS'))
         self.layout.add_widget(self.data_bits)
 
-        self.stop_bits = station_setting(label_text = 'Stopbits',
-                                            spinner_values = ("0", "1", "2"),
-                                            id = 'stopbits',
-                                            colors = self.colors,
-                                            default = self.ini.get_value(APP_NAME, 'STOPBITS'))
+        self.stop_bits = station_setting(label_text='Stopbits',
+                                            spinner_values=("0", "1", "2"),
+                                            id='stopbits',
+                                            colors=self.colors,
+                                            default=self.ini.get_value(APP_NAME, 'STOPBITS'))
         self.layout.add_widget(self.stop_bits)
 
-        self.buttons = e5_side_by_side_buttons(text = ['Back', 'Set'],
-                                                id = ['Back', 'Set'],
-                                                selected = [True, False],
-                                                call_back = [self.close_screen, self.update_ini],
-                                                colors = self.colors)
+        self.buttons = e5_side_by_side_buttons(text=['Back', 'Set'],
+                                                id=['Back', 'Set'],
+                                                selected=[True, False],
+                                                call_back=[self.close_screen, self.update_ini],
+                                                colors=self.colors)
         self.layout.add_widget(self.buttons)
         self.toggle_buttons(None, None)
         self.changes = False
 
     def toggle_buttons(self, instance, value):
-        disabled = self.station_type.spinner.text in ['Simulate', 'Microscribe']
+        disabled = self.station_type.spinner.text in ['Simulate', 'Microscribe', 'Manual XYZ', 'Manual VHD']
         self.stop_bits.spinner.disabled = disabled
         self.parity.spinner.disabled = disabled
         self.data_bits.spinner.disabled = disabled
@@ -2423,20 +2398,31 @@ class StationConfigurationScreen(Screen):
         self.ini.update_value(APP_NAME, 'COMMUNICATIONS', self.communications.spinner.text)
 
         self.ini.save()
+
+        if self.station.make in ['Simulate', 'Manual XYZ', 'Manual VHD', 'Microscribe', '']:
+            self.close_screen(None)
+        else:
+            self.popup = e5_MessageBox('EDM', "\nSetting up communications.  Setup will timeout after 30 seconds if communications with these settings fails, and you will receive an error message.", response_type="NONE", colors=self.colors)
+            self.popup.open()
+            self.event = Clock.schedule_once(self.test_open, 5)
+
+    def test_open(self, instance):
         success = self.station.open()
+        self.popup.dismiss()
         if success == '':
             self.close_screen(None)
         else:
-            self.popup = e5_MessageBox('Error', success)
+            self.popup = e5_MessageBox('Error', success, colors=self.colors)
             self.popup.open()
 
     def close_screen(self, value):
-        self.parent.current = self.call_back
+        sm.current = self.call_back
 
 
 class AboutScreen(e5_InfoScreen):
+
     def on_pre_enter(self):
-        self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + VERSION + ' Beta\nBlueberry Pie\n\n'
+        self.content.text = '\n\nEDM by Shannon P. McPherron\n\nVersion ' + VERSION + ' Cranberry Pie\n\n'
         self.content.text += f'Built using Python 3.8, Kivy {__kivy_version__} and TinyDB {__tinydb_version__}\n\n'
         self.content.text += 'An OldStoneAge.Com Production\n\n' + PRODUCTION_DATE
         self.content.halign = 'center'
@@ -2448,7 +2434,7 @@ class AboutScreen(e5_InfoScreen):
 
 class StatusScreen(e5_InfoScreen):
 
-    def __init__(self, data = None, ini = None, cfg = None, station = None, **kwargs):
+    def __init__(self, data=None, ini=None, cfg=None, station=None, **kwargs):
         super(StatusScreen, self).__init__(**kwargs)
         self.data = data
         self.ini = ini
@@ -2467,7 +2453,7 @@ class StatusScreen(e5_InfoScreen):
         txt += f'\nThe operating system is {platform_name()}.\n'
         txt += f'\nPython build is {python_version()}.\n'
         txt += f'\nLibraries installed include Kivy {__kivy_version__} and TinyDB {__tinydb_version__}.\n'
-        txt += '\nEDM was tested and distributed most recently on Python 3.8.1, Kivy 2.0.0 and TinyDB 4.4.0.\n'
+        txt += '\nEDM was tested and distributed most recently on Python 3.8.6, Kivy 2.1.0 and TinyDB 4.4.0.\n'
         self.content.text = txt
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
@@ -2481,18 +2467,32 @@ class EDMApp(App):
 
     def __init__(self, **kwargs):
         super(EDMApp, self).__init__(**kwargs)
+        self.setup_paths()
 
-        self.app_paths = AppDataPaths(APP_NAME)
-        self.app_paths.setup()
+    def setup_paths(self):
+        ini_file_path = user_data_dir(APP_NAME, 'OSA')
+        self.make_path(ini_file_path)
+
+        log_file_path = user_log_dir(APP_NAME, 'OSA')
+        self.make_path(log_file_path)
+
+        doc_file_path = user_documents_dir()
+        self.make_path(doc_file_path)
+
+    def make_path(self, pathname):
+        if not os.path.isdir(pathname):
+            os.makedirs(pathname, exist_ok=True)
 
     def build(self):
-        sm.add_widget(MainScreen(name = 'MainScreen'))
+        sm.add_widget(MainScreen(name='MainScreen'))
         sm.current = 'MainScreen'
-        self.title = APP_NAME + " " + VERSION
+        self.title = f"{APP_NAME} {VERSION}"
+        if 'exit' in sys.argv:
+            self.stop()
         return sm
 
 
-Factory.register(APP_NAME, cls = EDMApp)
+Factory.register(APP_NAME, cls=EDMApp)
 
 
 if __name__ == '__main__':
