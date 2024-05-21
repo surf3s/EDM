@@ -86,8 +86,14 @@ Changes for Version 1.0.40
   Added message to communication settings to let user know program is trying
   Fixed datum menu in setups (to not have add new)
   Added message when trying to do setups without having added datums
+  fixed a logic bug with units when also unit is set to carry
+
+Changes for Version 1.0.41
+  fixed crash when Add button is pressed multiple times
 
 Bugs/To Do
+  have to click twice on unit to get it to switch units
+  add units to menu as you go along
   need to move load_dialog out of kv and into code and error trap bad paths
   could make menus work better with keyboard (at least with tab)
   Do unitchecking after doing an offset shot on suffix 0 points
@@ -181,8 +187,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.40'
-PRODUCTION_DATE = 'April, 2024'
+VERSION = '1.0.41'
+PRODUCTION_DATE = 'May, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -1036,7 +1042,11 @@ class MainScreen(e5_MainScreen):
                 if field.carry:
                     carry_value = self.get_last_value(fieldname)
                     if carry_value:
-                        new_record[fieldname] = carry_value
+                        if fieldname in new_record:
+                            if new_record[fieldname] is None:
+                                new_record[fieldname] = carry_value
+                        else:
+                            new_record[fieldname] = carry_value
         return new_record
 
     def fill_link_fields(self, new_record):

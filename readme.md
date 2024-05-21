@@ -99,6 +99,9 @@ Short answer, I don't know.  I have simulated having 1000 points in the database
 
 I am working on this.  Once this program is working smoothly, I will add plot functionality.
 
+##### Changes for Version 1.0.41 (May, 2024)
+1.  Fixed crash when spamming Add button in menu in datagrid
+
 ##### Changes for Version 1.0.40 (Decemeber, 2023)
 1.  GeoMax added by Tim Schueler
 2.  Multiple bugs traps in datagrid
@@ -106,6 +109,7 @@ I am working on this.  Once this program is working smoothly, I will add plot fu
 4.  Added message to communication settings to let user know program is trying
 5.  Fixed datum menu in setups (to not have add new)
 6.  Added message when trying to do setups without having added datums
+7.  Fixed a logic bug with units when also unit is set to carry
 
 ##### Changes for Version 1.0.39 
 1.  Fixed issue with Alpha default buttons not working

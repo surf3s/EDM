@@ -3371,40 +3371,42 @@ class DataGridTableData(RecycleView):
 
     def menu_selection(self, instance):
         self.popup.dismiss()
-        if self.field in ['HANGLE', 'VANGLE'] and APP_NAME == 'EDM':
-            new_data = {self.field: self.datatable_widget.popup_textbox.text}
-        elif self.inputtype in ['MENU', 'BOOLEAN']:
-            new_data = {self.field: instance.text if not instance.text == 'Add' else self.datatable_widget.popup_textbox.text}
-        elif self.inputtype == 'NUMERIC':
-            edm_fields = ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ']
-            if self.field in edm_fields and APP_NAME == 'EDM':
-                try:
-                    self.datatable_widget.popup_textbox.text = str(eval(self.datatable_widget.popup_textbox.text))
-                except (DivisionByZero, NameError, SyntaxError):
-                    pass
-            try:
-                if '.' in self.datatable_widget.popup_textbox.text:
-                    new_data = {self.field: float(self.datatable_widget.popup_textbox.text)}
-                else:
-                    new_data = {self.field: int(self.datatable_widget.popup_textbox.text)}
-            except ValueError:
+        # This next if statement addresses a bug where Add button is clicked multiple times
+        if not instance.text == 'Add' or self.datatable_widget.popup_textbox:
+            if self.field in ['HANGLE', 'VANGLE'] and APP_NAME == 'EDM':
                 new_data = {self.field: self.datatable_widget.popup_textbox.text}
-        else:
-            new_data = {self.field: self.datatable_widget.popup_textbox.text}
-        is_valid = self.e5_cfg.validate_datafield(new_data, self.tb)
-        if is_valid is True:
-            self.tb.update(new_data, doc_ids=[int(self.datagrid_doc_id)])
-            self.update_recycle_data(self.datagrid_doc_id, self.field, new_data[self.field])
-            # for widget in self.walk():
-            #    if hasattr(widget, 'id'):
-            #        if widget.id == 'datacell':
-            #            if widget.key == self.datagrid_doc_id and widget.field == self.field:
-            #                widget.text = str(new_data[self.field])
-            self.datatable_widget.popup_scrollmenu = None
-            self.datatable_widget.popup_textbox = None
-        else:
-            self.popup = e5_MessageBox('Data error', is_valid, colors=self.colors)
-            self.popup.open()
+            elif self.inputtype in ['MENU', 'BOOLEAN']:
+                new_data = {self.field: instance.text if not instance.text == 'Add' else self.datatable_widget.popup_textbox.text}
+            elif self.inputtype == 'NUMERIC':
+                edm_fields = ['X', 'Y', 'Z', 'PRISM', 'SLOPED', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ']
+                if self.field in edm_fields and APP_NAME == 'EDM':
+                    try:
+                        self.datatable_widget.popup_textbox.text = str(eval(self.datatable_widget.popup_textbox.text))
+                    except (DivisionByZero, NameError, SyntaxError):
+                        pass
+                try:
+                    if '.' in self.datatable_widget.popup_textbox.text:
+                        new_data = {self.field: float(self.datatable_widget.popup_textbox.text)}
+                    else:
+                        new_data = {self.field: int(self.datatable_widget.popup_textbox.text)}
+                except ValueError:
+                    new_data = {self.field: self.datatable_widget.popup_textbox.text}
+            else:
+                new_data = {self.field: self.datatable_widget.popup_textbox.text}
+            is_valid = self.e5_cfg.validate_datafield(new_data, self.tb)
+            if is_valid is True:
+                self.tb.update(new_data, doc_ids=[int(self.datagrid_doc_id)])
+                self.update_recycle_data(self.datagrid_doc_id, self.field, new_data[self.field])
+                # for widget in self.walk():
+                #    if hasattr(widget, 'id'):
+                #        if widget.id == 'datacell':
+                #            if widget.key == self.datagrid_doc_id and widget.field == self.field:
+                #                widget.text = str(new_data[self.field])
+                self.datatable_widget.popup_scrollmenu = None
+                self.datatable_widget.popup_textbox = None
+            else:
+                self.popup = e5_MessageBox('Data error', is_valid, colors=self.colors)
+                self.popup.open()
 
     def update_recycle_data(self, doc_id, field, value):
         for record in self.data:
