@@ -1957,7 +1957,7 @@ class e5_RecordEditScreen(Screen):
         self.popup.dismiss()
         if self.popup_field_widget:
             self.popup_field_widget.text = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
-            self.refresh_linked_fields(instance.id, instance.text)
+            self.refresh_linked_fields(self.popup_field_widget.id, self.popup_field_widget.text)
             if instance.id == 'add_button' and self.popup_field_widget.text.strip() != '':
                 field = self.e5_cfg.get(self.popup_field_widget.id)
                 if self.popup_field_widget.text not in field.menu:

@@ -91,6 +91,10 @@ Changes for Version 1.0.40
 Changes for Version 1.0.41
   fixed crash when Add button is pressed multiple times
 
+Changes for Version 1.0.42
+  Fixed bug where default values on speed buttons did not trigger linked fields
+  Fixed bug where changing value of a field in edit screen did not trigger linked fields
+
 Bugs/To Do
   have to click twice on unit to get it to switch units
   add units to menu as you go along
@@ -187,7 +191,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.41'
+VERSION = '1.0.42'
 PRODUCTION_DATE = 'May, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
@@ -982,8 +986,8 @@ class MainScreen(e5_MainScreen):
         if self.station.shot_type != 'continue':
             new_record = self.find_unit_and_fill_fields(new_record)
             new_record = self.fill_carry_fields(new_record)
-            new_record = self.fill_link_fields(new_record)
             new_record = self.fill_button_defaults(new_record)
+            new_record = self.fill_link_fields(new_record)
             new_record = self.do_increments(new_record)
             new_record['SUFFIX'] = 0
         else:
