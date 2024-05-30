@@ -95,6 +95,9 @@ Changes for Version 1.0.42
   Fixed bug where default values on speed buttons did not trigger linked fields
   Fixed bug where changing value of a field in edit screen did not trigger linked fields
 
+Changes for Version 1.0.43
+  Fixed bug that broke communication with older Leica instruments
+
 Bugs/To Do
   have to click twice on unit to get it to switch units
   add units to menu as you go along
@@ -191,7 +194,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.42'
+VERSION = '1.0.43'
 PRODUCTION_DATE = 'May, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13

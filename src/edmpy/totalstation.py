@@ -495,6 +495,7 @@ class totalstation(object):
             if data:
                 self.add_to_io('Received <- ' + data)
         self.received = data
+        return data
 
     def close(self):
         if self.serialcom.is_open:
@@ -995,9 +996,13 @@ class totalstation(object):
 
     def fetch_point_leica(self):
         self.pnt = self.receive()
+        self.set_response_leica()
         if self.pnt:
             self.parce_leica()
             self.vhd_to_xyz()
+
+    def set_response_leica(self):
+        self.response = self.leica_trim_crlf(self.received) if self.received else ""
 
     def parce_leica(self):
         if self.pnt:

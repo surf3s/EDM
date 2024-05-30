@@ -103,6 +103,9 @@ I am working on this.  Once this program is working smoothly, I will add plot fu
 
 Recently (May, 2024) I was helping someone put the program on a Windows 10 tablet.  However, the virus protection software (Microsoft) said the Windows exe version was a virus and immediately removed it.  It took a lot of time to find a work around.  Eventually we made exe programs a virus exception.  This is not a great solution.  I can assure you that edm.exe does not contain a virus.  I also personally downloaded the same version and scanned it with my virus detection software.  Nothing.  I will try to find a computer where I can replicate this and see what part of my program is giving this problem.  If you experience this as well, let me know.
 
+##### Changes for Version 1.0.43 (May 20, 2024)
+1.  Fixed bug that broke communication with older Leica instruments
+
 ##### Changes for Version 1.0.42 (May, 2024)
 1.  Fixed bug where default values on speed buttons did not trigger linked fields
 2.  Fixed bug where changing value of a field in edit screen did not trigger linked fields
