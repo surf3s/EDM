@@ -19,7 +19,7 @@ class DB(dbs):
             self.db.close()
         try:
             if self.valid_format(filename):
-                self.db = TinyDB(filename, sort_keys = True, indent = 4, separators = (',', ': '))
+                self.db = TinyDB(filename, sort_keys=True, indent=4, separators=(',', ': '))
                 self.filename = filename
                 self.prisms = self.db.table('prisms')
                 self.new_data['prisms'] = True
@@ -40,52 +40,52 @@ class DB(dbs):
         p = self.db.search((where('unit') == unit) & (where('id') == id)) if self.db else None
         return p if p else None
 
-    def get_datum(self, name = None):
+    def get_datum(self, name=None):
         p = self.get_by_name('datums', name)
         return datum(p['NAME'] if 'NAME' in p.keys() else None,
-                        float(p['X']) if 'X' in p.keys() else None,
-                        float(p['Y']) if 'Y' in p.keys() else None,
-                        float(p['Z']) if 'Z' in p.keys() else None,
+                        (float(p['X']) if p['X'] != '' else None) if 'X' in p.keys() else None,
+                        (float(p['Y']) if p['Y'] != '' else None) if 'Y' in p.keys() else None,
+                        (float(p['Z']) if p['Z'] != '' else None) if 'Z' in p.keys() else None,
                         p['NOTES'] if 'NOTES' in p.keys() else '')
 
     def get_unit(self, name):
         p = self.get_by_name('units', name)
-        return unit(name = p['NAME'] if 'NAME' in p.keys() else None,
-                    minx = float(p['MINX']) if 'MINX' in p.keys() else None,
-                    miny = float(p['MINY']) if 'MINY' in p.keys() else None,
-                    maxx = float(p['MAXX']) if 'MAXX' in p.keys() else None,
-                    maxy = float(p['MAXY']) if 'MAXY' in p.keys() else None,
-                    centerx = float(p['CENTERX']) if 'CENTERX' in p.keys() else None,
-                    centery = float(p['CENTERY']) if 'CENTERY' in p.keys() else None,
-                    radius = float(p['RADIUS']) if 'RADIUS' in p.keys() else None)
+        return unit(name=(p['NAME'] if p['NAME'] else None) if 'NAME' in p.keys() else None,
+                    minx=(float(p['MINX']) if p['MINX'] != '' else None) if 'MINX' in p.keys() else None,
+                    miny=(float(p['MINY']) if p['MINY'] != '' else None) if 'MINY' in p.keys() else None,
+                    maxx=(float(p['MAXX']) if p['MAXX'] != '' else None) if 'MAXX' in p.keys() else None,
+                    maxy=(float(p['MAXY']) if p['MAXY'] != '' else None) if 'MAXY' in p.keys() else None,
+                    centerx=(float(p['CENTERX']) if p['CENTERX'] != '' else None) if 'CENTERX' in p.keys() else None,
+                    centery=(float(p['CENTERY']) if p['CENTERY'] != '' else None) if 'CENTERY' in p.keys() else None,
+                    radius=(float(p['RADIUS']) if p['RADIUS'] != '' else None) if 'RADIUS' in p.keys() else None)
 
     def get_prism(self, name):
         p = self.get_by_name('prisms', name)
         return prism(p['NAME'] if 'NAME' in p.keys() else None,
-                        float(p['HEIGHT']) if 'HEIGHT' in p.keys() else None,
-                        float(p['OFFSET']) if 'OFFSET' in p.keys() else None)
+                        (float(p['HEIGHT']) if p['HEIGHT'] != '' else None) if 'HEIGHT' in p.keys() else None,
+                        (float(p['OFFSET']) if p['OFFSET'] != '' else None) if 'OFFSET' in p.keys() else None)
 
-    def get_by_name(self, table = None, name = None):
+    def get_by_name(self, table=None, name=None):
         if table is not None and name is not None and self.db is not None:
             item = Query()
-            p = self.db.table(table).search(item.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
+            p = self.db.table(table).search(item.NAME.matches('^' + name + '$', flags=re.IGNORECASE))
             if p != []:
                 return p[0]
         return {}
 
-    def delete_unit(self, name = None):
+    def delete_unit(self, name=None):
         return self.delete_by_name('units', name)
 
-    def delete_prism(self, name = None):
+    def delete_prism(self, name=None):
         return self.delete_by_name('prisms', name)
 
-    def delete_datum(self, name = None):
+    def delete_datum(self, name=None):
         return self.delete_by_name('datums', name)
 
-    def delete_by_name(self, table = None, name = None):
+    def delete_by_name(self, table=None, name=None):
         if name is not None and table is not None and self.db is not None:
             item = Query()
-            self.db.table(table).remove(item.NAME.matches('^' + name + '$', flags = re.IGNORECASE))
+            self.db.table(table).remove(item.NAME.matches('^' + name + '$', flags=re.IGNORECASE))
             return True
         return False
 

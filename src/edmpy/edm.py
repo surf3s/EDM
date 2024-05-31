@@ -98,7 +98,16 @@ Changes for Version 1.0.42
 Changes for Version 1.0.43
   Fixed bug that broke communication with older Leica instruments
 
+Changes for Version 1.0.44
+  Fixed major bug with auto finding Unit based on XY
+  Fixed other related issues stemming from this
+
 Bugs/To Do
+    import CSV files that don't have quotes
+    have a toggle for unit checking
+    sort filter by docid
+
+
   have to click twice on unit to get it to switch units
   add units to menu as you go along
   need to move load_dialog out of kv and into code and error trap bad paths
@@ -194,7 +203,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.43'
+VERSION = '1.0.44'
 PRODUCTION_DATE = 'May, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
@@ -623,10 +632,25 @@ class MainScreen(e5_MainScreen):
             elif self.station.make in ['Topcon']:
                 self.station.fetch_point_topcon()
             if self.station.response:
+                self.event.cancel()
                 self.station.make_global()
                 self.station.prism_adjust()
+
+                # Update the XYZ in the current edit screen
                 sm.get_screen('EditPointScreen').reset_defaults_from_recorded_point(self.station)
-                self.event.cancel()
+
+                # Get the unit for these XY coordinates and if it is different than the current
+                # then update the linked fields.  And fix other stuff.
+                unitname = self.data.point_in_unit(self.station.xyz_global)
+                current_unit = sm.get_screen('EditPointScreen').read_widget_text("UNIT")
+                if unitname and current_unit != unitname:
+                    sm.get_screen('EditPointScreen').add_new_menu_item_to_cfg("UNIT", unitname)
+                    sm.get_screen('EditPointScreen').update_widget_text("UNIT", unitname)
+                    sm.get_screen('EditPointScreen').refresh_linked_fields("UNIT", unitname)
+                    button_values = self.fill_button_defaults({})
+                    for field in button_values.keys():
+                        if field != "UNIT":
+                            sm.get_screen('EditPointScreen').update_widget_text(field, button_values[field])
 
     def check_for_station_response_x_shot(self, dt):
         # print('.', end = "")

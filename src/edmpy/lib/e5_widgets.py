@@ -1676,6 +1676,20 @@ class e5_RecordEditScreen(Screen):
                     if widget.id in fields:
                         widget.text = ''
 
+    def update_widget_text(self, which_widget, what_text):
+        for widget in self.layout.walk():
+            if hasattr(widget, 'id'):
+                if widget.id == which_widget:
+                    widget.text = what_text
+                    break
+
+    def read_widget_text(self, which_widget):
+        for widget in self.layout.walk():
+            if hasattr(widget, 'id'):
+                if widget.id == which_widget:
+                    return widget.text
+        return None
+
     def put_data_in_frame(self):
         self.clear_the_frame()
         if self.doc_id and self.data.table and self.e5_cfg:
@@ -1759,6 +1773,7 @@ class e5_RecordEditScreen(Screen):
         if field.link_fields:
             linkfields = self.data.get_link_fields(fieldname, value)
             if linkfields:
+                id_bumped = False
                 for widget in self.layout.walk():
                     if hasattr(widget, 'id'):
                         if widget.id in linkfields.keys() and widget.id != fieldname:
@@ -1767,9 +1782,12 @@ class e5_RecordEditScreen(Screen):
                             if widget_field.increment:
                                 try:
                                     widget.text = str(int(widget.text) + 1)
+                                    id_bumped = True
                                 except ValueError:
                                     pass
                             # self.update_db(widget, widget.text)
+                if id_bumped:
+                    self.update_widget_text("SUFFIX", "0")
 
     def check_required_fields(self):
         save_errors = []
@@ -1953,17 +1971,21 @@ class e5_RecordEditScreen(Screen):
         elif not instance.focus and not self.loading:
             self.refresh_linked_fields(instance.id, instance.text)
 
+    def add_new_menu_item_to_cfg(self, fieldname, value):
+        field = self.e5_cfg.get(fieldname)
+        if field.inputtype == "MENU":
+            if value not in field.menu:
+                field.menu.append(value)
+                self.e5_cfg.update_value(field.name, 'MENU', ','.join(field.menu))
+                self.e5_cfg.save()
+
     def menu_selection(self, instance):
         self.popup.dismiss()
         if self.popup_field_widget:
             self.popup_field_widget.text = instance.text if not instance.id == 'add_button' else self.popup_textbox.text
             self.refresh_linked_fields(self.popup_field_widget.id, self.popup_field_widget.text)
             if instance.id == 'add_button' and self.popup_field_widget.text.strip() != '':
-                field = self.e5_cfg.get(self.popup_field_widget.id)
-                if self.popup_field_widget.text not in field.menu:
-                    field.menu.append(self.popup_field_widget.text)
-                    self.e5_cfg.update_value(field.name, 'MENU', ','.join(field.menu))
-                    self.e5_cfg.save()
+                self.add_new_menu_item_to_cfg(self.popup_field_widget.id, self.popup_field_widget.text)
         self.popup_field_widget = None
         self.popup_scrollmenu = None
 

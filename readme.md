@@ -75,7 +75,7 @@ This version of EDM also works with Microscribes.  These are instruments built f
 
 Currently EDM is only fully tested on Windows 10 and 11.  However, the libraries used here are specifically designed to work on Windows, Linux, MacOS and even Android.  The only issue I see is serial port drivers (but see also below BlueTooth).  In the coming months, I will be testing EDM on a variety of platforms including ChromeOS.  If you have experience running it on other platforms, please let me know.  For Android, I will have to produce a separate installation that I hope to work on soon.
 
-The main issues with a field computer are battery life and durability.  Now that the new program is written, I am looking for good field computers.  I have run both EDMWin and this version of EDM on a Topcon FC-6000 Geo Cell CE 128GB tablet with Windows 10.  This tablet is ruggized and comes with an exchangeable battery.  I will know better how they work in a few months, but it seems like a good solution.
+The main issues with a field computer are battery life and durability.  Now that the new program is written, I am looking for good field computers.  I have run both EDMWin and this version of EDM on a Topcon FC-6000 Geo Cell CE 128GB tablet with Windows 10.  This tablet is ruggized and comes with an exchangeable battery.  I will know better how they work in a few months, but it seems like a good solution.  I have also tested it on a reconditioned Panasonic ToughBook.  A fuller test of this unit will happen in the summer of 2024.  And I know a team using the Juniper Systems Mesa 2.  This looks a lot like the Topcon FC-6000.  I haven't used one myself, but a team will be using it in summer 2024.
 
 #### How should I connect a computer to a total station?
 
@@ -102,6 +102,10 @@ I am working on this.  Once this program is working smoothly, I will add plot fu
 ##### Virus Warning
 
 Recently (May, 2024) I was helping someone put the program on a Windows 10 tablet.  However, the virus protection software (Microsoft) said the Windows exe version was a virus and immediately removed it.  It took a lot of time to find a work around.  Eventually we made exe programs a virus exception.  This is not a great solution.  I can assure you that edm.exe does not contain a virus.  I also personally downloaded the same version and scanned it with my virus detection software.  Nothing.  I will try to find a computer where I can replicate this and see what part of my program is giving this problem.  If you experience this as well, let me know.
+
+##### Changes for Version 1.0.44 (May 31, 2024)
+1.  Fixed major bug with auto finding Unit based on XY
+2.  Fixed other related issues stemming from this
 
 ##### Changes for Version 1.0.43 (May 20, 2024)
 1.  Fixed bug that broke communication with older Leica instruments

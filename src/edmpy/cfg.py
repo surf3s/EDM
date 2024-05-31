@@ -26,7 +26,7 @@ class CFG(blockdata):
         def __init__(self, name):
             self.name = name
 
-    def __init__(self, filename = ''):
+    def __init__(self, filename=''):
         self.initialize()
         if filename:
             self.filename = filename
@@ -48,7 +48,7 @@ class CFG(blockdata):
         self.errors = []
         self.unique_together = []
 
-    def open(self, filename = ''):
+    def open(self, filename=''):
         if filename:
             self.filename = filename
         return self.load()
@@ -77,7 +77,7 @@ class CFG(blockdata):
                     return error_message
         return True
 
-    def validate_datarecord(self, data_to_insert, data_table, new_record = False):
+    def validate_datarecord(self, data_to_insert, data_table, new_record=False):
         # This validates one record (e.g. one a record is about to be inserted)
         for field in self.fields():
             f = self.get(field)
@@ -429,7 +429,7 @@ class CFG(blockdata):
     def save(self):
         self.write_blocks()
 
-    def load(self, filename = ''):
+    def load(self, filename=''):
         if filename:
             self.filename = filename
         self.path = os.path.split(self.filename)[0]
