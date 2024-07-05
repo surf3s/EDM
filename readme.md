@@ -103,6 +103,11 @@ I am working on this.  Once this program is working smoothly, I will add plot fu
 
 Recently (May, 2024) I was helping someone put the program on a Windows 10 tablet.  However, the virus protection software (Microsoft) said the Windows exe version was a virus and immediately removed it.  It took a lot of time to find a work around.  Eventually we made exe programs a virus exception.  This is not a great solution.  I can assure you that edm.exe does not contain a virus.  I also personally downloaded the same version and scanned it with my virus detection software.  Nothing.  I will try to find a computer where I can replicate this and see what part of my program is giving this problem.  If you experience this as well, let me know.
 
+
+#### Changes for Version 1.0.45 (July 5, 2024)
+1.  Some newer Leica models can return a valid hangle and vangle but a slope distance of 0 when the distance can't be measured.
+      This is now error trapped.  If the coordinates are the same as the station coordinates or if slope distance is zero, a message is displayed.
+
 ##### Changes for Version 1.0.44 (May 31, 2024)
 1.  Fixed major bug with auto finding Unit based on XY
 2.  Fixed other related issues stemming from this

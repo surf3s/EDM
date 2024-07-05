@@ -163,7 +163,7 @@ class totalstation(object):
                     self.error_message = 'Error: wrong setting of PPM or MM on EDM'
                     return
                 if self.error_code == 1292:
-                    self.error_message = 'Error: distance measurement no done (no aim, etc.)'
+                    self.error_message = 'Error: distance measurement not done (no aim, etc.)'
                     return
                 if self.error_code == 1293:
                     self.error_message = 'Error: system is busy (no measurement done)'

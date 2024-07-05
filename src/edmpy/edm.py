@@ -102,6 +102,10 @@ Changes for Version 1.0.44
   Fixed major bug with auto finding Unit based on XY
   Fixed other related issues stemming from this
 
+Changes for Version 1.0.45
+  Some newer Leica models can return a valid hangle and vangle but a slope distance of 0 when the distance can't be measured.
+    This is now error trapped.  If the coordinates are the same as the station coordinates or if slope distance is zero, a message is displayed.
+
 Bugs/To Do
     import CSV files that don't have quotes
     have a toggle for unit checking
@@ -203,8 +207,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.44'
-PRODUCTION_DATE = 'May, 2024'
+VERSION = '1.0.45'
+PRODUCTION_DATE = 'July 5, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -636,6 +640,17 @@ class MainScreen(e5_MainScreen):
                 self.station.make_global()
                 self.station.prism_adjust()
 
+                if self.station.xyz_global.x == self.station.location.x and self.station.xyz_global.y == self.station.location.y and self.station.xyz_global.z == self.station.location.z:
+                    self.popup = e5_MessageBox('Error',
+                                                 'The measured point is the same as the station coordinates.  This can happen if the slope distance is 0.  Retake the shot.',
+                                                 colors=self.colors)
+                    self.popup.open()
+                elif self.station.sloped == 0:
+                    self.popup = e5_MessageBox('Error',
+                                                 'The station returned a slope distance of 0.  Retake the shot.',
+                                                 colors=self.colors)
+                    self.popup.open()
+
                 # Update the XYZ in the current edit screen
                 sm.get_screen('EditPointScreen').reset_defaults_from_recorded_point(self.station)
 
@@ -702,6 +717,8 @@ class MainScreen(e5_MainScreen):
             self.event = Clock.schedule_interval(self.check_for_station_response_x_shot, .1)
 
     def on_save(self):
+        # if self.point_matches_station_coords():
+        #     return ['This point matches the station coordinates.  Normally this means that the point was not recorded correctly.  This can happen when the slope distance is 0.  If this is not correct, you will need to delete this point and reshoot it.']
         self.log_the_shot()
         self.update_info_label()
         self.make_backup()
