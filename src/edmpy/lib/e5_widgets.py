@@ -2268,16 +2268,16 @@ class DataUploadScreen(Screen):
         self.scroll_grid.add_widget(e5_label_wrapped(text=instructions, colors=self.colors))
         self.url = DataGridLabelAndField(col='URL', colors=self.colors)
         if url:
-            self.url.txt.text = url
+            self.url.txt.textbox.text = url
         self.scroll_grid.add_widget(self.url)
         self.username = DataGridLabelAndField(col='Username', colors=self.colors)
         if username:
-            self.username.txt.text = username
+            self.username.txt.textbox.text = username
         self.scroll_grid.add_widget(self.username)
         self.password = DataGridLabelAndField(col='Password', colors=self.colors)
         password = ''
         if password:
-            self.password.txt.text = password
+            self.password.txt.textbox.text = password
         self.password.txt.password = True
         self.scroll_grid.add_widget(self.password)
         self.dbname = DataGridLabelAndField(col='Database name', colors=self.colors)
@@ -2305,19 +2305,19 @@ class DataUploadScreen(Screen):
     def on_pre_enter(self):
         database = self.cfg.get_value(APP_NAME, 'ONLINE_DATABASE')
         if database:
-            self.dbname.txt.text = database
+            self.dbname.txt.textbox.text = database
 
         table = self.cfg.get_value(APP_NAME, 'ONLINE_TABLE')
         if table:
-            self.tablename.txt.text = table
+            self.tablename.txt.textbox.text = table
 
         username = self.cfg.get_value(APP_NAME, 'ONLINE_USERNAME')
         if username:
-            self.username.txt.text = username
+            self.username.txt.textbox.text = username
 
         url = self.cfg.get_value(APP_NAME, 'ONLINE_URL')
         if url:
-            self.url.txt.text = url
+            self.url.txt.textbox.text = url
 
     def on_enter(self):
         if not self.cfg.filename or not self.data.filename:
@@ -2334,16 +2334,16 @@ class DataUploadScreen(Screen):
 
     def back(self, instance):
         if self.dbname.txt.textbox.text:
-            self.cfg.update_value(APP_NAME, 'ONLINE_DATABASE', self.dbname.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_DATABASE', self.dbname.txt.textbox.text)
 
         if self.tablename.txt.textbox.text:
-            self.cfg.update_value(APP_NAME, 'ONLINE_TABLE', self.tablename.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_TABLE', self.tablename.txt.textbox.text)
 
         if self.username.txt.textbox.text:
-            self.cfg.update_value(APP_NAME, 'ONLINE_USERNAME', self.username.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_USERNAME', self.username.txt.textbox.text)
 
         if self.url.txt.textbox.text:
-            self.cfg.update_value(APP_NAME, 'ONLINE_URL', self.url.txt.text)
+            self.cfg.update_value(APP_NAME, 'ONLINE_URL', self.url.txt.textbox.text)
 
         self.cfg.save()
         self.parent.current = 'MainScreen'
@@ -2418,8 +2418,9 @@ class DataUploadScreen(Screen):
     def fix_numeric_fields(self, record, structure):
         new_record = record.copy()
         for field in record.keys():
-            if structure[field]['type'] in ['IntegerField', 'FloatField'] and record[field] == "":
-                new_record[field] = None
+            if field in structure:
+                if structure[field]['type'] in ['IntegerField', 'FloatField'] and record[field] == "":
+                    new_record[field] = None
         return new_record
 
     def remove_non_e5_cfg_fields(self, record, cfg_fields):
@@ -2439,16 +2440,16 @@ class DataUploadScreen(Screen):
             if structure[field]['type'] == 'ForeignKey' and field != 'squid':
                 second_route = route.copy()
                 second_route['table'] = field
-                detail = '/' + record[field]
+                detail = '/' + record[field if field != 'idno' else 'id']
                 response = self.get_details(second_route, detail)
                 if 'id' in response:
                     details.append(str(response['id']))
                 else:
                     details.append('None')
             else:
-                details.append(record[field])
+                details.append(record[field if field != 'idno' else 'id'])
         # detail = [record[field] if field in record.keys() else '' for field in unique_together]
-        return '/' + '/'.join([detail if detail != '' else 'None' for detail in details])
+        return '/' + '/'.join([str(detail) if detail != '' else 'None' for detail in details])
 
     def unique_together_as_humanreadable(self, record, unique_together):
         detail = [str(record[field]) if field in record.keys() else '' for field in unique_together]
@@ -2505,7 +2506,7 @@ class DataUploadScreen(Screen):
             return ("Could not connect to the URL provided above with those credentials.  "
                         "This URL should look something like https://www.oldstoneage.com/api/ but modified for your database.  "
                         f"The exact error message was '{status}'.", route)
-        if not self.dbname.txt.text or not self.tablename.txt.text:
+        if not self.dbname.txt.textbox.text or not self.tablename.txt.textbox.text:
             return ('Provide a database and table name.', route)
         route['type'] = status['type']
         return ('', route)
@@ -2620,85 +2621,95 @@ class DataUploadScreen(Screen):
             self.progress.label.text = 'Done\n'
             return
 
-        self.error_message = self.check_for_cfg_fields_not_online(xyz_structure + context_structure)
+        structure = {**xyz_structure, **context_structure}
+
+        self.error_message = self.check_for_cfg_fields_not_online(structure)
         if self.error_message:
             self.progress.label.text = 'Done\n'
             return
 
-        unique_together_xyz = ['unit', 'id', 'suffix']
-        # unique_together_context = ['unit', 'id']
-        # unique_keys = {}
+        unique_together_xyz = ['squid', 'suffix']
+        unique_together_context = ['squid']
+        unique_keys = {}
         self.error_message = ''
         n_records = len(self.data.db.table(self.data.table))
         record_counter = 0
         to_delete = []
         for record in self.data.db.table(self.data.table).all():
             record_copy = record.copy()
-            doc_id = record_copy.doc_id
+            doc_id = record.doc_id
             record_copy = {k.lower(): v for k, v in record_copy.items()}
             record_copy = self.remove_non_e5_cfg_fields(record_copy, self.cfg.fields())
             record_copy = self.clean_the_record(record_copy, xyz_structure)
             record_copy = self.clean_the_record(record_copy, context_structure)
             record_copy = self.fix_numeric_fields(record_copy, xyz_structure)
             record_copy = self.fix_numeric_fields(record_copy, context_structure)
+            if 'squid' not in record_copy:
+                record_copy['squid'] = f"{record_copy['unit']}-{record_copy['id']}"
 
             record_counter += 1
             self.progress.label.text = f'Uploading {self.unique_together_as_humanreadable(record_copy, unique_together_xyz)}\n'
             self.progress.bar.value = record_counter / n_records
 
-            online_record = self.record_already_exists(route, record_copy, self.cfg.unique_together, structure)
-            if online_record == 'Lookup error':
-                self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - "\
-                                      "Unable to test whether this record already exists."
-                self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
-            elif online_record and self.overwrite.check.active:
-                if route['type'] == 'Standard':
-                    url = f"{route['url']}{route['database']}/{route['table']}/{online_record['squid']}/"
+            for tablename in ['context', 'xyz']:
+                route['table'] = tablename
+                if tablename == 'context' and record_copy['suffix'] >= 1:
+                    continue
+                unique_together = unique_together_xyz if tablename == 'xyz' else unique_together_context
+                online_record = self.record_already_exists(route, record_copy, unique_together, structure)
+                if online_record == 'Lookup error':
+                    self.error_message += f"\n\nRecord {self.unique_together_as_humanreadable(record_copy, unique_together)} - "\
+                                        "Unable to test whether this record already exists."
+                    self.fails.append(self.unique_together_as_humanreadable(record_copy, unique_together))
+                elif online_record and self.overwrite.check.active:
+                    url = f"{route['url']}{route['database']}/{route['table']}/update/{online_record['squid']}/"
+                    record_copy = self.replace_keyfields(route, record_copy, unique_together, structure)
+                    record_copy = self.fix_numeric_fields(record_copy, structure)
+                    record_copy = self.remove_non_e5_cfg_fields(record_copy, self.cfg.fields())
+                    if 'squid' not in record_copy:
+                        record_copy['squid'] = f"{record_copy['unit']}-{record_copy['id']}"
+                    response = requests.patch(url, data=record_copy, headers={'Authorization': f"Token {route['api']}"})
+                    if response.status_code == 400:
+                        self.error_message += self.parse_error(record_copy, self.cfg.unique_together, json.loads(response.text))
+                        self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
+                    elif response.status_code == 500:
+                        self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - {response.reason}'
+                        self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
+                    elif response.reason == 'OK':
+                        self.overwrites.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
+                        if self.deleteafter.check.active:
+                            to_delete.append(doc_id)
+                    else:
+                        self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - \
+                                                Unexpected response - {response.reason}'
+                elif not online_record:
+                    record_copy = self.replace_keyfields(route, record_copy, unique_together, structure)
+                    record_copy = self.fix_numeric_fields(record_copy, structure)
+                    record_copy = self.remove_non_e5_cfg_fields(record_copy, self.cfg.fields())
+                    if 'squid' not in record_copy:
+                        record_copy['squid'] = f"{record_copy['unit']}-{record_copy['id']}"
+                    if route['type'] == 'Standard':
+                        url = f"{route['url']}{route['database']}/{route['table']}/"
+                    else:
+                        url = f"{route['url']}{route['database']}/{route['table']}/create/"
+                    response = requests.post(url, data=record_copy, headers={'Authorization': f"Token {route['api']}"})
+                    if response.status_code == 400:
+                        self.error_message += self.parse_error(record_copy, unique_together, json.loads(response.text))
+                        self.fails.append(self.unique_together_as_humanreadable(record_copy, unique_together))
+                    elif response.status_code == 500:
+                        self.error_message += f'{self.unique_together_as_humanreadable(record_copy, unique_together)} - {response.reason}'
+                        self.fails.append(self.unique_together_as_humanreadable(record_copy, unique_together))
+                    elif response.reason == 'Created' or response.reason == 'OK':
+                        if tablename == 'xyz':
+                            self.additions += 1
+                        if self.deleteafter.check.active:
+                            to_delete.append(doc_id)
+                    else:
+                        self.error_message += f'{self.unique_together_as_humanreadable(record_copy, unique_together)} - '
+                        self.error_message += 'Unexpected response - {response.reason}\n'
                 else:
-                    url = f"{route['url']}{route['database']}/{route['table']}/update/{online_record['id']}/"
-                record_copy['id'] = online_record['id']
-                record_copy = self.replace_keyfields(route, record_copy, self.cfg.unique_together, structure)
-                record_copy = self.fix_numeric_fields(record_copy, structure)
-                record_copy = self.remove_non_e5_cfg_fields(record_copy, self.cfg.fields())
-                response = requests.patch(url, data=record_copy, headers={'Authorization': f"Token {route['api']}"})
-                if response.status_code == 400:
-                    self.error_message += self.parse_error(record_copy, self.cfg.unique_together, json.loads(response.text))
-                    self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
-                elif response.status_code == 500:
-                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - {response.reason}'
-                    self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
-                elif response.reason == 'OK':
-                    self.overwrites.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
-                    if self.deleteafter.check.active:
-                        to_delete.append(doc_id)
-                else:
-                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - \
-                                            Unexpected response - {response.reason}'
-            elif not online_record:
-                record_copy = self.replace_keyfields(route, record_copy, self.cfg.unique_together, structure)
-                record_copy = self.fix_numeric_fields(record_copy, structure)
-                record_copy = self.remove_non_e5_cfg_fields(record_copy, self.cfg.fields())
-                if route['type'] == 'Standard':
-                    url = f"{route['url']}{route['database']}/{route['table']}/"
-                else:
-                    url = f"{route['url']}{route['database']}/{route['table']}/create/"
-                response = requests.post(url, data=record_copy, headers={'Authorization': f"Token {route['api']}"})
-                if response.status_code == 400:
-                    self.error_message += self.parse_error(record_copy, self.cfg.unique_together, json.loads(response.text))
-                    self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
-                elif response.status_code == 500:
-                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - {response.reason}'
-                    self.fails.append(self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together))
-                elif response.reason == 'Created' or response.reason == 'OK':
-                    self.additions += 1
-                    if self.deleteafter.check.active:
-                        to_delete.append(doc_id)
-                else:
-                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - '
-                    self.error_message += 'Unexpected response - {response.reason}\n'
-            else:
-                self.error_message += f'{self.unique_together_as_humanreadable(record_copy, self.cfg.unique_together)} - '
-                self.error_message += 'Record already exists and overwrite set to false.\n'
+                    self.error_message += f'{self.unique_together_as_humanreadable(record_copy, unique_together)} - '
+                    self.error_message += 'Record already exists and overwrite set to false.\n'
 
         if self.deleteafter.check.active:
             self.progress.label.text = 'Deleting uploaded and updated records\n\n'
@@ -2880,14 +2891,17 @@ class DataUploadScreen(Screen):
             self.progress.label.text = 'Done\n'
             return
 
-        self.error_message = self.check_for_cfg_fields_not_online(xyz_structure + context_structure)
+        structure = {**xyz_structure, **context_structure}
+
+        self.error_message = self.check_for_cfg_fields_not_online(structure)
         if self.error_message:
             self.progress.label.text = 'Done\n'
             return
 
-        unique_together_xyz = ['unit', 'id', 'suffix']
-        unique_together_context = ['unit', 'id']
-        unique_keys = {}
+        unique_together_xyz = ['squid', 'suffix']
+        unique_together_context = ['squid']
+        unique_keys_xyz = {}
+        unique_keys_context = {}
         self.error_message = ''
         n_records = len(self.data.db.table(self.data.table))
         record_counter = 0
@@ -2899,27 +2913,36 @@ class DataUploadScreen(Screen):
             record_copy = self.clean_the_record(record_copy, context_structure)
             record_copy = self.fix_numeric_fields(record_copy, xyz_structure)
             record_copy = self.fix_numeric_fields(record_copy, context_structure)
+            if 'squid' not in record_copy:
+                record_copy['squid'] = f"{record_copy['unit']}-{record_copy['id']}"
 
             record_counter += 1
             self.progress.label.text = f'Testing upload of {self.unique_together_as_humanreadable(record_copy, unique_together_xyz)}\n'
             self.progress.bar.value = record_counter / n_records
 
+            additions = self.additions
             route['table'] = 'context'
             self.duplicate_check(route, record_copy, unique_together_context, context_structure)
+            self.additions = additions
             route['table'] = 'xyz'
             self.duplicate_check(route, record_copy, unique_together_xyz, xyz_structure)
 
-            if self.unique_together_as_humanreadable(record_copy, unique_together_xyz) not in unique_keys.keys():
-                unique_keys[self.unique_together_as_humanreadable(record_copy, unique_together_xyz)] = 1
+            if self.unique_together_as_humanreadable(record_copy, unique_together_xyz) not in unique_keys_xyz.keys():
+                unique_keys_xyz[self.unique_together_as_humanreadable(record_copy, unique_together_xyz)] = 1
             else:
-                unique_keys[self.unique_together_as_humanreadable(record_copy, unique_together_xyz)] += 1
+                unique_keys_xyz[self.unique_together_as_humanreadable(record_copy, unique_together_xyz)] += 1
 
-            self.field_check(record_copy, xyz_structure + context_structure, unique_together_xyz)
+            if self.unique_together_as_humanreadable(record_copy, unique_together_context) not in unique_keys_context.keys():
+                unique_keys_context[self.unique_together_as_humanreadable(record_copy, unique_together_context)] = 1
+            else:
+                unique_keys_context[self.unique_together_as_humanreadable(record_copy, unique_together_context)] += 1
 
-        if len(unique_keys) != record_counter:
+            self.field_check(record_copy, structure, unique_together_xyz)
+
+        if len(unique_keys_xyz) != record_counter:
             self.error_message += "\n\nWARNING: The following records are duplicated in the data file.  "\
                                   "When they are transfered they will overwrite each other: "\
-                                  f"{', '.join([item for item, value in unique_keys.items() if value > 1])}"
+                                  f"{', '.join([item for item, value in unique_keys_xyz.items() if value > 1])}"
 
         self.progress.label.text = 'Done\n'
         return
@@ -3026,13 +3049,19 @@ class DataUploadScreen(Screen):
 
     def test(self, instance):
         self.event = Clock.schedule_interval(self.update_test_progress, 0.5)
-        self.test_thread = Thread(target=self.do_test)
+        if APP_NAME == 'EDM':
+            self.test_thread = Thread(target=self.do_test_of_edm_data)
+        else:
+            self.test_thread = Thread(target=self.do_test)
         self.test_thread.start()
 
     def upload(self, instance):
         # backup the data file
         self.event = Clock.schedule_interval(self.update_upload_progress, 0.5)
-        self.upload_thread = Thread(target=self.do_upload)
+        if APP_NAME == 'EDM':
+            self.upload_thread = Thread(target=self.do_upload_of_edm_data)
+        else:
+            self.upload_thread = Thread(target=self.do_upload)
         self.upload_thread.start()
 
     def close_popup(self, instance):

@@ -106,6 +106,9 @@ Changes for Version 1.0.45
   Some newer Leica models can return a valid hangle and vangle but a slope distance of 0 when the distance can't be measured.
     This is now error trapped.  If the coordinates are the same as the station coordinates or if slope distance is zero, a message is displayed.
 
+Changes for Version 1.0.46
+  Added in form to allow upload of data to cloud running OSA type system
+
 Bugs/To Do
     import CSV files that don't have quotes
     have a toggle for unit checking
@@ -160,7 +163,7 @@ sys.path.append(os.path.join(sys.path[0], 'lib'))
 from lib.e5_widgets import e5_label, e5_button, e5_MessageBox, e5_DatagridScreen, e5_RecordEditScreen, e5_side_by_side_buttons, e5_textinput
 from lib.e5_widgets import edm_manual, DataGridTextBox, e5_SaveDialog, e5_LoadDialog, e5_PopUpMenu, e5_MainScreen, e5_InfoScreen, e5_scrollview_label
 from lib.e5_widgets import e5_LogScreen, e5_CFGScreen, e5_INIScreen, e5_SettingsScreen, e5_scrollview_menu, DataGridMenuList, SpinnerOptions
-from lib.e5_widgets import e5_JSONScreen, DataGridLabelAndField
+from lib.e5_widgets import e5_JSONScreen, DataGridLabelAndField, DataUploadScreen
 from lib.colorscheme import ColorScheme
 from lib.misc import restore_window_size_position, filename_only, platform_name
 
@@ -207,8 +210,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.45'
-PRODUCTION_DATE = 'July 5, 2024'
+VERSION = '1.0.46'
+PRODUCTION_DATE = 'July 10, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -374,6 +377,11 @@ class MainScreen(e5_MainScreen):
                                         colors=self.colors,
                                         station=self.station,
                                         cfg=self.cfg))
+
+        sm.add_widget(DataUploadScreen(name='UploadScreen',
+                                        data=self.data,
+                                        cfg=self.cfg,
+                                        colors=self.colors))
 
     def delete_screens(self):
         for screen in sm.screens[:]:

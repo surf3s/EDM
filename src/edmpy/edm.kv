@@ -175,6 +175,10 @@
                         on_release: root.show_save_geojson()
                         color: SUBMENU_COLOR
                     ActionButton:
+                        text: 'Upload to Cloud'
+                        on_press: app.root.current = 'UploadScreen'
+                        color: SUBMENU_COLOR
+                    ActionButton:
                         text: 'Exit'
                         #on_release: app.stop()
                         on_release: root.exit_program()
