@@ -109,6 +109,9 @@ Changes for Version 1.0.45
 Changes for Version 1.0.46
   Added in form to allow upload of data to cloud running OSA type system
 
+Changes for Version 1.0.47
+  Fixed problem with continuation shots that cross unit boundaries.
+
 Bugs/To Do
     import CSV files that don't have quotes
     have a toggle for unit checking
@@ -210,8 +213,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.46'
-PRODUCTION_DATE = 'July 10, 2024'
+VERSION = '1.0.47'
+PRODUCTION_DATE = 'August 6, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -662,18 +665,20 @@ class MainScreen(e5_MainScreen):
                 # Update the XYZ in the current edit screen
                 sm.get_screen('EditPointScreen').reset_defaults_from_recorded_point(self.station)
 
-                # Get the unit for these XY coordinates and if it is different than the current
+                # If not a continuation shot, get the unit for these XY coordinates and 
+                # if it is different than the current
                 # then update the linked fields.  And fix other stuff.
-                unitname = self.data.point_in_unit(self.station.xyz_global)
-                current_unit = sm.get_screen('EditPointScreen').read_widget_text("UNIT")
-                if unitname and current_unit != unitname:
-                    sm.get_screen('EditPointScreen').add_new_menu_item_to_cfg("UNIT", unitname)
-                    sm.get_screen('EditPointScreen').update_widget_text("UNIT", unitname)
-                    sm.get_screen('EditPointScreen').refresh_linked_fields("UNIT", unitname)
-                    button_values = self.fill_button_defaults({})
-                    for field in button_values.keys():
-                        if field != "UNIT":
-                            sm.get_screen('EditPointScreen').update_widget_text(field, button_values[field])
+                if self.station.shot_type != 'continue':
+                    unitname = self.data.point_in_unit(self.station.xyz_global)
+                    current_unit = sm.get_screen('EditPointScreen').read_widget_text("UNIT")
+                    if unitname and current_unit != unitname:
+                        sm.get_screen('EditPointScreen').add_new_menu_item_to_cfg("UNIT", unitname)
+                        sm.get_screen('EditPointScreen').update_widget_text("UNIT", unitname)
+                        sm.get_screen('EditPointScreen').refresh_linked_fields("UNIT", unitname)
+                        button_values = self.fill_button_defaults({})
+                        for field in button_values.keys():
+                            if field != "UNIT":
+                                sm.get_screen('EditPointScreen').update_widget_text(field, button_values[field])
 
     def check_for_station_response_x_shot(self, dt):
         # print('.', end = "")
