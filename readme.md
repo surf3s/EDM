@@ -103,6 +103,9 @@ I am working on this.  Once this program is working smoothly, I will add plot fu
 
 Recently (May, 2024) I was helping someone put the program on a Windows 10 tablet.  However, the virus protection software (Microsoft) said the Windows exe version was a virus and immediately removed it.  It took a lot of time to find a work around.  Eventually we made exe programs a virus exception.  This is not a great solution.  I can assure you that edm.exe does not contain a virus.  I also personally downloaded the same version and scanned it with my virus detection software.  Nothing.  I will try to find a computer where I can replicate this and see what part of my program is giving this problem.  If you experience this as well, let me know.
 
+#### Changes to Version 1.0.48
+1.  Better error trapping of CSV export when there are bad characters.
+2.  Better handling of CFG files moved between MacOS and Windows
 
 #### Changes for Version 1.0.47 (August 6, 2024)
 1.  Fixed problem with continuation shots that cross unit boundaries.

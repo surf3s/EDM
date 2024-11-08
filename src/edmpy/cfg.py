@@ -499,6 +499,8 @@ class CFG(blockdata):
             return ''
         except OSError:
             return '\nCould not write data to %s.' % (filename)
+        except UnicodeEncodeError:
+            return f'\nThere is a bad character in this line:\n{csv_row}\n\nCould not write data to {filename}.'
 
     def get_unique_key(self, data_record, unique_together):
         unique_key = []

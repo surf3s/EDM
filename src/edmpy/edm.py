@@ -112,6 +112,10 @@ Changes for Version 1.0.46
 Changes for Version 1.0.47
   Fixed problem with continuation shots that cross unit boundaries.
 
+Changes to Version 1.0.48
+  Better error trapping of CSV export when there are bad characters
+  Better handling of CFG files moved between MacOS and Windows
+
 Bugs/To Do
     import CSV files that don't have quotes
     have a toggle for unit checking
@@ -213,8 +217,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.47'
-PRODUCTION_DATE = 'August 6, 2024'
+VERSION = '1.0.48'
+PRODUCTION_DATE = 'August 15, 2024'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
