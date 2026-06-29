@@ -140,8 +140,17 @@ Changes to Version 1.0.52
 
 Changes to Version 1.0.53
   Fixed some additional bugs in three point shift (microscribe and such)
-  
+
+Changes to Version 1.0.54
+  Added support for newer Nikon stations (e.g Nivo series)
+  Added a button for Nikon stations to change prism constants in the machine
+  Fix a bug with Topcon and Bluetooth where shots had to be recorded twice
+  Tweaked Test Com screen to show non-printable characters
+  Tweaked Test Com screen to allow me to test specific issues more easily
+
 Bugs/To Do
+    Add a check for invalid vertical angles
+    Add a search to grid view
     have a toggle for unit checking
     sort filter by docid
 
@@ -241,8 +250,8 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.53'
-PRODUCTION_DATE = 'May, 2026'
+VERSION = '1.0.54'
+PRODUCTION_DATE = 'July, 2026'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
 __LASTCOMPORT__ = 16
@@ -300,6 +309,18 @@ class MainScreen(e5_MainScreen):
     def on_leave(self, *args):
         Window.unbind(on_key_down=self._on_keyboard_down)
 
+    def update_nikon_prism_button(self):
+        if self.station:
+            if self.station.make != 'Nikon' and self.prism_type_button:
+                self.build_mainscreen()  # This is a hack to get the prism button to update on entry to the main screen for non-Nikon stations
+            elif self.station.make == 'Nikon' and self.prism_type_button is None:
+                self.build_mainscreen()
+            elif self.station.make == 'Nikon' and self.prism_type_button is not None:
+                if self.station.using_prism:
+                    self.prism_type_button.text = 'Using\nPrism'
+                else:
+                    self.prism_type_button.text = 'Using\nReflectorless'
+
     def on_enter(self, *args):
         if self.warnings or self.errors:
             self.popup = self.warnings_and_errors_popup(self.warnings, self.errors, auto_dismiss=False)
@@ -310,6 +331,8 @@ class MainScreen(e5_MainScreen):
             self.popup.open()
             self.ini.first_time = False
         self.update_info_label()
+        self.update_nikon_prism_button()
+
         Window.bind(on_key_down=self._on_keyboard_down)
 
     def setup_logger(self):
@@ -495,17 +518,26 @@ class MainScreen(e5_MainScreen):
 
         # self.layout.add_widget(scroll_content)
 
-        shot_buttons = GridLayout(cols=3, size_hint=(1, size_hints['shot_buttons']), spacing=20)
+        cols = 3
+        if self.station:
+            if self.station.make == 'Nikon':
+                cols = 4
 
-        shot_buttons.add_widget(e5_button(text='Record', id='record',
-                                            colors=self.colors, call_back=self.take_shot, selected=True))
+        shot_buttons = GridLayout(cols=cols, size_hint=(1, size_hints['shot_buttons']), spacing=20,)
 
-        shot_buttons.add_widget(e5_button(text='Continue', id='continue',
-                                            colors=self.colors, call_back=self.take_shot, selected=True))
+        shot_buttons.add_widget(e5_button(text='Record', id='record', colors=self.colors, call_back=self.take_shot, selected=True))
 
-        self.measure_button = e5_button(text='Measure', id='measure',
-                                            colors=self.colors, call_back=self.take_shot, selected=True)
+        shot_buttons.add_widget(e5_button(text='Continue', id='continue', colors=self.colors, call_back=self.take_shot, selected=True))
+
+        self.measure_button = e5_button(text='Measure', id='measure', colors=self.colors, call_back=self.take_shot, selected=True)
+
         shot_buttons.add_widget(self.measure_button)
+
+        if cols == 4:
+            self.prism_type_button = e5_button(text='Using\nPrism', id='prism_or_not', colors=self.colors, call_back=self.prism_reflector_setting, selected=True)
+            shot_buttons.add_widget(self.prism_type_button)
+        else:
+            self.prism_type_button = None
 
         self.layout.add_widget(shot_buttons)
 
@@ -531,6 +563,10 @@ class MainScreen(e5_MainScreen):
 
     def ready_to_use(self):
         return self.cfg is not None and self.data.filename != '' and self.data.filename is not None
+
+    def prism_reflector_setting(self, instance):
+        instance.text = self.station.nikon_prism_vs_reflector()
+        pass
 
     def take_shot(self, instance):
         if not self.ready_to_use() and instance.id != 'measure':
@@ -906,18 +942,21 @@ class MainScreen(e5_MainScreen):
         if not self.ready_to_use():
             self.popup = self.message_open_cfg_first()
         else:
-            self.popup = e5_MessageBox(title="Reset Connection",
-                                        message='\n This will reset the connection to the EDM station by closing and reopening the port.  '
-                                                'You do not need to reinitialize the station.',
-                                        response_type="Other",
-                                        response_text=['Cancel', 'Reset'],
-                                        call_back=[self.dismiss_popup, self.DoResetConnection],
-                                        colors=self.colors)
+            message = '\n This will reset the connection to the EDM by closing and reopening the port.  On Topcon and Nikon stations it will also reset the station into '
+            message += 'its initial settings (e.g. for Nikon it will revert to recording with a prism).\n\n'
+            message += 'Importantly, you do not need to reinitialize the station (i.e. reshoot datums).\n\n'
+            message += 'This option is useful for waking the serial communications after the computer or tablet goes to sleep.  Some computers recover nicely on their own after a sleep, and some need to have the connection manually reset.'
+            self.popup = e5_MessageBox(title="Reset Connection", message=message,
+                                            response_type="Other",
+                                            response_text=['Cancel', 'Reset'],
+                                            call_back=[self.dismiss_popup, self.DoResetConnection],
+                                            colors=self.colors)
         self.popup.auto_dismiss = False
         self.popup.open()
 
     def DoResetConnection(self, instance):
         self.station.ResetConnection()
+        self.update_nikon_prism_button()
         self.popup.dismiss()
 
     def show_current_station(self):
@@ -1411,9 +1450,12 @@ class ComTestScreen(Screen):
         self.horizontal_angle.add_widget(self.set_angle)
         self.layout.add_widget(self.horizontal_angle)
 
-        self.record = GridLayout(cols=1, spacing=5, padding=5, size_hint=(.2, None))
+        self.record = GridLayout(cols=2, spacing=5, padding=5, size_hint=(.2, None))
         self.measure = e5_button("Record Point", call_back=self.record_point, colors=self.colors)
+        self.debug = e5_button("Debug for\nShannon", call_back=self.debug_point, colors=self.colors)
         self.record.add_widget(self.measure)
+        self.record.add_widget(self.debug)
+
         self.layout.add_widget(self.record)
 
         self.io = e5_scrollview_label('Set an angle or record a point and the communication to the station will appear here.  '
@@ -1430,6 +1472,14 @@ class ComTestScreen(Screen):
                                                     selected=[False, False, False],
                                                     colors=self.colors)
         self.layout.add_widget(self.buttons)
+
+    def debug_point(self, instance):
+        if not self.station.serialcom.is_open:
+            self.popup = e5_MessageBox('Error', '\n The COM port is not open.  Please open the COM port first.', colors=self.colors)
+            self.popup.open()
+            return
+        if self.station.make == "Nikon":
+            self.station.nikon_set_prism_constant(17.0)
 
     def clear_io(self, instance):
         self.station.clear_io()
@@ -2635,11 +2685,13 @@ class StationConfigurationScreen(Screen):
 
         message = ""
         if self.station_type.spinner.text == "Nikon":
-            message += "\nNikon is not fully tested.  If you have a Nikon that allows you to set it to use SET protocols (which are also Sokkia protocols) then use this option in this program (Nikon SET).  "
-            message += "If you are interested in helping me debug Nikon stations, let me know.  Also, setting the horizontal angle only may work.  This is just me debuggging the program.  Let me know."
+            message += "\nThis option has been tested on a Nikon Nivo 5.C (in summer, 2026).  It may work on other Nikon models as well (but see also Nikon (SET) for older models).\n\n"
+            message += "Important - a new button appears on the home screen to switch between prism and reflectorless modes.  This is because apparently it can't easily be done on the station itself.  Also, and this is extremely important, "
+            message += "when you switch between prism and reflectorless modes, the prism constant is changed in the station by EDMpy.  In reflectorless it is set to 0 mm, and in prism mode it is set to 17.0 mm.  My intention is to make this "
+            message += "adjustable in the future.  If you need a different prism constant, please let me know and I will fix this faster.  I do not recommend setting the the prism offset in the prism menu EDMpy offers, but write me."
 
         if self.station_type.spinner.text == "Nikon (SET)":
-            message += "\nNikon SET is a set of protocols that are also used by Sokkia.  You have to set this option on the Nikon station itself as well.  This is new (Summer, 2025), but appears to work."
+            message += "\nNikon SET is a set of protocols that are also used by Sokkia.  You have to set this option on the Nikon station itself as well.  This is new as of summer 2025, but appears to work well."
 
         if self.station_type.spinner.text == "Leica":
             message += "\nThis is for the older Leica format.  At some point, Leica introduced the GeoCom format as well, and many stations could use both the older format and the newer GeoCom format.  "
@@ -2650,15 +2702,14 @@ class StationConfigurationScreen(Screen):
 
         if self.station_type.spinner.text == "Sokkia":
             message += "\nThese are not yet tested.  Please contact me if you have a Sokkia station and are willing to help test this option.  "
-            message += "My guess is that setting the horizontal angle will work, and it may launch a shot, but it will not correctly parse the return data.  "
-            message += "I think I can fix it quickly, but I need someone with a Sokkia station to test it."
+            message += "I updated this when I managed to make Nikon (SET) stations work (SET means use the Sokkia protocol), and I am hopeful that Sokkia stations will work with this version, but I have not yet been able to test it.  "
 
         if self.station_type.spinner.text == "Wild":
-            message += "\nThis is an old total station type that i have not seen in year.  We had it working with our other versions of this program, and I could likely make it work with this version, but it is not yet tested.  "
+            message += "\nThis is an old total station type that I have not seen in years.  We had it working with our other versions of this program, and I could likely make it work with this version, but it is not yet tested.  "
             message += "Please contact me if you have a Wild station and are willing to help test this option."
 
         if self.station_type.spinner.text == "Topcon":
-            message += "\nTopcon should work well with this program.  If you experience difficulties, let me know.  "
+            message += "\nTopcon should work well with this program.  It has been tested by at least one team.  If you experience difficulties, let me know.  "
 
         if message:
             self.popup = e5_MessageBox(f'{self.station_type.spinner.text} Station', message, response_type="OK", colors=self.colors)

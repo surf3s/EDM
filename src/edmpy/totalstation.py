@@ -57,6 +57,7 @@ class totalstation(object):
         self.prism_constant = 0.0
         self.prism_offset = 0.0
         self.prism_prompt = True
+        self.using_prism = True         # Flip between prism and reflectorless measurement for Nikon stations
         self.hangle = None              # Decimal degrees
         self.vangle = None              # Decimal degrees
         self.sloped = 0.0
@@ -118,11 +119,15 @@ class totalstation(object):
             txt += f'  Communication type is {self.communication}\n'
             txt += f'  COM Port is {self.comport}\n'
             txt += '  Com settings are %s, %s, %s, %s\n' % (self.baudrate, self.parity, self.databits, self.stopbits)
-            txt += f'COM Port is {"open" if self.serialcom.is_open else "closed"}\n'
+            txt += f'  COM Port is {"open" if self.serialcom.is_open else "closed"}\n'
             txt += f'  Station was initialized with {self.last_setup_type}\n'
             txt += f'  Station X : {self.location.x}\n'
             txt += f'  Station Y : {self.location.y}\n'
             txt += f'  Station Z : {self.location.z}\n'
+            if self.make == "Nikon" and self.serialcom.is_open:
+                txt += f'  The prism constant is set to {self.nikon_get_prism_constant()} mm\n'
+                txt += self.nikon_get_settings()
+                
         else:
             if self.last_setup_type:
                 txt += '  Station was initialized with %s\n' % self.last_setup_type
@@ -494,8 +499,7 @@ class totalstation(object):
         time_one = time.time()
         while time.time() - time_one < seconds:
             if self.data_waiting():
-                self.receive()
-                return
+                return self.receive()
 
     def delay(self, seconds=1):
         # This is used to wait for the station to respond
@@ -507,15 +511,18 @@ class totalstation(object):
 
     def data_waiting(self):
         if self.serialcom.is_open:
-            if self.serialcom.in_waiting > 0:
-                return True
+            try:
+                if self.serialcom.in_waiting > 0:
+                    return True
+            except SerialException:
+                pass
         return False
 
     def send(self, data):
         if self.serialcom.is_open:
             try:
                 self.serialcom.write(data)
-                self.add_to_io('Sent -> ' + data.decode())
+                self.add_to_io('Sent -> ' + self.convert_non_printing_characters(data.decode()) + '\r\n')
                 # print('SENT -> ' + data.decode())
                 return True
             except SerialException:
@@ -530,10 +537,20 @@ class totalstation(object):
         if self.serialcom.is_open:
             data = self.serialcom.read_until().decode() if self.serialcom.is_open else ''
             if data:
-                self.add_to_io('Received <- ' + data)
+                self.add_to_io('Received <- ' + self.convert_non_printing_characters(data) + '\r\n')
         self.received = data
         return data
 
+    def convert_non_printing_characters(self, data):
+        # This is used to make the io more readable by converting non printing characters to their hex values in brackets
+        result = ''
+        for char in data:
+            if char in string.printable and char not in string.whitespace:
+                result += char
+            else:
+                result += f'[{ord(char):02x}]'
+        return result
+    
     def close(self):
         if self.serialcom.is_open:
             self.serialcom.close()
@@ -620,10 +637,11 @@ class totalstation(object):
 
     def vhd_to_xyz(self):
         if self.vangle is not None and self.hangle is not None and self.sloped is not None:
-            # angle_decdeg = self.dms_to_decdeg(self.vangle)
-            z = self.sloped * cos(self.decdeg_to_radians(self.vangle))
-            actual_distance = sqrt(self.sloped**2 - z**2)
-            # angle_decdeg = self.dms_to_decdeg(self.hangle)
+            slope_distance = self.sloped
+            if self.prism.offset is not None:
+                slope_distance = self.sloped + self.prism.offset
+            z = slope_distance * cos(self.decdeg_to_radians(self.vangle))
+            actual_distance = sqrt(slope_distance**2 - z**2)
             angle_decdeg = 450 - self.hangle
             x = cos(self.decdeg_to_radians(angle_decdeg)) * actual_distance
             y = sin(self.decdeg_to_radians(angle_decdeg)) * actual_distance
@@ -860,15 +878,15 @@ class totalstation(object):
             self.nikon_initialize()
 
     """
-    Topcon specific functions for the total statin
+    Topcon specific functions for the total station
     """
     def launch_point_topcon(self):
         self.send(self.topcon_format("Z34"))   # Slope angle mode
-        self.wait_for_received(1)
+        self.wait_for_received(3)
         # delay(0.5)
 
         self.send(self.topcon_format("C"))     # Take the shot
-        self.wait_for_received(1)
+        self.wait_for_received(3)
         # delay(0.5)
         self.event1 = Clock.schedule_interval(self.check_receive_buffer, .2)
 
@@ -895,23 +913,23 @@ class totalstation(object):
         decimal_point = angle.index('.')
         angle = angle[decimal_point - 3: decimal_point] + angle[decimal_point + 1: decimal_point + 5]
         self.send(self.topcon_format("J+" + angle + "d"))
-        self.wait_for_received(1)
+        self.wait_for_received(3)
         # delay(1)
         self.clear_serial_buffers()
 
     def topcon_stop_tracking(self):
         self.send(self.topcon_format("N"))
-        self.wait_for_received(2)
+        self.wait_for_received(3)
 
     def topcon_horizontal_mode(self):
         # Should bump the display back to angle mode
         # Can be used after taking a shot
         self.send(self.topcon_format("Z10"))
-        self.wait_for_received(1)
+        self.wait_for_received(3)
 
     def topcon_initialize(self):
         self.send(self.topcon_format("L"))
-        self.wait_for_received(1)
+        self.wait_for_received(3)
         self.topcon_set_response()
         return self.topcon_valid_bcc()
 
@@ -975,22 +993,193 @@ class totalstation(object):
         return True
 
     """
-    Nikon specific functions (these won't work yet - they need to be converted to proper Nikon commands)
-    See Nikon (SET) for running a Nikon total station as if it is Sokkkia
+    Nikon specific functions.
+        See Nikon (SET) for running a Nikon total station as if it is Sokkkia
     """
+
+    def nikon_get_settings(self):
+        get_settings_command = "CT\x02?CND\x03"
+        get_settings_command += self.nikon_checksum(get_settings_command)
+        get_settings_command = "\x01" + get_settings_command + "\x04\r\n"
+        self.send(get_settings_command.encode())
+        ack_or_nak = self.wait_for_received(2)
+        ack_text = ack_or_nak.decode(errors="ignore") if isinstance(ack_or_nak, (bytes, bytearray)) else str(ack_or_nak)
+        if not ack_or_nak or 'TC\x06' not in ack_text:
+            self.clear_serial_buffers()
+            return "  Error: No ACK received - " + ack_text + "\n" if ack_or_nak else "  Error: No ACK received\n"
+        
+        data = self.wait_for_received(5)
+        self.clear_serial_buffers()
+        result = "  Settings: No data returned\n"
+        if data:
+
+            data = data.strip().decode(errors="ignore") if isinstance(data, (bytes, bytearray)) else str(data).strip()
+            data = data[4:] if len(data) >= 4 else ""
+            data = data.split("\x03", 1)[0]
+            
+            try:
+                if data[12] == "H":
+                    angle_resolution = "High"
+                elif data[12] == "L":
+                    angle_resolution = "Low"
+                elif data[12] == "C":
+                    angle_resolution = "Normal"
+                else:
+                    angle_resolution = "Unknown"
+
+                if data[14] == "M":
+                    distance_unit = "Meters"
+                elif data[14] == "F":
+                    distance_unit = "Feet"
+                elif data[14] == "N":
+                    distance_unit = "International Feet"
+                else:
+                    distance_unit = "Unknown"
+
+                if data[15] == "D":
+                    angle_unit = "DMS"
+                elif data[15] == "G":
+                    angle_unit = "GON"
+                elif data[15] == "M":
+                    angle_unit = "MIL"
+                else:
+                    angle_unit = "Unknown"
+
+                if data[16] == "V":
+                    vertical_zero_position = "Zenith"
+                elif data[16] == "H":
+                    vertical_zero_position = "Horizon"
+                elif data[16] == "C":
+                    vertical_zero_position = "Compass"
+                else:
+                    vertical_zero_position = "Unknown"
+
+                if data[17] == "X":
+                    coordinates_order = "NEZ"
+                elif data[17] == "Y":
+                    coordinates_order = "ENZ"
+                else:
+                    coordinates_order = "Unknown"
+
+                if data[22] == "S":
+                    distance_resolution = "High"
+                elif data[22] == "L":
+                    distance_resolution = "Low"
+                else:
+                    distance_resolution = "Unknown"
+
+                result = f"  Angle Resolution: {angle_resolution}\n  Distance Unit: {distance_unit}\n  Angle Unit: {angle_unit}\n  Vertical Zero Position: {vertical_zero_position}\n  Coordinates Order: {coordinates_order}\n  Distance Resolution: {distance_resolution}"
+
+            except (IndexError):
+                result = "  Settings Error: Invalid data format\n"
+
+        return result
+
+    def nikon_get_prism_constant(self):
+        get__prism_constant_command = "CT\x02?PSM\x03"
+        get__prism_constant_command += self.nikon_checksum(get__prism_constant_command)
+        get__prism_constant_command = "\x01" + get__prism_constant_command + "\x04\r\n"
+        self.send(get__prism_constant_command.encode())
+        ack_or_nak = self.wait_for_received(2)
+        ack_text = ack_or_nak.decode(errors="ignore") if isinstance(ack_or_nak, (bytes, bytearray)) else str(ack_or_nak)
+        if not ack_or_nak or 'TC\x06' not in ack_text:
+            self.clear_serial_buffers()
+            return "  Error: No ACK received - " + ack_or_nak.decode() if ack_or_nak else "  Error: No ACK received"
+        
+        data = self.wait_for_received(5)
+        self.clear_serial_buffers()
+        try:
+            payload = data.strip().decode(errors="ignore") if isinstance(data, (bytes, bytearray)) else str(data).strip()
+            value_part = payload.split(":", 1)[1]
+
+            number = ""
+            started = False
+            for ch in value_part:
+                if ch in "+-" and not started and not number:
+                    number += ch
+                    continue
+                if ch.isdigit():
+                    number += ch
+                    started = True
+                    continue
+                if started:
+                    break
+
+            constant = float(number)
+            return constant
+        except (IndexError, ValueError, AttributeError):
+            return "No data - " + data.decode() if data is not None else "No data"
+
+    def nikon_set_prism_constant(self, constant):
+        ''' The constant should be in mm '''
+        #constant_str = f"{abs(round(constant * 10)):03d}"
+        constant_str = f"{abs(int(constant)):03d}"
+        if constant < 0:
+            constant_str = "-" + constant_str
+        else:
+            constant_str = "0" + constant_str
+        set_prism_constant_command = "CT\x02!PSM" + constant_str + "\x03"
+        set_prism_constant_command += self.nikon_checksum(set_prism_constant_command)
+        set_prism_constant_command = "\x01" + set_prism_constant_command + "\x04\r\n"
+        self.send(set_prism_constant_command.encode())
+        self.wait_for_received(2)
+        self.clear_serial_buffers()
+
+    def nikon_set_prism_mode(self):
+        set_prism_mode_command = "CT\x02!TGTP\x03"
+        set_prism_mode_command += self.nikon_checksum(set_prism_mode_command)
+        set_prism_mode_command = "\x01" + set_prism_mode_command + "\x04\r\n"
+        self.send(set_prism_mode_command.encode())
+        self.wait_for_received(2)
+        self.clear_serial_buffers()
+        self.nikon_set_prism_constant(17.0)
+        self.using_prism = True
+
+    def nikon_set_reflector_mode(self):
+        set_reflector_mode_command = "CT\x02!TGTN\x03"
+        set_reflector_mode_command += self.nikon_checksum(set_reflector_mode_command)
+        set_reflector_mode_command = "\x01" + set_reflector_mode_command + "\x04\r\n"
+        self.send(set_reflector_mode_command.encode())
+        self.wait_for_received(2)
+        self.clear_serial_buffers()
+        self.nikon_set_prism_constant(0.0)
+        self.using_prism = False
+
+    def nikon_prism_vs_reflector(self):
+        if self.using_prism:
+            self.nikon_set_reflector_mode()
+            return "Using\nReflector"
+        else:
+            self.nikon_set_prism_mode()
+            return "Using\nPrism"
+
+    def nikon_point_averaging(self, shots=5):
+        """
+        This sets the Nikon to average a number of shots.
+        Currently not used but was added because one person thought it might be needed.
+        """
+        set_averaging = "CT\x02!AVE" + str(shots).zfill(2) + "\x03"
+        set_averaging += self.nikon_checksum(set_averaging)
+        set_averaging = "\x01" + set_averaging + "\x04\r\n"
+        self.send(set_averaging.encode())
+        self.wait_for_received(2)
+        self.clear_serial_buffers()
+
     def nikon_initialize(self):
         """
         This sets the instrument to output SD/HA/VA after each shot.
         """
-        initialize_command = "CT\x02$DSX\x03"
+        initialize_command = "CT\x02$DNX\x03"
         initialize_command += self.nikon_checksum(initialize_command)
         initialize_command = "\x01" + initialize_command + "\x04\r\n"
         self.send(initialize_command.encode())
         self.wait_for_received(2)
         self.clear_serial_buffers()
 
+        self.nikon_set_prism_mode()
+        
     def launch_point_nikon(self):
-        record_point_command = "CT\x02$TRK\x03"
+        record_point_command = "CT\x02$MSR\x03"
         record_point_command += self.nikon_checksum(record_point_command)
         record_point_command = "\x01" + record_point_command + "\x04\r\n"
         self.send(record_point_command.encode())
