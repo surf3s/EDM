@@ -1,0 +1,37 @@
+
+The JSON data file is C:\la faurelie\logiciels\EDMpy ete 2026\default.json.
+
+There are 4 tables in this data file as follows:
+  A table named 'default' with 0 records.
+  A table named 'prisms' with 1 records.
+  A table named 'units' with 25 records.
+  A table named 'datums' with 5 records.
+  In total there are 31 records in the data file.
+The current table is 'default'.
+
+CFG file is C:\la faurelie\logiciels\EDMpy ete 2026\default.cfg
+
+The INI file is C:\Users\elise\AppData\Local\OSA\EDM\EDM.ini.
+
+Total Station:
+  Make is Leica
+  Communication type is Bluetooth
+  COM Port is COM5
+  Com settings are 2400, Even, 7, 1
+  COM Port is open
+  Station was initialized with Record two datums
+  Station X : 38.695
+  Station Y : 23.012
+  Station Z : 7.435
+
+The default user path is C:\Users\elise\EDM.
+
+The log is written to C:\Users\elise\AppData\Local\OSA\EDM\Logs\EDM.log
+
+The operating system is Windows.
+
+Python build is 3.8.6.
+
+Libraries installed include Kivy 2.1.0 and TinyDB 4.4.0.
+
+EDM was tested and distributed most recently on Python 3.8.6, Kivy 2.1.0 and TinyDB 4.4.0.

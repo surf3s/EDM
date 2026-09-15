@@ -54,8 +54,8 @@ class totalstation(object):
         self.port_open = False
         self.location = point(0, 0, 0)
         self.xyz = point()
-        self.prism_constant = 0.0
-        self.prism_offset = 0.0
+        self.prism_constant = 0.0       # Used to set the prism_constant for Nikon stations.
+        self.prism_offset = 0.0         # Used only for storing what Topcon returns.  Should be changed to prism_constant, but I won't touch it for now to avoid bugs.
         self.prism_prompt = True
         self.using_prism = True         # Flip between prism and reflectorless measurement for Nikon stations
         self.hangle = None              # Decimal degrees
@@ -91,6 +91,11 @@ class totalstation(object):
             self.databits = ini.get_value(APP_NAME, 'DATABITS')
         if ini.get_value(APP_NAME, 'STOPBITS'):
             self.stopbits = ini.get_value(APP_NAME, 'STOPBITS')
+        if ini.get_value(APP_NAME, 'PRISM_CONSTANT'):
+            try:
+                self.prism_constant = float(ini.get_value(APP_NAME, 'PRISM_CONSTANT'))
+            except (ValueError, TypeError):
+                self.prism_constant = 0.0
 
         self.last_setup_type = ini.get_value('SETUPS', 'LASTSETUP_TYPE')
 
@@ -1112,12 +1117,18 @@ class totalstation(object):
 
     def nikon_set_prism_constant(self, constant):
         ''' The constant should be in mm '''
-        #constant_str = f"{abs(round(constant * 10)):03d}"
-        constant_str = f"{abs(int(constant)):03d}"
+        try:
+            constant = int(float(constant))
+        except (ValueError, TypeError):
+            constant = 0
+
+        constant_str = f"{abs(constant):03d}"
+
         if constant < 0:
             constant_str = "-" + constant_str
         else:
             constant_str = "0" + constant_str
+
         set_prism_constant_command = "CT\x02!PSM" + constant_str + "\x03"
         set_prism_constant_command += self.nikon_checksum(set_prism_constant_command)
         set_prism_constant_command = "\x01" + set_prism_constant_command + "\x04\r\n"
@@ -1132,7 +1143,7 @@ class totalstation(object):
         self.send(set_prism_mode_command.encode())
         self.wait_for_received(2)
         self.clear_serial_buffers()
-        self.nikon_set_prism_constant(17.0)
+        self.nikon_set_prism_constant(self.prism_constant if self.prism_constant is not None else 0.0)
         self.using_prism = True
 
     def nikon_set_reflector_mode(self):
@@ -1148,10 +1159,10 @@ class totalstation(object):
     def nikon_prism_vs_reflector(self):
         if self.using_prism:
             self.nikon_set_reflector_mode()
-            return "Using\nReflector"
+            return "Using\nReflectorless\n0.0 mm\nconstant"
         else:
             self.nikon_set_prism_mode()
-            return "Using\nPrism"
+            return f"Using\nPrism\n{self.prism_constant if self.prism_constant is not None else 0.0} mm\nconstant"
 
     def nikon_point_averaging(self, shots=5):
         """

@@ -148,6 +148,9 @@ Changes to Version 1.0.54
   Tweaked Test Com screen to show non-printable characters
   Tweaked Test Com screen to allow me to test specific issues more easily
 
+Changes to Version 1.0.55
+  Made Nikon prism offset a configurable value in the INI file accessed through Setup Options.
+
 Bugs/To Do
     Add a check for invalid vertical angles
     Add a search to grid view
@@ -250,7 +253,7 @@ try:
 except ModuleNotFoundError:
     pass
 
-VERSION = '1.0.54'
+VERSION = '1.0.55'
 PRODUCTION_DATE = 'July, 2026'
 __DEFAULT_FIELDS__ = ['X', 'Y', 'Z', 'SLOPED', 'VANGLE', 'HANGLE', 'STATIONX', 'STATIONY', 'STATIONZ', 'DATUMX', 'DATUMY', 'DATUMZ', 'LOCALX', 'LOCALY', 'LOCALZ', 'DATE', 'PRISM', 'ID']
 __BUTTONS__ = 13
@@ -317,9 +320,9 @@ class MainScreen(e5_MainScreen):
                 self.build_mainscreen()
             elif self.station.make == 'Nikon' and self.prism_type_button is not None:
                 if self.station.using_prism:
-                    self.prism_type_button.text = 'Using\nPrism'
+                    self.prism_type_button.text = f"Using\nPrism\n{self.station.prism_constant if self.station.prism_constant is not None else 0.0} mm\nconstant"
                 else:
-                    self.prism_type_button.text = 'Using\nReflectorless'
+                    self.prism_type_button.text = "Using\nReflectorless\n0.0 mm\nconstant"
 
     def on_enter(self, *args):
         if self.warnings or self.errors:
@@ -441,6 +444,7 @@ class MainScreen(e5_MainScreen):
         sm.add_widget(OptionsScreen(name='OptionsScreen',
                                         colors=self.colors,
                                         station=self.station,
+                                        ini=self.ini,
                                         cfg=self.cfg))
 
         sm.add_widget(DataUploadScreen(name='UploadScreen',
@@ -1353,12 +1357,13 @@ class MainScreen(e5_MainScreen):
 
 class OptionsScreen(Screen):
 
-    def __init__(self, station=None, cfg=None, colors=None, **kwargs):
+    def __init__(self, station=None, cfg=None, ini=None, colors=None, **kwargs):
         super(OptionsScreen, self).__init__(**kwargs)
 
         self.colors = colors if colors else ColorScheme()
         self.station = station
         self.cfg = cfg
+        self.ini = ini
 
         self.clear_widgets()
         self.layout = GridLayout(cols=1,
@@ -1378,6 +1383,15 @@ class OptionsScreen(Screen):
         prism.height = 100
         self.layout.add_widget(prism)
 
+        if self.station.make in ['Nikon']:
+            nikon_prism_constant = GridLayout(cols=2, size_hint_y=None, spacing=5, padding=5)
+            nikon_prism_constant.add_widget(e5_label('Nikon prism constant (in mm)', colors=self.colors))
+            default_constant = self.station.prism_constant if self.station.prism_constant is not None else 0.0
+            self.nikon_prism_constant_input = e5_textinput(text=str(default_constant), multiline=False, write_tab=False, colors=self.colors)
+            nikon_prism_constant.add_widget(self.nikon_prism_constant_input)
+            nikon_prism_constant.height = 100
+            self.layout.add_widget(nikon_prism_constant)
+
         self.back_button = e5_button('Back', selected=True, call_back=self.go_back, colors=self.colors)
         self.layout.add_widget(self.back_button)
 
@@ -1385,6 +1399,17 @@ class OptionsScreen(Screen):
         self.station.prism_prompt = value
 
     def go_back(self, instance):
+        if self.station.make in ['Nikon']:
+            try:
+                prism_constant = float(self.nikon_prism_constant_input.textbox.text.strip())
+                self.station.prism_constant = prism_constant
+                if self.ini:
+                    self.ini.update_value(APP_NAME, 'PRISM_CONSTANT', prism_constant)
+                    self.ini.save()
+                if self.station.make == 'Nikon' and self.station.serialcom.is_open:
+                    self.station.nikon_set_prism_constant(prism_constant)
+            except ValueError:
+                pass
         sm.current = 'MainScreen'
 
 
@@ -1479,7 +1504,7 @@ class ComTestScreen(Screen):
             self.popup.open()
             return
         if self.station.make == "Nikon":
-            self.station.nikon_set_prism_constant(17.0)
+            self.station.nikon_set_prism_constant(34.0)
 
     def clear_io(self, instance):
         self.station.clear_io()
@@ -2687,8 +2712,9 @@ class StationConfigurationScreen(Screen):
         if self.station_type.spinner.text == "Nikon":
             message += "\nThis option has been tested on a Nikon Nivo 5.C (in summer, 2026).  It may work on other Nikon models as well (but see also Nikon (SET) for older models).\n\n"
             message += "Important - a new button appears on the home screen to switch between prism and reflectorless modes.  This is because apparently it can't easily be done on the station itself.  Also, and this is extremely important, "
-            message += "when you switch between prism and reflectorless modes, the prism constant is changed in the station by EDMpy.  In reflectorless it is set to 0 mm, and in prism mode it is set to 17.0 mm.  My intention is to make this "
-            message += "adjustable in the future.  If you need a different prism constant, please let me know and I will fix this faster.  I do not recommend setting the the prism offset in the prism menu EDMpy offers, but write me."
+            message += "when you switch between prism and reflectorless modes, the prism constant is changed in the station by EDMpy.  In reflectorless it is set to 0 mm, and unless you modify it, in prism mode it is also set to 0.0 mm.  "
+            message += "To modify this value, go to the menu option in Station-Options.  If you have set the station type to Nikon, a box will appear where you can set the prism constant.  "
+            message += "I do not recommend setting the the prism offset in the prism menu EDMpy offers, but write me."
 
         if self.station_type.spinner.text == "Nikon (SET)":
             message += "\nNikon SET is a set of protocols that are also used by Sokkia.  You have to set this option on the Nikon station itself as well.  This is new as of summer 2025, but appears to work well."
