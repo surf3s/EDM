@@ -1,18 +1,24 @@
 from kivy.properties import ObjectProperty
 from kivy.clock import Clock
 
+from geo import point, prism
+from constants import APP_NAME
+
+import os
 import serial
 from serial.serialutil import SerialTimeoutException
 from serial.serialutil import SerialException
-import os
-from geo import point, prism
-from constants import APP_NAME
 from math import sqrt
 from math import pi
 from math import cos
 from math import sin
 from math import acos
-from angles import r2d, deci2sexa, Angle
+from math import atan2
+from math import radians
+from math import degrees
+from math import inf
+from angles import r2d, deci2sexa, Angle, d2r
+
 import string
 import random
 import time
@@ -28,8 +34,9 @@ else:
 NO_ERROR = 0            # No total station error (Leica)
 TMC_CLEAR = 3           # Stop the current measure and clear the stored values
 TOPCON_TERMINATION = "\r\n"
-
-
+WAIT_FOR_RECEIVED_TIMEOUT = 3       # Seconds
+SERIAL_TIMEOUT = 2                  # seconds
+SERIAL_WRITE_TIMEOUT = 2            # seconds
 class totalstation(object):
 
     popup = ObjectProperty(None)
@@ -54,7 +61,7 @@ class totalstation(object):
         self.port_open = False
         self.location = point(0, 0, 0)
         self.xyz = point()
-        self.prism_constant = 0.0       # Used to set the prism_constant for Nikon stations.
+        self.prism_constant = 0.0       # Used to set the prism_constant for Nikon and Leica GeoCom stations (in mm)
         self.prism_offset = 0.0         # Used only for storing what Topcon returns.  Should be changed to prism_constant, but I won't touch it for now to avoid bugs.
         self.prism_prompt = True
         self.using_prism = True         # Flip between prism and reflectorless measurement for Nikon stations
@@ -64,8 +71,10 @@ class totalstation(object):
         self.suffix = 0
         self.prism = prism()
         self.xyz_global = point()
-        self.rotate_local = []
-        self.rotate_global = []
+        self.rotate_local = []          # Used in 3 point transformations
+        self.rotate_global = []         # Used in 3 point transformations
+        self.rotator = {}               # Used in multi-datum transformations
+        self.rotator_datums = {}        # Used in multi-datum transformations
         self.last_setup_type = ''
         self.shot_type = ''
         self.event = None
@@ -99,18 +108,36 @@ class totalstation(object):
 
         self.last_setup_type = ini.get_value('SETUPS', 'LASTSETUP_TYPE')
 
-        if ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_1'):
-            point1 = self.text_to_point(ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_1'))
-            point2 = self.text_to_point(ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_2'))
-            point3 = self.text_to_point(ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_3'))
-            if point1 is not None and point2 is not None and point3 is not None:
-                self.rotate_local = [point1, point2, point3]
-        if ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1'):
-            point1 = data.get_datum(ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1'))
-            point2 = data.get_datum(ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2'))
-            point3 = data.get_datum(ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3'))
-            if point1 is not None and point2 is not None and point3 is not None:
-                self.rotate_global = [point1.as_point(), point2.as_point(), point3.as_point()]
+        if self.last_setup_type == 'Three datum 3D transform':
+            if ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_1'):
+                point1 = self.text_to_point(ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_1'))
+                point2 = self.text_to_point(ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_2'))
+                point3 = self.text_to_point(ini.get_value('SETUPS', '3DATUM_SHIFT_LOCAL_3'))
+                if point1 is not None and point2 is not None and point3 is not None:
+                    self.rotate_local = [point1, point2, point3]
+            if ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1'):
+                point1 = data.get_datum(ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_1'))
+                point2 = data.get_datum(ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_2'))
+                point3 = data.get_datum(ini.get_value('SETUPS', '3DATUM_SHIFT_GLOBAL_3'))
+                if point1 is not None and point2 is not None and point3 is not None:
+                    self.rotate_global = [point1.as_point(), point2.as_point(), point3.as_point()]
+        else:
+            self.rotate_local = []
+            self.rotate_global = []
+
+        if self.last_setup_type == 'Multi datum 3D transform':
+            if ini.get_value('SETUPS', 'MULTIDATUM_TRANSFORM_ROTATOR'):
+                values = [float(v) for v in ini.get_value('SETUPS', 'MULTIDATUM_TRANSFORM_ROTATOR').split(',')]
+                if len(values) == 7:
+                    self.rotator = {'tx': values[0], 'ty': values[1], 'tz': values[2], 'omega': values[3], 'phi': values[4], 'kappa': values[5], 's': values[6]}
+                else:
+                    self.rotator = {}
+            if ini.get_value('SETUPS', 'MULTIDATUM_TRANSFORM_DATUMS'):
+                datum_names = ini.get_value('SETUPS', 'MULTIDATUM_TRANSFORM_DATUMS').split(',')
+                self.rotator_datums = {name: data.get_datum(name) for name in datum_names}
+        else:
+            self.rotator = {}
+            self.rotator_datums = {}
 
         if ini.get_value('SETUPS', 'STATIONX'):
             self.location.x = float(ini.get_value('SETUPS', 'STATIONX'))
@@ -130,9 +157,20 @@ class totalstation(object):
             txt += f'  Station Y : {self.location.y}\n'
             txt += f'  Station Z : {self.location.z}\n'
             if self.make == "Nikon" and self.serialcom.is_open:
-                txt += f'  The prism constant is set to {self.nikon_get_prism_constant()} mm\n'
-                txt += self.nikon_get_settings()
-                
+                try:
+                    txt += f'  The prism constant is set to {self.nikon_get_prism_constant()} mm\n'
+                    txt += self.nikon_get_settings()
+                except Exception as e:
+                    txt += f'  Error occurred while fetching Nikon data: {e}\n'
+            elif self.make == "Leica GeoCom" and self.serialcom.is_open:
+                try:
+                    self.get_targettype_geocom()
+                    self.get_prismconstant_geocom()
+                    txt += f'  The station is set to {"prism" if self.using_prism else "reflectorless"} mode\n'
+                    txt += f'  The prism constant is set to {self.prism_constant} mm\n'
+                    txt += self.get_settings_geocom()
+                except Exception as e:
+                    txt += f'  Error occurred while fetching Leica GeoCom data : {e}\n'
         else:
             if self.last_setup_type:
                 txt += '  Station was initialized with %s\n' % self.last_setup_type
@@ -166,47 +204,48 @@ class totalstation(object):
                     self.error_message = ''
                     return
                 if self.error_code == 1283:
-                    self.error_message = 'Warning: measurement without full correction'
+                    self.error_message = 'Warning: measurement without full correction. Check leveling the station.'
                     return
-                if self.error_code == 1284:
+                elif self.error_code == 1284:
                     self.error_message = 'Info: accuracy can not be guaranteed'
                     return
-                if self.error_code == 1285:
+                elif self.error_code == 1285:
                     self.error_message = 'Warning: only angle measurement valid'
                     return
-                if self.error_code == 1288:
+                elif self.error_code == 1288:
                     self.error_message = 'Warning: only angle measurement valid but without full correction'
                     return
-                if self.error_code == 1289:
+                elif self.error_code == 1289:
                     self.error_message = 'Info: only angle measurement valid but accuracy can not be guaranteed'
                     return
-                if self.error_code == 1290:
+                elif self.error_code == 1290:
                     self.error_message = 'Error: no angle measurement'
                     return
-                if self.error_code == 1291:
+                elif self.error_code == 1291:
                     self.error_message = 'Error: wrong setting of PPM or MM on EDM'
                     return
-                if self.error_code == 1292:
+                elif self.error_code == 1292:
                     self.error_message = 'Error: distance measurement not done (no aim, etc.)'
                     return
-                if self.error_code == 1293:
+                elif self.error_code == 1293:
                     self.error_message = 'Error: system is busy (no measurement done)'
                     return
-                if self.error_code == 1294:
+                elif self.error_code == 1294:
                     self.error_message = 'Error: no signal on EDM (only in signal mode)'
                     return
-                if self.error_code == 1380:
-                    self.error_message = 'Warning: inclination our of time range'
+                elif self.error_code == 1380:
+                    self.error_message = 'Warning: inclination out of time range'
                     return
-                if self.error_code == 1381:
+                elif self.error_code == 1381:
                     self.error_message = 'Warning: measurement without plane inclination correction'
                     return
-                if self.error_code == 1382:
+                elif self.error_code == 1382:
                     self.error_message = 'Warning: measurement without sensor inclination correction'
                     return
-                if self.error_code == 1383:
+                elif self.error_code == 1383:
                     self.error_message = 'Info: inclination accuracy can not be guaranteed'
                     return
+        self.error_message = ''
 
     def text_to_point(self, txt):
         if len(txt.split(',')) == 3:
@@ -354,6 +393,11 @@ class totalstation(object):
             return False
 
     def set_horizontal_angle(self, angle):
+        """
+        Upload a horizontal angle to the total station.
+        hangle is expected to be in dddmmss format.
+        """
+
         if self.is_numeric(angle):
             if self.make == 'Topcon':
                 self.set_horizontal_angle_topcon(angle)
@@ -365,7 +409,10 @@ class totalstation(object):
                 self.set_horizontal_angle_leica(angle)
                 time.sleep(1.5)
             elif self.make in ['Leica GeoCom']:
-                self.set_horizontal_angle_geocom(angle)
+                try:
+                    self.set_horizontal_angle_geocom(angle)
+                except Exception as e:
+                    raise(f"{e}")
                 time.sleep(1.5)
             elif self.make == 'Sokkia':
                 self.set_horizontal_angle_sokkia(angle)
@@ -391,6 +438,63 @@ class totalstation(object):
         self.make_global()
         self.vhd_from_xyz()
         return False
+
+    def anyone_home(self):
+        if self.make == 'Topcon':
+            result = self.anyone_home_topcon()
+            return result
+        elif self.make in ['WILD', 'Leica']:
+            pass
+        elif self.make == "Leica GeoCom":
+            result = self.anyone_home_geocom()
+            return result
+        elif self.make == "GeoMax":
+            pass
+        elif self.make == "Sokkia":
+            pass
+        elif self.make == "Nikon":
+            result = self.anyone_home_nikon()
+            return result
+        elif self.make == "Nikon (SET)":
+            pass
+        elif self.make == 'Simulate':
+            return True
+        else:
+            return False
+        
+    def upload_station_coordinates(self):
+        try:
+            if self.make == 'Topcon':
+                pass
+            elif self.make in ['WILD', 'Leica']:
+                pass
+            elif self.make == "Leica GeoCom":
+                self.upload_station_coordinates_geocom()
+            elif self.make == "GeoMax":
+                pass
+            elif self.make == "Sokkia":
+                pass
+            elif self.make == "Nikon":
+                pass
+            elif self.make == "Nikon (SET)":
+                pass
+            elif self.make == 'Simulate':
+                pass
+            else:
+                pass
+        except Exception as e:
+            raise Exception(f"Error uploading station coordinates: {e}")
+        
+    def prism_vs_reflectorless(self):
+        try:
+            if self.make == 'Nikon':
+                return self.prism_vs_reflectorless_nikon()
+            elif self.make == 'Leica GeoCom':
+                return self.prism_vs_reflectorless_geocom()
+            else:
+                raise Exception(f"Prism vs reflectorless is not supported for {self.make} total stations.")
+        except Exception as e:
+            raise Exception(f"Error setting prism vs reflectorless: {e}")
 
     def take_shot(self):
 
@@ -428,6 +532,34 @@ class totalstation(object):
 
         return error
 
+    def fetch_hangle(self):
+        """
+        Fetch the horizontal angle from the total station.
+        """
+
+        hangle = None
+        try:
+            if self.make == "Topcon":
+                hangle = self.fetch_hangle_topcon()
+            elif self.make in ['WILD', 'Leica']:
+                hangle = self.fetch_hangle_leica()
+            elif self.make == "Leica GeoCom":
+                hangle = self.fetch_hangle_leica_geocom()
+            elif self.make == "GeoMax":
+                hangle = self.fetch_hangle_geomax()
+            elif self.make == "Sokkia":
+                hangle = self.fetch_hangle_sokkia()
+            elif self.make == "Nikon":
+                hangle = self.fetch_hangle_nikon()
+            elif self.make == "Nikon (SET)":
+                hangle = self.fetch_hangle_nikon_set()
+            else:
+                hangle = None
+        except Exception as e:
+            raise Exception(f"Error fetching horizontal angle: {e}")
+
+        return hangle
+
     def fetch_point(self):
         if self.make in ['WILD', 'Leica']:
             self.fetch_point_leica()
@@ -453,18 +585,28 @@ class totalstation(object):
     def make_global(self):
         if not self.xyz.is_none():
             if self.make == 'Microscribe':
+                """ If it is Microscribe, then a transformation is required """
                 if len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
                     self.xyz_global = self.rotate_point(self.xyz)
+                elif self.rotator:
+                    self.xyz_global = point(*self.helmert_3d_transform(self.xyz, self.rotator))
                 else:
                     self.xyz_global = self.xyz
-                self.round_xyz()
+            elif len(self.rotate_local) == 3 and len(self.rotate_global) == 3:
+                """ Transformations are still possible with a total station """
+                self.xyz_global = self.rotate_point(self.xyz) 
+            elif self.rotator:
+                """ Transformations are still possible with a total station """
+                self.xyz_global = point(*self.helmert_3d_transform(self.xyz, self.rotator))
             else:
+                """ Otherwise add the local coordinates to the station coordinatges """
                 if not self.location.is_none():
                     self.xyz_global = point(self.xyz.x + self.location.x,
                                             self.xyz.y + self.location.y,
                                             self.xyz.z + self.location.z,)
                 else:
                     self.xyz_global = self.xyz
+            self.round_xyz()
 
     def round_xyz(self):
         self.xyz_global = self.round_point(self.xyz_global)
@@ -510,10 +652,6 @@ class totalstation(object):
         # This is used to wait for the station to respond
         time.sleep(seconds) 
 
-    # def check_receive_buffer(self, dt):
-    #     if self.data_waiting():
-    #         self.receive()
-
     def data_waiting(self):
         if self.serialcom.is_open:
             try:
@@ -531,10 +669,10 @@ class totalstation(object):
                 # print('SENT -> ' + data.decode())
                 return True
             except SerialException:
-                print("SerialException: Could not write to the serial port. Is it open?")
+                print(f"SerialException: Could not write to serial port {self.serialcom.port}. Is it open?")
                 return False
             except SerialTimeoutException:
-                print("SerialTimeout: Could not write to the serial port. Is it open?")
+                print(f"SerialTimeout: Could not write to serial port {self.serialcom.port}. Is it open?")
                 return False
 
     def receive(self):
@@ -555,7 +693,14 @@ class totalstation(object):
             else:
                 result += f'[{ord(char):02x}]'
         return result
-    
+
+    def comport_settings_from_dictionary(self, settings):
+        self.baudrate = settings.get('baudrate', '')
+        self.comport = settings.get('comport', '')
+        self.parity = settings.get('parity', '')
+        self.databits = settings.get('bytesize', 0)
+        self.stopbits = settings.get('stopbits', 0)
+
     def close(self):
         if self.serialcom.is_open:
             self.serialcom.close()
@@ -592,16 +737,43 @@ class totalstation(object):
             self.serialcom.parity = serial.PARITY_NONE
         self.serialcom.stopbits = int(self.stopbits)
         self.serialcom.bytesize = int(self.databits)
-        self.serialcom.timeout = 30
-        self.serialcom.write_timeout = 5
+        self.serialcom.timeout = SERIAL_TIMEOUT
+        self.serialcom.write_timeout = SERIAL_WRITE_TIMEOUT
         try:
             self.serialcom.open()
             self.clear_io()
             self.initialize()
+        except ValueError as err:
+            self.error_code = 1
+            self.error_message = str(err) + '\n\n'
         except OSError as err:
             self.error_code = 1
             self.error_message = str(err) + '\n\n'
         return self.error_message
+
+    def quick_com_open_test(self, comport):
+        try:
+            self.serialcom.port = comport
+            self.serialcom.baudrate = int(self.baudrate) if self.baudrate else 2400
+            if self.parity == 'Even':
+                self.serialcom.parity = serial.PARITY_EVEN
+            elif self.parity == 'Odd':
+                self.serialcom.parity = serial.PARITY_ODD
+            else:
+                self.serialcom.parity = serial.PARITY_NONE
+            self.serialcom.stopbits = int(self.stopbits) if self.stopbits else serial.STOPBITS_ONE
+            self.serialcom.bytesize = int(self.databits) if self.databits else serial.EIGHTBITS
+            self.serialcom.timeout = SERIAL_TIMEOUT
+            self.serialcom.open()
+            if self.serialcom.is_open:
+                self.clear_serial_buffers()
+                can_receive = self.anyone_home()
+                self.serialcom.close()
+                return True, can_receive
+        except Exception as e:
+            return False, False
+        return False, False
+
 
     def settings_pretty(self):
         if self.baudrate and self.comport and self.parity and self.databits and self.stopbits:
@@ -659,10 +831,445 @@ class totalstation(object):
             p.z = round(p.z / 1000, 3)
         return p
 
-    # The following functions are needed by the rotation function at the end of this list.
-    # Note too that all of the dependent routines are self written
-    # rather than pulled from existing libraries (like numpy) to avoid dependencies.  Dependencies make porting to
-    # Apple and Android more difficult.
+    """
+        Code to do a two shot setup.  It is not from AI.
+        The following code is ported from EDM-Mobile (and EDMWin).
+        I can't remember exactly how this works, but it does work.
+        And I remember the hot, weekend day at Carsac when Harold
+        and I first figured out how to do this.
+    """
+
+    def solve_two_shot_setup(self, datum1, result1, datum2, result2):
+        measured_distance = self.distance(result1.xyz, result2.xyz)
+        actual_distance = self.distance(datum1.as_point(), datum2.as_point())
+        error_distance = abs(measured_distance - actual_distance)
+
+        # Workout what the measured angle would be from datum1 to datum2
+        y = -1 * result1.xyz.y
+        y = y + result2.xyz.y
+        p = point(result2.xyz.x, y, 0)
+        measured_angle = self.angle_between_points(point(0, 0, 0), p)
+
+        # Calculate the actual angle between datum1 and datum2
+        defined_angle = self.angle_between_points(datum1.as_point(), datum2.as_point())
+
+        # get the difference between these two angles
+        angle_difference = defined_angle - measured_angle
+
+        # Based on this, compute the new datum.
+        x = round(-1 * result1.xyz.y * sin(d2r(angle_difference)) + datum1.x, 3)
+        y = round(-1 * result1.xyz.y * cos(d2r(angle_difference)) + datum1.y, 3)
+        z1 = datum1.z - result1.xyz.z
+        z2 = datum2.z - result2.xyz.z
+        z = round((z1 + z2) / 2, 3)
+        new_station = point(x, y, z)
+
+        # Workout what angle needs to be uploaded to the station
+        new_foresight = self.angle_between_points(new_station, datum2.as_point())
+
+        return new_station, new_foresight, measured_distance, actual_distance, error_distance
+
+    """
+        What follows is code to do resectioning.  The base of this code comes from Geminin AI.
+        It uses a closed form solution to the 2x2 SVD problem to avoid using NumPy or other third-party libraries.  
+        It is a bit slower than using NumPy, but it is more portable and avoids the need for additional dependencies.
+    """
+
+    def svd_2x2(self, a, b, c, d):
+        """
+            Computes exact SVD for a 2x2 matrix H = [[a, b], [c, d]]
+            Returns U, S, Vt as 2x2 lists.
+        """
+        # Angles for rotation matrices U and V
+        theta_v = 0.5 * atan2(2 * (a * c + b * d), (a**2 + b**2 - c**2 - d**2))
+        theta_u = 0.5 * atan2(2 * (a * b + c * d), (a**2 - b**2 + c**2 - d**2))
+
+        cu, su = cos(theta_u), sin(theta_u)
+        cv, sv = cos(theta_v), sin(theta_v)
+
+        U = [[cu, -su], 
+            [su,  cu]]
+        
+        Vt = [[cv,  sv], 
+            [-sv, cv]]
+
+        return U, Vt
+
+    def compute_free_station(self, control_points, observations, sigma_dist=0.003, sigma_angle_sec=5.0):
+        """
+            Computes Free Stationing using Weighted SVD without NumPy or third-party libraries.
+        """
+        if len(control_points) < 2:
+            raise ValueError("At least 2 active datums are required.")
+
+        sigma_angle_rad = radians(sigma_angle_sec / 3600.0)
+        
+        P_local = []
+        P_world = []
+        weights = []
+        ids = []
+
+        # 1. Local polar to Cartesian & per-point weighting
+        for (pt_id, world_point), (datum_name, observation) in zip(control_points.items(), observations.items()):
+            # S = obs['dist']
+            # hz = obs['hz']
+            # zen = obs.get('zenith', pi / 2.0)
+
+            # # Local polar to Cartesian
+            # HD = S * sin(zen)
+            # x_loc = HD * sin(hz)
+            # y_loc = HD * cos(hz)
+            # z_loc = S * cos(zen)
+
+            # Spatial variance weight
+            HD = (observation.x ** 2 + observation.y ** 2) ** 0.5
+            variance_i = (sigma_dist ** 2) + ((HD * sigma_angle_rad) ** 2)
+            w_i = 1.0 / variance_i
+
+            P_local.append(tuple(observation))
+            P_world.append(tuple(world_point))
+            weights.append(w_i)
+            ids.append(pt_id)
+
+        N = len(ids)
+        sum_w = sum(weights)
+        w_norm = [w / sum_w for w in weights]
+
+        # 2. Height offset (Z0)
+        Z0 = sum(w_norm[i] * (P_world[i][2] - P_local[i][2]) for i in range(N))
+
+        # 3. Weighted Centroids
+        loc_cx = sum(w_norm[i] * P_local[i][0] for i in range(N))
+        loc_cy = sum(w_norm[i] * P_local[i][1] for i in range(N))
+        
+        wrd_cx = sum(w_norm[i] * P_world[i][0] for i in range(N))
+        wrd_cy = sum(w_norm[i] * P_world[i][1] for i in range(N))
+
+        # 4. Construct Weighted Cross-Covariance Matrix H = [[a, b], [c, d]]
+        a = b = c = d = 0.0
+        for i in range(N):
+            dx_loc = P_local[i][0] - loc_cx
+            dy_loc = P_local[i][1] - loc_cy
+            dx_wrd = P_world[i][0] - wrd_cx
+            dy_wrd = P_world[i][1] - wrd_cy
+            
+            w = weights[i]
+            a += w * dx_loc * dx_wrd
+            b += w * dx_loc * dy_wrd
+            c += w * dy_loc * dx_wrd
+            d += w * dy_loc * dy_wrd
+
+        # 5. Closed-Form 2x2 SVD
+        U, Vt = self.svd_2x2(a, b, c, d)
+
+        # Rotation matrix R_2d = Vt^T * U^T
+        # Vt^T = [[Vt[0][0], Vt[1][0]], [Vt[0][1], Vt[1][1]]]
+        # U^T  = [[U[0][0],  U[1][0]],  [U[0][1],  U[1][1]]]
+        r00 = Vt[0][0] * U[0][0] + Vt[1][0] * U[0][1]
+        r01 = Vt[0][0] * U[1][0] + Vt[1][0] * U[1][1]
+        r10 = Vt[0][1] * U[0][0] + Vt[1][1] * U[0][1]
+        r11 = Vt[0][1] * U[1][0] + Vt[1][1] * U[1][1]
+
+        # Reflection check (determinant)
+        det = r00 * r11 - r01 * r10
+        if det < 0:
+            r01 = -r01
+            r11 = -r11
+
+        # Orientation and station coordinates
+        t0_rad = atan2(r01, r00) % (2 * pi)
+        X0 = wrd_cx - (r00 * loc_cx + r01 * loc_cy)
+        Y0 = wrd_cy - (r10 * loc_cx + r11 * loc_cy)
+
+        station_coords = (round(X0, 3), round(Y0, 3), round(Z0, 3))
+
+        # 6. Residual Metrics per Point
+        datum_errors = {}
+        total_sq_residuals = 0.0
+
+        for i, pt_id in enumerate(ids):
+            px_loc, py_loc, pz_loc = P_local[i]
+            pred_X = r00 * px_loc + r01 * py_loc + X0
+            pred_Y = r10 * px_loc + r11 * py_loc + Y0
+            pred_Z = pz_loc + Z0
+
+            e_wrd, n_wrd, h_wrd = P_world[i]
+            diff_E = e_wrd - pred_X
+            diff_N = n_wrd - pred_Y
+            diff_H = h_wrd - pred_Z
+
+            dist_error = sqrt(diff_E**2 + diff_N**2 + diff_H**2)
+            sigma_i = sqrt(1.0 / weights[i])
+            std_residual = dist_error / sigma_i
+            
+            total_sq_residuals += dist_error**2
+
+            datum_errors[pt_id] = {
+                "east_residual_m": round(diff_E, 4),
+                "north_residual_m": round(diff_N, 4),
+                "elev_residual_m": round(diff_H, 4),
+                "total_error_m": round(dist_error, 4),
+                "std_residual_score": round(std_residual, 2),
+                "weight_percent": round(w_norm[i] * 100, 1)
+            }
+
+        dof = max(1, (2 * N) - 3)
+        sigma_0 = sqrt(total_sq_residuals / dof)
+
+        return {
+            "station_coords": point(*station_coords),
+            "orientation_deg": round(degrees(t0_rad), 4),
+            "orientation_rad": round(t0_rad, 6),
+            "global_std_error_m": round(sigma_0, 4),
+            "datum_errors": datum_errors
+        }
+
+    def offset_hangle(self, angle_offset):
+        """
+        Offsets a horizontal angle by a given amount, ensuring the result is within [0, 360) degrees.
+        Parameters:
+        - angle_offset: The amount to offset the horizontal angle by (in decimal degrees).
+        """
+        try:
+            hangle = self.fetch_hangle()
+        except Exception as e:
+            raise Exception(f"{e}")    
+
+        try:
+            hangle = (self.dddmmss_to_decimal_degrees(hangle) + angle_offset) % 360.0
+            hangle = self.decimal_degrees_to_dddmmss(hangle)
+        except Exception as e:
+            raise Exception(f"Error adjusting horizontal angle of {hangle} by offset of {angle_offset}: {e}")
+        
+        try:
+            self.set_horizontal_angle(hangle)
+        except Exception as e:
+            raise Exception(f"Error setting horizontal angle of {hangle}: {e}")
+
+        return hangle
+    
+    """
+        End resectioning code.
+    """
+
+    """
+    What follows are functions for Helmert transformations and 3D rotations.  These are used for the Microscribe and other applications.
+    This code was written by Gemini AI and adapted to EDM.
+    """
+
+    def compute_helmert_transformation(self, source_points, target_points, fix_scale_to_one=True):
+        """
+        Source_points are the locally measured points, and target_points are the known global coordinates.
+        This function computes the 7 Helmert parameters and the residual errors.
+        """
+        rotator = self.calculate_helmert_parameters(source_points, target_points, fix_scale_to_one=fix_scale_to_one)
+        errors = self.residual_errors(source_points, target_points, rotator)
+        return rotator, errors
+    
+    def helmert_residuals(self, params, source_pts, target_pts):
+        """
+        Calculates the 3D distance errors between transformed source points
+        and target points for a given set of 7 parameters, without using NumPy.
+        """
+        def matmul(a, b):
+            return [[sum(a[i][k] * b[k][j] for k in range(len(b))) for j in range(len(b[0]))]
+                    for i in range(len(a))]
+
+        def rotate_x(theta):
+            return [[1, 0, 0],
+                    [0, cos(theta), -sin(theta)],
+                    [0, sin(theta), cos(theta)]]
+
+        def rotate_y(theta):
+            return [[cos(theta), 0, sin(theta)],
+                    [0, 1, 0],
+                    [-sin(theta), 0, cos(theta)]]
+
+        def rotate_z(theta):
+            return [[cos(theta), -sin(theta), 0],
+                    [sin(theta), cos(theta), 0],
+                    [0, 0, 1]]
+
+        tx, ty, tz, omega, phi, kappa, s = params
+
+        R_x = rotate_x(omega)
+        R_y = rotate_y(phi)
+        R_z = rotate_z(kappa)
+        R = matmul(matmul(R_z, R_y), R_x)
+        T = [tx, ty, tz]
+
+        residuals = []
+        for p_src, p_tgt in zip(source_pts, target_pts):
+            p = [float(p_src[0]), float(p_src[1]), float(p_src[2])]
+            p_transformed = [T[i] + s * sum(R[i][j] * p[j] for j in range(3)) for i in range(3)]
+            residuals.extend([p_transformed[i] - float(p_tgt[i]) for i in range(3)])
+
+        return residuals
+
+    def calculate_helmert_parameters(self, source_points, target_points, fix_scale_to_one=True):
+        """
+        Derives the 7 Helmert parameters using Least-Squares optimization.
+        Accepts any number of points (minimum 3).
+        """
+        # Initial guesses: [tx, ty, tz, omega, phi, kappa, scale]
+        # Starting with 0 translations, 0 rotations, and 1.0 scale
+        initial_guess = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+        
+        # Levenberg-Marquardt optimization with a finite-difference Jacobian.
+        # Keep scale out of the optimization entirely when it is fixed.
+        active = list(range(6)) if fix_scale_to_one else list(range(7))
+        params = initial_guess[:]
+        residual = self.helmert_residuals(params, source_points, target_points)
+        cost = sum(value * value for value in residual)
+        damping = 1e-3
+
+        for _ in range(200):
+            jacobian = [[0.0] * len(active) for _ in residual]
+            for column, index in enumerate(active):
+                step = 1e-6 * max(1.0, abs(params[index]))
+                perturbed = params[:]
+                perturbed[index] += step
+                shifted = self.helmert_residuals(perturbed, source_points, target_points)
+                for row in range(len(residual)):
+                    jacobian[row][column] = (shifted[row] - residual[row]) / step
+
+            size = len(active)
+            normal = [[sum(jacobian[k][i] * jacobian[k][j] for k in range(len(residual)))
+                       for j in range(size)] for i in range(size)]
+            gradient = [sum(jacobian[k][i] * residual[k] for k in range(len(residual)))
+                        for i in range(size)]
+            for i in range(size):
+                normal[i][i] += damping * max(normal[i][i], 1.0)
+
+            # Solve (J'J + damping I) delta = -J'r by Gaussian elimination.
+            matrix = [normal[i][:] + [-gradient[i]] for i in range(size)]
+            for col in range(size):
+                pivot = max(range(col, size), key=lambda row: abs(matrix[row][col]))
+                if abs(matrix[pivot][col]) < 1e-20:
+                    break
+                matrix[col], matrix[pivot] = matrix[pivot], matrix[col]
+                divisor = matrix[col][col]
+                matrix[col] = [value / divisor for value in matrix[col]]
+                for row in range(size):
+                    if row != col:
+                        factor = matrix[row][col]
+                        matrix[row] = [matrix[row][j] - factor * matrix[col][j]
+                                       for j in range(size + 1)]
+            else:
+                delta = [matrix[i][-1] for i in range(size)]
+                candidate = params[:]
+                for i, index in enumerate(active):
+                    candidate[index] += delta[i]
+                candidate_residual = self.helmert_residuals(candidate, source_points, target_points)
+                candidate_cost = sum(value * value for value in candidate_residual)
+                if candidate_cost < cost:
+                    params, residual, cost = candidate, candidate_residual, candidate_cost
+                    damping = max(damping / 3.0, 1e-12)
+                    if max(abs(value) for value in delta) < 1e-10:
+                        break
+                else:
+                    damping = min(damping * 10.0, 1e12)
+    
+        """ This is a bit ineffecient for readability """
+        tx, ty, tz, omega, phi, kappa, s = params
+        rotator = {
+            'tx': tx,
+            'ty': ty,
+            'tz': tz,
+            'omega': omega,
+            'phi': phi,
+            'kappa': kappa,
+            'scale': s
+        }
+        return rotator
+
+    def residual_errors(self, local_measured_pts, original_field_pts, rotator):
+        """
+        Used to compute errors per datum used in the Helmert transformation.  
+        This is useful for debugging and understanding how well the transformation fits the data.
+        """
+        tx, ty, tz, omega, phi, kappa, scale = rotator.values()
+        errors = {}
+        for i, (src, tgt) in enumerate(zip(local_measured_pts, original_field_pts)):
+            src = list(src)
+            tgt = list(tgt)
+
+            # Re-create rotation matrix to transform and verify
+            R_x = [[1, 0, 0],
+                   [0, cos(omega), -sin(omega)],
+                   [0, sin(omega), cos(omega)]]
+            R_y = [[cos(phi), 0, sin(phi)],
+                   [0, 1, 0],
+                   [-sin(phi), 0, cos(phi)]]
+            R_z = [[cos(kappa), -sin(kappa), 0],
+                   [sin(kappa), cos(kappa), 0],
+                   [0, 0, 1]]
+
+            def matmul(a, b):
+                return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+            R = matmul(R_z, matmul(R_y, R_x))
+            rotated = [sum(R[row][j] * src[j] for j in range(3)) for row in range(3)]
+            transformed = [tx + scale * rotated[0], ty + scale * rotated[1], tz + scale * rotated[2]]
+            error = [transformed[j] - tgt[j] for j in range(3)]
+            dist_error_3d = sqrt(sum(value * value for value in error))
+            # print(f"Point {i + 1} -> dX: {error[0]:.4f}, dY: {error[1]:.4f}, dZ: {error[2]:.4f} | Total 3D Error: {dist_error_3d:.4f}")
+            error.append(dist_error_3d)
+            errors[i] = error
+
+        return errors
+
+    def helmert_3d_transform(self, point, rotator):
+        """
+        Transforms a 3D point using the 7-parameter Helmert Transformation.
+        
+        Parameters:
+        point (list/array): [X, Y, Z] local total station coordinates
+        tx, ty, tz: Translations along X, Y, Z axes (in meters/mm)
+        omega, phi, kappa: Rotations around X, Y, Z axes (in radians)
+        s: Scale factor multiplier (use 1.0 to preserve physical lab distance)
+        """
+        tx, ty, tz, omega, phi, kappa, s = rotator.values()
+        P_local = list(point)
+        
+        # 3D Rotation matrices for each axis
+        R_x = [[1, 0, 0],
+            [0, cos(omega), -sin(omega)],
+            [0, sin(omega), cos(omega)]]
+    
+        R_y = [[cos(phi), 0, sin(phi)],
+            [0, 1, 0],
+            [-sin(phi), 0, cos(phi)]]
+    
+        R_z = [[cos(kappa), -sin(kappa), 0],
+            [sin(kappa), cos(kappa), 0],
+            [0, 0, 1]]
+        
+        # Combined Rotation Matrix (R = Rz * Ry * Rx)
+        R_zy = [[sum(R_z[i][k] * R_y[k][j] for k in range(3))
+                for j in range(3)] for i in range(3)]
+        R = [[sum(R_zy[i][k] * R_x[k][j] for k in range(3))
+            for j in range(3)] for i in range(3)]
+        
+        # Apply standard Helmert formula: Target = T + s * R * Local
+        rotated = [sum(R[i][j] * P_local[j] for j in range(3))
+               for i in range(3)]
+        P_target = [round(translation + s * coordinate, 3)
+                for translation, coordinate in zip((tx, ty, tz), rotated)]
+        
+        return P_target
+
+    """
+        end of Helmert transformation code.
+    """
+
+    """
+        The following functions are needed by the rotation function at the end of this list.
+        Note too that all of the dependent routines are self written
+        rather than pulled from existing libraries (like numpy) to avoid dependencies.  Dependencies make porting to
+        Apple and Android more difficult.
+    """
+
     def dot_product(self, a, b):
         return a.x * b.x + a.y * b.y + a.z * b.z if not a.is_none() and not b.is_none() else point()
 
@@ -879,12 +1486,25 @@ class totalstation(object):
     def initialize(self):
         if self.make == 'Topcon':
             self.topcon_initialize()
-        if self.make == 'Nikon':
+        elif self.make == 'Leica GeoCom':
+            try:
+                self.initialize_geocom()
+            except ValueError as ve:
+                raise ValueError(f"Error initializing Leica GeoCom total station: {ve}")
+            except Exception as e:
+                raise Exception(f"Error initializing Leica GeoCom total station: {e}")
+        elif self.make == 'Nikon':
             self.nikon_initialize()
 
     """
     Topcon specific functions for the total station
     """
+    def anyone_home_topcon(self):
+        self.send(self.topcon_format("L"))  # Request settings
+        self.wait_for_received(3)
+        self.topcon_set_response()
+        return self.topcon_valid_bcc()
+        
     def launch_point_topcon(self):
         self.send(self.topcon_format("Z34"))   # Slope angle mode
         self.wait_for_received(3)
@@ -933,10 +1553,7 @@ class totalstation(object):
         self.wait_for_received(3)
 
     def topcon_initialize(self):
-        self.send(self.topcon_format("L"))
-        self.wait_for_received(3)
-        self.topcon_set_response()
-        return self.topcon_valid_bcc()
+        return self.anyone_home_topcon()
 
     def topcon_acknowledge(self):
         ack = chr(6) + "006" + chr(3) + TOPCON_TERMINATION
@@ -997,10 +1614,45 @@ class totalstation(object):
             return False
         return True
 
+    def fetch_hangle_topcon(self):
+        self.send(self.topcon_format("L"))
+        self.wait_for_received(3)
+        self.topcon_set_response()
+        self.topcon_acknowledge()
+        hangle = None
+        if self.response:
+            try:
+                hangle = self.dddmmss_to_decimal_degrees(self.response[2:5] + '.' + self.response[5:9])
+            except Exception as e:
+                pass
+        self.clear_serial_buffers()
+        return hangle
+    
     """
     Nikon specific functions.
         See Nikon (SET) for running a Nikon total station as if it is Sokkkia
     """
+    def initialize_nikon(self):
+        try:
+            good_connection = self.anyone_home_nikon()
+            if not good_connection:
+                raise Exception("No response from Nikon total station.")
+            self.nikon_get_prism_constant()
+        except Exception as e:
+            raise Exception(f"Error initializing Nikon total station: {e}")    
+
+    def anyone_home_nikon(self):
+        """ Ask for the settings and see if at least an ack comes back """
+        get_settings_command = "CT\x02?CND\x03"
+        get_settings_command += self.nikon_checksum(get_settings_command)
+        get_settings_command = "\x01" + get_settings_command + "\x04\r\n"
+        self.send(get_settings_command.encode())
+        ack_or_nak = self.wait_for_received(2)
+        self.clear_serial_buffers()
+        if not ack_or_nak:
+            return False
+        else:
+            return True
 
     def nikon_get_settings(self):
         get_settings_command = "CT\x02?CND\x03"
@@ -1111,6 +1763,7 @@ class totalstation(object):
                     break
 
             constant = float(number)
+            self.prism_constant = constant
             return constant
         except (IndexError, ValueError, AttributeError):
             return "No data - " + data.decode() if data is not None else "No data"
@@ -1156,7 +1809,7 @@ class totalstation(object):
         self.nikon_set_prism_constant(0.0)
         self.using_prism = False
 
-    def nikon_prism_vs_reflector(self):
+    def prism_vs_reflectorless_nikon(self):
         if self.using_prism:
             self.nikon_set_reflector_mode()
             return "Using\nReflectorless\n0.0 mm\nconstant"
@@ -1245,6 +1898,31 @@ class totalstation(object):
     def set_response_nikon(self):
         self.response = self.received
 
+    def fetch_hangle_nikon(self):
+        get__hangle_command = "CT\x02?HAN\x03"
+        get__hangle_command += self.nikon_checksum(get__hangle_command)
+        get__hangle_command = "\x01" + get__hangle_command + "\x04\r\n"
+        self.send(get__hangle_command.encode())
+        ack_or_nak = self.wait_for_received(2)
+        ack_text = ack_or_nak.decode(errors="ignore") if isinstance(ack_or_nak, (bytes, bytearray)) else str(ack_or_nak)
+        if not ack_or_nak or 'TC\x06' not in ack_text:
+            self.clear_serial_buffers()
+            return "  Error: No ACK received - " + ack_or_nak.decode() if ack_or_nak else "  Error: No ACK received"
+        
+        data = self.wait_for_received(5)
+        self.clear_serial_buffers()
+        try:
+            payload = data.strip().decode(errors="ignore") if isinstance(data, (bytes, bytearray)) else str(data).strip()
+            item = payload.split(":", 1)[1].strip()
+
+            if item.startswith('HA'):
+                hangle = Angle(f'{item[3:7]}d{item[7:9]}m{item[9:12]}').d
+                return hangle
+            else:
+                return "No HA data - " + item
+        except (IndexError, ValueError, AttributeError):
+            return "No data - " + data.decode() if data is not None else "No data"
+
     """
     Nikon SET protocols.  This means the Nikon acts like a Sokkia.
     """
@@ -1313,6 +1991,9 @@ class totalstation(object):
     def set_response_nikon_set(self):
         self.response = self.received
 
+    def fetch_hangle_nikon_set(self):
+        raise NotImplementedError("fetch_hangle_nikon_set is not implemented yet.")
+    
     """
     Sokkia specific functions
     Note - I am not sure these work.  I need someone with a Sokkia total station to test them.
@@ -1349,6 +2030,9 @@ class totalstation(object):
     def initialize_sokkia(self):
         pass
 
+    def fetch_hangle_sokkia(self):
+        raise NotImplementedError("fetch_hangle_sokkia is not implemented yet.")
+    
     """
     Leica specific functions
     """
@@ -1417,6 +2101,9 @@ class totalstation(object):
         acknow2 = self.receive()
         return acknow1 + acknow2
 
+    def fetch_hangle_leica(self):
+        raise NotImplementedError("fetch_hangle_leica is not implemented yet.")
+    
     """
     GeoMax specific functions
     """
@@ -1475,25 +2162,75 @@ class totalstation(object):
         self.response = self.geomax_trim_crlf(self.received) if self.received else ""
         # self.set_error_code()
 
+    def fetch_hangle_geomax(self):
+        raise NotImplementedError("fetch_hangle_geomax is not implemented yet.")
+    
     """
-    Leica GeoCom specific functions
+        Leica GeoCom specific functions
+        Note that quite a few of these related to motorized total stations do not work because they require
+        one to purchase an additional license from Leica.  I have not purchased this license and so cannot test these functions.
     """
     def initialize_geocom(self):
-        pass
+        try:
+            good_connection = self.anyone_home_geocom()
+            if not good_connection:
+                raise ValueError("No response from Leica GeoCom total station.  Check connection issues and try again.")
+            self.get_targettype_geocom()
+            self.get_prismconstant_geocom()
+        except Exception as e:
+            raise ValueError(f"Error initializing Leica GeoCom total station: {e}")
 
+    def get_settings_geocom(self):
+        txt = "\n"
+        try:
+            results = self.get_atmosphere_geocom()
+            txt += f"  Lambda: {results['lambda_constant']}\n"
+            txt += f"  Pressure: {results['pressure']}\n"
+            txt += f"  Dry Temperature: {results['dry_temperature']}\n"
+            txt += f"  Wet Temperature: {results['wet_temperature']}\n"
+        except Exception as e:
+            pass
+
+        try:
+            results = self.get_atmosphere_correction_geocom()
+            txt += f"  Atmosphere correction factor: {results}ppm\n"
+        except Exception as e:
+            pass
+
+        try:
+            results = self.get_station_coordinates_geocom()
+            txt += f"  Station Coordinates: X:{results['x']}, Y:{results['y']}, Z:{results['z']}, Height:{results['height']} (Note: Only relevant for the XYZ displayed on the station.  EDM uses the station coordinates calculated during setup and listed above.)\n"
+        except Exception as e:
+            pass
+
+        try:
+            results = self.get_the_reflectorheight_geocom()
+            txt += f"  Reflector height: {results} m (NOTE: Only relevant for the XYZ displayed on the station.  EDM uses the prism heights set in the program.)\n"
+        except Exception as e:
+            pass
+
+        return txt
+    
     def set_horizontal_angle_geocom(self, angle):
         # function expects angle as ddd.mmss as input
         # %R1Q,2113:HzOrientation[double]
+        self.stop_and_clear_geocom()
         output = "%R1Q,2113:{:10.8f}\r\n".format(self.decdeg_to_radians(self.dms_to_decdeg(angle)))
         self.send(bytes(output, 'utf-8'))
         self.wait_for_received(1)
         self.set_response_leica_geocom()
-        return self.error_code == NO_ERROR
+        acceptable_error_codes = [0, 1285, 1289, 1288, 1292, 1291, 1293, 8, 12]
+        try:
+            if int(self.error_code) not in acceptable_error_codes:
+                raise ValueError(f"Leica returned an error code of {self.error_code} of while setting horiztonal angle.  It could be that the station is not level enough for the auto-compensator can work.")
+        except (TypeError):
+            raise ValueError(f"Invalid error code: {self.error_code}")
+        return True
 
     def launch_point_leica_geocom(self):
         self.clear_serial_buffers()
         self.send(b"%R1Q,2008:1,1\r\n")          # Use the defaults with 1 and 1
-        self.wait_for_received(5)
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
         self.set_response_leica_geocom()
         if self.error_code == 0:
             self.clear_serial_buffers_internal_only()
@@ -1511,7 +2248,7 @@ class totalstation(object):
     def stop_and_clear_geocom(self):
         output = f"%R1Q,2008:{TMC_CLEAR},1\r\n"
         self.send(bytes(output, 'utf-8'))
-        self.wait_for_received(5)
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
         self.set_response_leica_geocom()
         return self.error_code == NO_ERROR
 
@@ -1546,6 +2283,8 @@ class totalstation(object):
             else:
                 self.error_code = int(self.response[:self.response.find(',')])
             self.set_error_message()
+        else:
+            self.error_code = -1
 
     def is_leica(self):
         return self.make in ['Leica', 'Leica GeoCom']
@@ -1577,3 +2316,200 @@ class totalstation(object):
         self.send(b'%R1Q,9008:\r\n')
         self.set_response_leica_geocom(self.receive())
         return self.response.startswith('0,')
+
+    def fetch_hangle_leica_geocom(self):
+        """
+        Fetch the horizontal angle using Leica GeoCOM TMC_GetAngle.
+        Value is returned in DDD.MMSS format.
+        """
+
+        """Manual says that first I need to send a clear to DoMeasure"""
+        self.stop_and_clear_geocom()
+
+        self.send(b'%R1Q,2107:1\r\n')
+        self.receive()
+        self.set_response_leica_geocom()
+
+        acceptable_error_codes = [0, 1285, 1289, 1288, 1292, 1291, 1293, 8, 12]
+        values = self.response.split(',')
+        if len(values) < 3:
+            raise ValueError("Invalid response format: expected at least 3 values, got {}".format(len(values)))
+        try:
+            if int(values[0]) not in acceptable_error_codes:
+                raise ValueError(f"Leica returned an error code of {values[0]}.  It could be that the station is not level enough for the auto-compensator can work.")
+        except (TypeError):
+            raise ValueError(f"Invalid error code: {values[0]}")
+        try:
+            hangle = self.decimal_degrees_to_dddmmss(self.radians_to_decdeg(float(values[1])))
+        except (ValueError, TypeError):
+            raise ValueError("Invalid horizontal angle value: {}".format(values[1]))
+
+        return hangle
+
+    def set_prism_mode_geocom(self):
+        output = f"%R1Q,17021:0\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        return self.error_code == NO_ERROR
+    
+    def set_reflectorless_mode_geocom(self):
+        output = f"%R1Q,17021:1\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(5)
+        self.set_response_leica_geocom()
+        return self.error_code == NO_ERROR
+    
+    def prism_vs_reflectorless_geocom(self):
+        try:
+            self.get_targettype_geocom()
+            if self.using_prism:
+                self.set_reflectorless_mode_geocom()
+                self.get_prismconstant_geocom()
+                self.using_prism = False
+                return f"Using\nReflectorless\n{self.prism_constant if self.prism_constant is not None else 0.0} mm\nconstant"
+            else:
+                self.set_prism_mode_geocom()
+                self.get_prismconstant_geocom()
+                self.using_prism = True
+                return f"Using\nPrism\n{self.prism_constant if self.prism_constant is not None else 0.0} mm\nconstant"
+        except ValueError as e:
+            raise ValueError(f"{e}")
+
+    def get_targettype_geocom(self):
+        """Get the target type using Leica GeoCOM."""
+        output = f"%R1Q,17022:\r\n"
+        success = self.send(bytes(output, 'utf-8'))
+        if not success:
+            raise ValueError("Failed to send command to Leica GeoCOM for getting target type.")
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.response == "":
+            raise ValueError("No response received from Leica while getting target type.")
+        if self.error_code == NO_ERROR:
+            values = self.response.split(',')
+            try:
+                if int(values[1]) == 0:
+                    self.using_prism = True
+                else:
+                    self.using_prism = False
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid target type value: {values[1]}")
+        else:
+            raise ValueError(f"Leica returned an error code of {self.error_code} while getting target type.")
+        
+    def get_prismconstant_geocom(self):
+        """Get the prism constant using Leica GeoCOM."""
+        output = f"%R1Q,2023:\r\n"
+        success = self.send(bytes(output, 'utf-8'))
+        if not success:
+            raise ValueError("Failed to send command to Leica GeoCOM for getting prism constant.")
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.response == "":
+            raise ValueError("No response received from Leica while getting prism constant.")
+        if self.error_code == NO_ERROR:
+            values = self.response.split(',')
+            try:
+                self.prism_constant = round(float(values[1]) * 1000, 1)
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid prism constant value: {values[1]}")
+        else:
+            raise ValueError(f"Leica returned an error code of {self.error_code} while getting prism constant.")
+
+    def get_atmosphere_geocom(self):
+        """Get the atmosphere settings using Leica GeoCOM."""
+        output = f"%R1Q,2029:\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.error_code == NO_ERROR:
+            values = self.response.split(',')
+            try:
+                atmosphere = {
+                    "lambda_constant": float(values[1]),
+                    "pressure": float(values[2]),
+                    "dry_temperature": round(float(values[3]), 1),
+                    "wet_temperature": round(float(values[4]), 1),
+                }
+                return atmosphere
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid atmosphere values: {self.response}")
+        else:
+            raise ValueError(f"Leica returned an error code of {self.error_code} while getting atmosphere settings.")
+
+    def get_station_coordinates_geocom(self):
+        """Get the station coordinates using Leica GeoCOM."""
+        output = f"%R1Q,2009:\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.error_code == NO_ERROR:
+            values = self.response.split(',')
+            try:
+                coordinates = {
+                    "x": float(values[1]),
+                    "y": float(values[2]),
+                    "z": float(values[3]),
+                    "height": float(values[4]),
+                }
+                return coordinates
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid station coordinates values: {self.response}")
+        else:
+            raise ValueError(f"Leica returned an error code of {self.error_code} while getting station coordinates.")
+
+    def get_atmosphere_correction_geocom(self):
+        """Get the atmosphere correction factor using Leica GeoCOM."""
+        output = f"%R1Q,2151:\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.error_code == NO_ERROR:
+            values = self.response.split(',')
+            try:
+                correction = round(float(values[1]), 3)
+                return correction
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid atmosphere correction value: {self.response}")
+        else:
+            raise ValueError(f"Leica returned an error code of {self.error_code} while getting atmosphere correction.") 
+        
+    def get_the_reflectorheight_geocom(self):
+        """Get the reflector height using Leica GeoCOM."""
+        output = f"%R1Q,2011:\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.error_code == NO_ERROR:
+            values = self.response.split(',')
+            try:
+                reflector_height = round(float(values[1]), 3)
+                return reflector_height
+            except (ValueError, IndexError):
+                raise ValueError(f"Invalid reflector height value: {self.response}")
+        else:
+            raise ValueError(f"Leica returned an error code of {self.error_code} while getting reflector height.")
+
+    def upload_station_coordinates_geocom(self):
+        if self.location.is_none():
+            raise ValueError("Station coordinates are not set. Cannot upload to Leica GeoCOM.")
+        output = f"%R1Q,2010:{self.location.x},{self.location.y},{self.location.z},0.000\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.error_code == NO_ERROR:
+            return True
+        else:
+            raise ValueError(f"Leica returned an error code of {self.error_code} while uploading station coordinates.")
+    
+    def anyone_home_geocom(self):
+        """Check if anyone is home using Leica GeoCOM."""
+        output = f"%R1Q,0:\r\n"
+        self.send(bytes(output, 'utf-8'))
+        self.wait_for_received(WAIT_FOR_RECEIVED_TIMEOUT)
+        self.set_response_leica_geocom()
+        if self.error_code == NO_ERROR:
+            return True
+        else:
+            return False

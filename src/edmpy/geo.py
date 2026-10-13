@@ -19,6 +19,9 @@ class point:
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __iter__(self):
+        return iter((self.x, self.y, self.z))
+
     def is_none(self):
         return self.x is None and self.y is None and self.z is None
 
@@ -54,6 +57,9 @@ class datum:
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def __iter__(self):
+        return iter((self.x, self.y, self.z))
 
     def is_none(self):
         return self.name is None and self.x is None and self.y is None and self.z is None and self.notes == ''

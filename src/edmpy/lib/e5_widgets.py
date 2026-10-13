@@ -1216,16 +1216,23 @@ class e5_InfoScreen(Screen):
     content = ObjectProperty(None)
     back_button = ObjectProperty(None)
 
-    def __init__(self, colors=None, **kwargs):
+    def __init__(self, colors=None, clear_button=None, **kwargs):
         super(e5_InfoScreen, self).__init__(**kwargs)
         self.colors = colors if colors else ColorScheme()
         layout = GridLayout(cols=1, size_hint_y=1, spacing=5, padding=5)
         layout.add_widget(e5_scrollview_label(text='', widget_id='content', colors=self.colors))
-        layout.add_widget(e5_side_by_side_buttons(['Back', 'Copy'], height=self.calc_button_height(),
-                                                    id=['back_button', 'copy_button'],
-                                                    selected=[False, False],
-                                                    call_back=[self.go_back, self.copy],
-                                                    colors=self.colors))
+        if clear_button is not None:
+            layout.add_widget(e5_side_by_side_buttons(['Back', 'Copy', 'Clear'], height=self.calc_button_height(),
+                                                        id=['back_button', 'copy_button', 'clear_button'],
+                                                        selected=[False, False, False],
+                                                        call_back=[self.go_back, self.copy, clear_button],
+                                                        colors=self.colors))
+        else:
+            layout.add_widget(e5_side_by_side_buttons(['Back', 'Copy'], height=self.calc_button_height(),
+                                                        id=['back_button', 'copy_button'],
+                                                        selected=[False, False],
+                                                        call_back=[self.go_back, self.copy],
+                                                        colors=self.colors))
         self.add_widget(layout)
         for widget in self.walk():
             if hasattr(widget, 'id'):
@@ -1274,11 +1281,11 @@ class e5_JSONScreen(e5_InfoScreen):
 class e5_LogScreen(e5_InfoScreen):
 
     def __init__(self, logger=None, **kwargs):
-        super(e5_LogScreen, self).__init__(**kwargs)
+        super(e5_LogScreen, self).__init__(clear_button=self.on_clear, **kwargs)
         self.logger = logger
 
     def on_pre_enter(self):
-        self.content.text = 'The last 150 lines:\n\n'
+        self.content.text = 'The last 150 lines reading backwards from most recent:\n\n'
         try:
             with open(self.logger.handlers[0].baseFilename, 'r') as f:
                 content = f.readlines()
@@ -1290,6 +1297,31 @@ class e5_LogScreen(e5_InfoScreen):
         self.content.color = self.colors.text_color
         self.back_button.background_color = self.colors.button_background
         self.back_button.color = self.colors.button_color
+
+    def on_clear(self, instance):
+        message = '\n  You are about to clear the log file.  This action cannot be undone.\n\n  Continue?'
+        self.popup = e5_MessageBox('Clear contents of log file', message,
+                                    response_type="YESNO",
+                                    call_back=[self.delete_and_save, self.close_popup],
+                                    colors=self.colors,
+                                    auto_dismiss=False)
+        self.popup.open()
+
+    def close_popup(self, instance):
+        self.popup.dismiss()
+        
+    def delete_and_save(self, instance):
+        self.popup.dismiss()
+        self._clear_log()
+
+    def _clear_log(self):
+        try:
+            with open(self.logger.handlers[0].baseFilename, 'w'):
+                pass
+            self.on_pre_enter()
+        except (AttributeError, OSError):
+            pass
+
 
 
 class e5_INIScreen(e5_InfoScreen):
@@ -1387,7 +1419,7 @@ class e5_SaveDialog(BoxLayout):
 
     def path_changed(self, instance, value):
         self.path = instance.path
-        self.pathlabel.text = instance.path
+        self.pathlabel.textbox.text = instance.path
 
     def path_selected(self, instance, value):
         self.path = instance.path

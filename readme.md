@@ -10,9 +10,9 @@ If you want to work with the source code rather than the Windows distributable (
 
 ##### Windows
 
-A Windows exe file can be found in the Windows folder listed above or [click here to download directly](https://github.com/surf3s/EDM/raw/master/Windows/dist/edm.exe).  Download this file, place it in a folder where you want to start your data entry, and launch the program.
+A Windows exe file can be found in the Windows folder listed above or [click here to download last stable version directly](https://github.com/surf3s/EDM/raw/master/Windows/dist/edm.exe).  Download this file, place it in a folder where you want to start your data entry, and launch the program.
 
-I have tested EDMpy thus far on several Windows 10 and 11 computers.  I also have it running on an ARM ChromeBook (non-ARM ChromeBooks should work as well).  One user has reported that it runs on a Microsoft tablet running Windows 11.  Another  user is running it on Topcon tablets without issues.  I doubt it works on Windows 7 and it almost certainly does not work on Windows XP, but you really, really should not be using computers with either of those operating systems.
+I have tested EDMpy thus far on several Windows 10 and 11 computers.  I also have it running on an ARM ChromeBook (non-ARM ChromeBooks should work as well).  One user has reported that it runs on a Microsoft tablet running Windows 11.  Other users are running it on Topcon tablets without issues.  I doubt it works on Windows 7 and it almost certainly does not work on Windows XP, but you really, really should not be using computers with either of those operating systems.
 
 If you get a Windows error telling you that the program is incompatible with Windows 10 or 11, be sure that you have downloaded the complete program.  I have found that you can run a partially downloaded exe, in which case Windows will give an incompatability error.  Also, when you first run the program, Windows may tell you the program is dangerous.  Just work your way around these blocks and run it anyway.
 
@@ -106,6 +106,29 @@ Recently (May, 2024) I was helping someone put the program on a Windows 10 table
 #### Change log
 
 What follows is a list of changes I have made with each new version number.  If you have a version that works, you don't need to update.  However, do scan this list as periodically there can be important fixes.
+
+IMPORTANT: I have heavily revised EDMpy to add new ways to initialize the station and to make a great many quality of life improvements.  This breaks my general strategy of slowly making the program as bug free as possible.  As a result, I have broken updates into a last stable version (which remains edm.exe) and a beta version (edm2.exe).  I do not plan to make further changes to verson 1.0.55.  Instead, all new updates will be on version 2.0.  If the program is working for you and you don't care about the new features, I recommend using 1.0.55.  If you want the new features and have some time to test them before going into the field, I recommend version 2.0.  Note, I have coded resectioning for Leica GeoCOM, Nikon, and Topcon, but I have only tested it on Leica GeoCom.  I am hoping for some help on this.
+
+[click here to download last stable Windows version directly](https://github.com/surf3s/EDM/raw/master/Windows/dist/edm.exe)
+
+[click here to download the Windows beta version directly](https://github.com/surf3s/EDM/raw/master/Windows/dist/edm2.exe)
+
+#### Changes to Version 2.0.0 (beta)
+  Added all sorts of status information coming from Leica GeoCOM and Nikon
+  Improved error trapping and reporting when communicating with the total station
+  Drastically improved scan button on station setup so that correct com port is found more often
+  Added resectioning as a setup type
+  Added feature to upload station coordinates after setup to station on Leica GeoCOM
+  Added button to toggle between prism and reflectorless on Leica GeoCOM
+  Improved how existing toggle button works for Nikon and added to additional screens where points are recorded
+  Improved layout and functionality of Adding New Datums with totals station
+  Added button to clear log file in Log file display screen
+  Fix bug in save file dialog that meant that the path was not displayed correctly
+  Added multi-point 3D transformation as a setup type
+  Added support for Nikon and Topcon resectioning (though not tested yet - tested only on Leica GeoCOM)
+
+#### Changes to Version 1.0.55 (last stable)
+  Made Nikon prism offset a configurable value in the INI file accessed through Setup Options.
 
 #### Changes to Version 1.0.54
   Added support for newer Nikon stations (e.g Nivo series)
